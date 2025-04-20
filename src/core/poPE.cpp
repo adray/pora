@@ -148,7 +148,8 @@ poPortableExecutable::poPortableExecutable()
     _initializedSection(-1),
     _uninitializedSection(-1),
     _iData(-1),
-    _readonlySection(-1)
+    _readonlySection(-1),
+    _entryPoint(0)
 {
 }
 
@@ -285,8 +286,8 @@ void poPortableExecutable::write(const std::string& filename)
         optionalHeader.mSizeOfInitializedData = _initializedSection > -1 ? uint32_t(initializedSection.data().size()) : 0;
         optionalHeader.mMajorOperatingSystemVersion = 0x6;
         optionalHeader.mMajorSubsystemVersion = 0x6;
-        optionalHeader.mAddressOfEntryPoint = 0x1000/*hardcoded to text section..*/;
-        optionalHeader.mBaseOfCode = 0x1000 /*hardcoded to text section..*/;
+        optionalHeader.mAddressOfEntryPoint = 0x01000 /*hardcoded to text section..*/ + _entryPoint ;
+        optionalHeader.mBaseOfCode = 0x01000 /*hardcoded to text section.. (with padding, can't be 0)*/;
         optionalHeader.mImageBase = 0x0000000140000000; //0x00400000;
         optionalHeader.mSectionAlignment = 0x1000; // standard section alignment
         optionalHeader.mFileAlignment = 0x200; // standard file alignment
@@ -302,7 +303,7 @@ void poPortableExecutable::write(const std::string& filename)
 
         const int offset = 0x3C;
         int sectionFilePos = optionalHeader.mSizeOfHeaders;
-        int imagePos = 0;
+        int imagePos = optionalHeader.mBaseOfCode;
 
         // Compute sections
 
@@ -387,7 +388,7 @@ void poPortableExecutable::write(const std::string& filename)
                 break;
             case poSectionType::INITIALIZED:
                 std::memcpy(table.mName, initName.data(), initName.size());
-                table.mCharacteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_READ;
+                table.mCharacteristics = IMAGE_SCN_CNT_INITIALIZED_DATA /* | IMAGE_SCN_MEM_WRITE*/ | IMAGE_SCN_MEM_READ;
                 break;
             case poSectionType::UNINITIALIZED:
                 std::memcpy(table.mName, uninitializedName.data(), uninitializedName.size());

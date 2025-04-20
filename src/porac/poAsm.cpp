@@ -1,4 +1,8 @@
 #include "poAsm.h"
+#include "poModule.h"
+#include "poRegLinear.h"
+#include "poTypeChecker.h"
+
 #include <assert.h>
 
 using namespace po;
@@ -387,800 +391,1309 @@ static constexpr vm_sse_instruction gInstructions_SSE[VMI_SSE_MAX_INSTRUCTIONS] 
 
 };
 
+//=================
+// poAsmJump
+//=================
+
+poAsmJump::poAsmJump(const int programDataPos, const int jumpType, const int size, poBasicBlock* bb)
+    :
+    _programDataPos(programDataPos),
+    _jumpType(jumpType),
+    _size(size),
+    _bb(bb),
+    _applied(false)
+{
+}
+
+//====================
+// poAsmBasicBlock
+//====================
+
+poAsmBasicBlock::poAsmBasicBlock()
+    :
+    _pos(0)
+{
+}
+
+//==============
+// poAsmCall
+//==============
+
+poAsmCall::poAsmCall(const int pos, const int arity, const std::string& symbol)
+    :
+    _pos(pos),
+    _arity(arity),
+    _symbol(symbol)
+{
+}
+
 //=====================
 // R/M 0-2
 // Op/Reg 3-5
 // Mod 6-8
 //=====================
 
-static void vm_emit(const vm_instruction& ins, unsigned char* program, int& count)
+void poAsm::emit(const vm_instruction& ins)
 {
     assert(ins.code == CODE_NONE);
-    if (ins.rex > 0) { program[count++] = ins.rex; }
-    program[count++] = ins.ins;
+    if (ins.rex > 0) { _programData.push_back(ins.rex); }
+    _programData.push_back(ins.ins);
 }
 
-static void vm_emit_ur(const vm_instruction& ins, unsigned char* program, int& count, char reg)
+void poAsm::emit_ur(const vm_instruction& ins, char reg)
 {
     assert(ins.code == CODE_UR);
     if (ins.rex > 0)
     {
-        program[count++] = ins.rex | (reg >= VM_REGISTER_R8 ? 0x1 : 0x0);
+        _programData.push_back(ins.rex | (reg >= VM_REGISTER_R8 ? 0x1 : 0x0));
     }
     if (ins.subins != VMI_UNUSED)
     {
-        program[count++] = ins.ins;
-        program[count++] = (ins.subins << 3) | ((reg % 8) & 0x7) | (0x3 << 6);
+        _programData.push_back(ins.ins);
+        _programData.push_back((ins.subins << 3) | ((reg % 8) & 0x7) | (0x3 << 6));
     }
     else
     {
-        program[count++] = ins.ins | ((reg % 8) & 0x7);
+        _programData.push_back(ins.ins | ((reg % 8) & 0x7));
     }
 }
 
-static void vm_emit_um(const vm_instruction& ins, unsigned char* program, int& count, char reg)
+void poAsm::emit_um(const vm_instruction& ins, char reg)
 {
     assert(ins.code == CODE_UM);
-    if (ins.rex > 0) { program[count++] = ins.rex; }
-    program[count++] = ins.ins;
+    if (ins.rex > 0) { _programData.push_back(ins.rex); }
+    _programData.push_back(ins.ins);
 
     if (reg == VM_REGISTER_ESP)
     {
-        program[count++] = ((ins.subins & 0x7) << 3) | 0x4 | (0x0 << 6);
-        program[count++] = 0x24; // SIB byte
+        _programData.push_back(((ins.subins & 0x7) << 3) | 0x4 | (0x0 << 6));
+        _programData.push_back(0x24); // SIB byte
     }
     else
     {
-        program[count++] = ((ins.subins & 0x7) << 3) | (0x0 << 6) | (reg & 0x7);
+        _programData.push_back(((ins.subins & 0x7) << 3) | (0x0 << 6) | (reg & 0x7));
     }
 }
 
-static void vm_emit_umo(const vm_instruction& ins, unsigned char* program, int& count, char reg, int offset)
+void poAsm::emit_umo(const vm_instruction& ins, char reg, int offset)
 {
     assert(ins.code == CODE_UMO);
-    if (ins.rex > 0) { program[count++] = ins.rex; }
-    program[count++] = ins.ins;
+    if (ins.rex > 0) { _programData.push_back(ins.rex); }
+    _programData.push_back(ins.ins);
 
     if (reg == VM_REGISTER_ESP)
     {
-        program[count++] = ((ins.subins & 0x7) << 3) | 0x4 | (0x2 << 6);
-        program[count++] = 0x24; // SIB byte
-        program[count++] = (unsigned char)(offset & 0xff);
-        program[count++] = (unsigned char)((offset >> 8) & 0xff);
-        program[count++] = (unsigned char)((offset >> 16) & 0xff);
-        program[count++] = (unsigned char)((offset >> 24) & 0xff);
+        _programData.push_back(((ins.subins & 0x7) << 3) | 0x4 | (0x2 << 6));
+        _programData.push_back(0x24); // SIB byte
+        _programData.push_back((unsigned char)(offset & 0xff));
+        _programData.push_back((unsigned char)((offset >> 8) & 0xff));
+        _programData.push_back((unsigned char)((offset >> 16) & 0xff));
+        _programData.push_back((unsigned char)((offset >> 24) & 0xff));
     }
     else
     {
-        program[count++] = ((ins.subins & 0x7) << 3) | (0x2 << 6) | (reg & 0x7);
-        program[count++] = (unsigned char)(offset & 0xff);
-        program[count++] = (unsigned char)((offset >> 8) & 0xff);
-        program[count++] = (unsigned char)((offset >> 16) & 0xff);
-        program[count++] = (unsigned char)((offset >> 24) & 0xff);
+        _programData.push_back(((ins.subins & 0x7) << 3) | (0x2 << 6) | (reg & 0x7));
+        _programData.push_back((unsigned char)(offset & 0xff));
+        _programData.push_back((unsigned char)((offset >> 8) & 0xff));
+        _programData.push_back((unsigned char)((offset >> 16) & 0xff));
+        _programData.push_back((unsigned char)((offset >> 24) & 0xff));
     }
 }
 
-static void vm_emit_bri(const vm_instruction& ins, unsigned char* program, int& count, char reg, int imm)
+void poAsm::emit_bri(const vm_instruction& ins, char reg, int imm)
 {
     assert(ins.code == CODE_BRI);
     if (ins.rex > 0)
     {
-        program[count++] = ins.rex | (reg >= VM_REGISTER_R8 ? 0x1 : 0x0);
-        program[count++] = ins.ins;
-        program[count++] = (ins.subins << 3) | (reg % 8) | (0x3 << 6);
+        _programData.push_back(ins.rex | (reg >= VM_REGISTER_R8 ? 0x1 : 0x0));
+        _programData.push_back(ins.ins);
+        _programData.push_back((ins.subins << 3) | (reg % 8) | (0x3 << 6));
     }
     else
     {
-        program[count++] = ins.ins | reg;
+        _programData.push_back(ins.ins | reg);
     }
 
-    program[count++] = (unsigned char)(imm & 0xff);
-    program[count++] = (unsigned char)((imm >> 8) & 0xff);
-    program[count++] = (unsigned char)((imm >> 16) & 0xff);
-    program[count++] = (unsigned char)((imm >> 24) & 0xff);
+    _programData.push_back((unsigned char)(imm & 0xff));
+    _programData.push_back((unsigned char)((imm >> 8) & 0xff));
+    _programData.push_back((unsigned char)((imm >> 16) & 0xff));
+    _programData.push_back((unsigned char)((imm >> 24) & 0xff));
 }
 
-static void vm_emit_brr(const vm_instruction& ins, unsigned char* program, int& count, char dst, char src)
+void poAsm::emit_brr(const vm_instruction& ins, char dst, char src)
 {
     assert(ins.code == CODE_BRR);
 
     if (ins.enc == VMI_ENC_MR)
     {
-        if (ins.rex > 0) { program[count++] = ins.rex | (dst >= VM_REGISTER_R8 ? 0x1 : 0x0) | (src >= VM_REGISTER_R8 ? 0x4 : 0x0); }
-        program[count++] = ins.ins;
-        if (ins.subins != VMI_UNUSED) { program[count++] = ins.subins; }
+        if (ins.rex > 0) { _programData.push_back(ins.rex | (dst >= VM_REGISTER_R8 ? 0x1 : 0x0) | (src >= VM_REGISTER_R8 ? 0x4 : 0x0)); }
+        _programData.push_back(ins.ins);
+        if (ins.subins != VMI_UNUSED) { _programData.push_back(ins.subins); }
 
-        program[count++] = 0xC0 | (((src % 8) & 0x7) << 0x3) | (((dst % 8) & 0x7) << 0);
+        _programData.push_back(0xC0 | (((src % 8) & 0x7) << 0x3) | (((dst % 8) & 0x7) << 0));
     }
     else if (ins.enc == VMI_ENC_RM)
     {
-        if (ins.rex > 0) { program[count++] = ins.rex | (dst >= VM_REGISTER_R8 ? 0x4 : 0x0) | (src >= VM_REGISTER_R8 ? 0x1 : 0x0); }
-        program[count++] = ins.ins;
-        if (ins.subins != VMI_UNUSED) { program[count++] = ins.subins; }
+        if (ins.rex > 0) { _programData.push_back(ins.rex | (dst >= VM_REGISTER_R8 ? 0x4 : 0x0) | (src >= VM_REGISTER_R8 ? 0x1 : 0x0)); }
+        _programData.push_back(ins.ins);
+        if (ins.subins != VMI_UNUSED) { _programData.push_back(ins.subins); }
 
-        program[count++] = 0xC0 | (((dst % 8) & 0x7) << 0x3) | (((src % 8) & 0x7) << 0);
+        _programData.push_back(0xC0 | (((dst % 8) & 0x7) << 0x3) | (((src % 8) & 0x7) << 0));
     }
 }
 
-static void vm_emit_brm(const vm_instruction& ins, unsigned char* program, int& count, char dst, char src)
+void poAsm::emit_brm(const vm_instruction& ins, char dst, char src)
 {
     assert(ins.code == CODE_BRM);
-    if (ins.rex > 0) { program[count++] = ins.rex; }
-    program[count++] = ins.ins;
+    if (ins.rex > 0) { _programData.push_back(ins.rex); }
+    _programData.push_back(ins.ins);
 
     if (src == VM_REGISTER_ESP)
     {
-        program[count++] = ((dst & 0x7) << 3) | 0x4 | (0x0 << 6);
-        program[count++] = 0x24; // SIB byte
+        _programData.push_back(((dst & 0x7) << 3) | 0x4 | (0x0 << 6));
+        _programData.push_back(0x24); // SIB byte
     }
     else
     {
-        program[count++] = ((dst & 0x7) << 3) | (0x0 << 6) | (src & 0x7);
+        _programData.push_back(((dst & 0x7) << 3) | (0x0 << 6) | (src & 0x7));
     }
 }
 
-static void vm_emit_bmr(const vm_instruction& ins, unsigned char* program, int& count, char dst, char src)
+void poAsm::emit_bmr(const vm_instruction& ins, char dst, char src)
 {
     assert(ins.code == CODE_BMR);
-    if (ins.rex > 0) { program[count++] = ins.rex; }
-    program[count++] = ins.ins;
+    if (ins.rex > 0) { _programData.push_back(ins.rex); }
+    _programData.push_back(ins.ins);
 
     if (dst == VM_REGISTER_ESP)
     {
-        program[count++] = ((src & 0x7) << 3) | 0x4 | (0x0 << 6);
-        program[count++] = 0x24; // SIB byte
+        _programData.push_back(((src & 0x7) << 3) | 0x4 | (0x0 << 6));
+        _programData.push_back(0x24); // SIB byte
     }
     else
     {
-        program[count++] = ((src & 0x7) << 3) | (0x0 << 6) | (dst & 0x7);
+        _programData.push_back(((src & 0x7) << 3) | (0x0 << 6) | (dst & 0x7));
     }
 }
 
-static void vm_emit_brmo(const vm_instruction& ins, unsigned char* program, int& count, char dst, char src, int offset)
+void poAsm::emit_brmo(const vm_instruction& ins, char dst, char src, int offset)
 {
     assert(ins.code == CODE_BRMO);
     if (ins.rex > 0)
     {
-        program[count++] = ins.rex | (dst >= VM_REGISTER_R8 ? 0x4 : 0x0) | (src >= VM_REGISTER_R8 ? 0x1 : 0x0);
+        _programData.push_back(ins.rex | (dst >= VM_REGISTER_R8 ? 0x4 : 0x0) | (src >= VM_REGISTER_R8 ? 0x1 : 0x0));
     }
-    program[count++] = ins.ins;
-    if (ins.subins != VMI_UNUSED) { program[count++] = ins.subins; }
+    _programData.push_back(ins.ins);
+    if (ins.subins != VMI_UNUSED) { _programData.push_back(ins.subins); }
 
     if (src == VM_REGISTER_ESP)
     {
-        program[count++] = (((dst % 8) & 0x7) << 3) | 0x4 | (0x2 << 6);
-        program[count++] = 0x24; // SIB byte
-        program[count++] = (unsigned char)(offset & 0xff);
-        program[count++] = (unsigned char)((offset >> 8) & 0xff);
-        program[count++] = (unsigned char)((offset >> 16) & 0xff);
-        program[count++] = (unsigned char)((offset >> 24) & 0xff);
+        _programData.push_back((((dst % 8) & 0x7) << 3) | 0x4 | (0x2 << 6));
+        _programData.push_back(0x24); // SIB byte
+        _programData.push_back((unsigned char)(offset & 0xff));
+        _programData.push_back((unsigned char)((offset >> 8) & 0xff));
+        _programData.push_back((unsigned char)((offset >> 16) & 0xff));
+        _programData.push_back((unsigned char)((offset >> 24) & 0xff));
     }
     else
     {
-        program[count++] = (((dst % 8) & 0x7) << 3) | (0x2 << 6) | ((src % 8) & 0x7);
-        program[count++] = (unsigned char)(offset & 0xff);
-        program[count++] = (unsigned char)((offset >> 8) & 0xff);
-        program[count++] = (unsigned char)((offset >> 16) & 0xff);
-        program[count++] = (unsigned char)((offset >> 24) & 0xff);
+        _programData.push_back((((dst % 8) & 0x7) << 3) | (0x2 << 6) | ((src % 8) & 0x7));
+        _programData.push_back((unsigned char)(offset & 0xff));
+        _programData.push_back((unsigned char)((offset >> 8) & 0xff));
+        _programData.push_back((unsigned char)((offset >> 16) & 0xff));
+        _programData.push_back((unsigned char)((offset >> 24) & 0xff));
     }
 }
 
-static void vm_emit_bmro(const vm_instruction& ins, unsigned char* program, int& count, char dst, char src, int offset)
+void poAsm::emit_bmro(const vm_instruction& ins, char dst, char src, int offset)
 {
     assert(ins.code == CODE_BMRO);
     if (ins.rex > 0)
     {
-        program[count++] = ins.rex | (dst >= VM_REGISTER_R8 ? 0x1 : 0x0) | (src >= VM_REGISTER_R8 ? 0x4 : 0x0);
+        _programData.push_back(ins.rex | (dst >= VM_REGISTER_R8 ? 0x1 : 0x0) | (src >= VM_REGISTER_R8 ? 0x4 : 0x0));
     }
-    program[count++] = ins.ins;
+    _programData.push_back(ins.ins);
 
     if (dst == VM_REGISTER_ESP)
     {
-        program[count++] = ((src & 0x7) << 3) | 0x4 | (0x2 << 6);
-        program[count++] = 0x24; // SIB byte
-        program[count++] = (unsigned char)(offset & 0xff);
-        program[count++] = (unsigned char)((offset >> 8) & 0xff);
-        program[count++] = (unsigned char)((offset >> 16) & 0xff);
-        program[count++] = (unsigned char)((offset >> 24) & 0xff);
+        _programData.push_back(((src & 0x7) << 3) | 0x4 | (0x2 << 6));
+        _programData.push_back(0x24); // SIB byte
+        _programData.push_back((unsigned char)(offset & 0xff));
+        _programData.push_back((unsigned char)((offset >> 8) & 0xff));
+        _programData.push_back((unsigned char)((offset >> 16) & 0xff));
+        _programData.push_back((unsigned char)((offset >> 24) & 0xff));
     }
     else
     {
-        program[count++] = (((src % 8) & 0x7) << 3) | (0x2 << 6) | ((dst % 8) & 0x7);
-        program[count++] = (unsigned char)(offset & 0xff);
-        program[count++] = (unsigned char)((offset >> 8) & 0xff);
-        program[count++] = (unsigned char)((offset >> 16) & 0xff);
-        program[count++] = (unsigned char)((offset >> 24) & 0xff);
+        _programData.push_back((((src % 8) & 0x7) << 3) | (0x2 << 6) | ((dst % 8) & 0x7));
+        _programData.push_back((unsigned char)(offset & 0xff));
+        _programData.push_back((unsigned char)((offset >> 8) & 0xff));
+        _programData.push_back((unsigned char)((offset >> 16) & 0xff));
+        _programData.push_back((unsigned char)((offset >> 24) & 0xff));
     }
 }
 
-static void vm_emit_ui(const vm_instruction& ins, unsigned char* program, int& count, char imm)
+void poAsm::emit_ui(const vm_instruction& ins, char imm)
 {
     assert(ins.code == CODE_UI);
-    if (ins.rex > 0) { program[count++] = ins.rex; }
-    program[count++] = ins.ins;
-    program[count++] = imm;
+    if (ins.rex > 0) { _programData.push_back(ins.rex); }
+    _programData.push_back(ins.ins);
+    _programData.push_back(imm);
 }
 
-static void vm_emit_ui(const vm_instruction& ins, unsigned char* program, int& count, int imm)
+void poAsm::emit_ui(const vm_instruction& ins, int imm)
 {
     assert(ins.code == CODE_UI);
-    if (ins.rex > 0) { program[count++] = ins.rex; }
-    program[count++] = ins.ins;
+    if (ins.rex > 0) { _programData.push_back(ins.rex); }
+    _programData.push_back(ins.ins);
     if (ins.subins != VMI_UNUSED)
     {
-        program[count++] = ins.subins;
+        _programData.push_back(ins.subins);
     }
-    program[count++] = imm & 0xFF;
-    program[count++] = (imm >> 8) & 0xFF;
-    program[count++] = (imm >> 16) & 0xFF;
-    program[count++] = (imm >> 24) & 0xFF;
+    _programData.push_back(imm & 0xFF);
+    _programData.push_back((imm >> 8) & 0xFF);
+    _programData.push_back((imm >> 16) & 0xFF);
+    _programData.push_back((imm >> 24) & 0xFF);
 }
 
 //================
 
-static void vm_emit_sse_brr(const vm_sse_instruction& ins, unsigned char* program, int& count, int src, int dst)
+void poAsm::emit_sse_brr(const vm_sse_instruction& ins, int src, int dst)
 {
     assert(ins.code == CODE_BRR);
     assert(ins.enc == VMI_ENC_A);
     if (ins.ins1 != VMI_UNUSED) {
-        program[count++] = ins.ins1;
+        _programData.push_back(ins.ins1);
     }
     unsigned char rex = ins.rex;
     if (src >= VM_SSE_REGISTER_XMM8) { rex |= 0x1 | (1 << 6); }
     if (dst >= VM_SSE_REGISTER_XMM8) { rex |= 0x4 | (1 << 6); }
 
-    if (rex > 0) { program[count++] = rex; }
-    program[count++] = ins.ins2;
-    program[count++] = ins.ins3;
+    if (rex > 0) { _programData.push_back(rex); }
+    _programData.push_back(ins.ins2);
+    _programData.push_back(ins.ins3);
 
-    program[count++] = (((dst % 8) & 0x7) << 3) | (0x3 << 6) | ((src % 8) & 0x7);
+    _programData.push_back((((dst % 8) & 0x7) << 3) | (0x3 << 6) | ((src % 8) & 0x7));
 }
 
-static void vm_emit_sse_brmo(const vm_sse_instruction& ins, unsigned char* program, int& count, int src, int dst, int src_offset)
+void poAsm::emit_sse_brmo(const vm_sse_instruction& ins, int src, int dst, int src_offset)
 {
     assert(ins.code == CODE_BRMO);
     assert(ins.enc == VMI_ENC_A);
     if (ins.ins1 != VMI_UNUSED) {
-        program[count++] = ins.ins1;
+        _programData.push_back(ins.ins1);
     }
     unsigned char rex = ins.rex;
     if (src >= VM_SSE_REGISTER_XMM8) { rex |= 0x1 | (1 << 6); }
     if (dst >= VM_REGISTER_R8) { rex |= 0x4 | (1 << 6); }
 
-    if (rex > 0) { program[count++] = rex; }
+    if (rex > 0) { _programData.push_back(rex); }
 
-    program[count++] = ins.ins2;
-    program[count++] = ins.ins3;
+    _programData.push_back(ins.ins2);
+    _programData.push_back(ins.ins3);
 
     if (src == VM_REGISTER_ESP)
     {
-        program[count++] = (((dst % 8) & 0x7) << 3) | 0x4 | (0x2 << 6);
-        program[count++] = 0x24; // SIB byte
-        program[count++] = (unsigned char)(src_offset & 0xff);
-        program[count++] = (unsigned char)((src_offset >> 8) & 0xff);
-        program[count++] = (unsigned char)((src_offset >> 16) & 0xff);
-        program[count++] = (unsigned char)((src_offset >> 24) & 0xff);
+        _programData.push_back((((dst % 8) & 0x7) << 3) | 0x4 | (0x2 << 6));
+        _programData.push_back(0x24); // SIB byte
+        _programData.push_back((unsigned char)(src_offset & 0xff));
+        _programData.push_back((unsigned char)((src_offset >> 8) & 0xff));
+        _programData.push_back((unsigned char)((src_offset >> 16) & 0xff));
+        _programData.push_back((unsigned char)((src_offset >> 24) & 0xff));
     }
     else
     {
-        program[count++] = (((dst % 8) & 0x7) << 3) | (0x2 << 6) | ((src % 8) & 0x7);
-        program[count++] = src_offset & 0xFF;
-        program[count++] = (src_offset >> 8) & 0xFF;
-        program[count++] = (src_offset >> 16) & 0xFF;
-        program[count++] = (src_offset >> 24) & 0xFF;
+        _programData.push_back((((dst % 8) & 0x7) << 3) | (0x2 << 6) | ((src % 8) & 0x7));
+        _programData.push_back(src_offset & 0xFF);
+        _programData.push_back((src_offset >> 8) & 0xFF);
+        _programData.push_back((src_offset >> 16) & 0xFF);
+        _programData.push_back((src_offset >> 24) & 0xFF);
     }
 }
 
-static void vm_emit_sse_bmro(const vm_sse_instruction& ins, unsigned char* program, int& count, int src, int dst, int dst_offset)
+void poAsm::emit_sse_bmro(const vm_sse_instruction& ins, int src, int dst, int dst_offset)
 {
     assert(ins.code == CODE_BMRO);
     assert(ins.enc == VMI_ENC_A || ins.enc == VMI_ENC_C);
     if (ins.ins1 != VMI_UNUSED) {
-        program[count++] = ins.ins1;
+        _programData.push_back(ins.ins1);
     }
     unsigned char rex = ins.rex;
 
     if (dst >= VM_SSE_REGISTER_XMM8) { rex |= 0x1 | (1 << 6); }
     if (src >= VM_REGISTER_R8) { rex |= 0x4 | (1 << 6); }
 
-    if (rex > 0) { program[count++] = rex; }
+    if (rex > 0) { _programData.push_back(rex); }
 
-    program[count++] = ins.ins2;
-    program[count++] = ins.ins3;
+    _programData.push_back(ins.ins2);
+    _programData.push_back(ins.ins3);
 
     if (dst == VM_REGISTER_ESP)
     {
-        program[count++] = (((src % 8) & 0x7) << 3) | 0x4 | (0x2 << 6);
-        program[count++] = 0x24; // SIB byte
-        program[count++] = (unsigned char)(dst_offset & 0xff);
-        program[count++] = (unsigned char)((dst_offset >> 8) & 0xff);
-        program[count++] = (unsigned char)((dst_offset >> 16) & 0xff);
-        program[count++] = (unsigned char)((dst_offset >> 24) & 0xff);
+        _programData.push_back((((src % 8) & 0x7) << 3) | 0x4 | (0x2 << 6));
+        _programData.push_back(0x24); // SIB byte
+        _programData.push_back((unsigned char)(dst_offset & 0xff));
+        _programData.push_back((unsigned char)((dst_offset >> 8) & 0xff));
+        _programData.push_back((unsigned char)((dst_offset >> 16) & 0xff));
+        _programData.push_back((unsigned char)((dst_offset >> 24) & 0xff));
     }
     else
     {
-        program[count++] = (((src % 8) & 0x7) << 3) | (0x2 << 6) | ((dst % 8) & 0x7);
-        program[count++] = dst_offset & 0xFF;
-        program[count++] = (dst_offset >> 8) & 0xFF;
-        program[count++] = (dst_offset >> 16) & 0xFF;
-        program[count++] = (dst_offset >> 24) & 0xFF;
+        _programData.push_back((((src % 8) & 0x7) << 3) | (0x2 << 6) | ((dst % 8) & 0x7));
+        _programData.push_back(dst_offset & 0xFF);
+        _programData.push_back((dst_offset >> 8) & 0xFF);
+        _programData.push_back((dst_offset >> 16) & 0xFF);
+        _programData.push_back((dst_offset >> 24) & 0xFF);
     }
 }
 
-static void vm_emit_sse_brm(const vm_sse_instruction& ins, unsigned char* program, int& count, int dst, int disp32)
+void poAsm::emit_sse_brm(const vm_sse_instruction& ins, int dst, int disp32)
 {
     assert(ins.code == CODE_BRMO);
     assert(ins.enc == VMI_ENC_A);
     if (ins.ins1 != VMI_UNUSED) {
-        program[count++] = ins.ins1;
+        _programData.push_back(ins.ins1);
     }
     unsigned char rex = ins.rex;
 
     if (dst >= VM_SSE_REGISTER_XMM8) { rex |= 0x4 | (1 << 6); }
 
-    if (rex > 0) { program[count++] = rex; }
+    if (rex > 0) { _programData.push_back(rex); }
 
-    program[count++] = ins.ins2;
-    program[count++] = ins.ins3;
+    _programData.push_back(ins.ins2);
+    _programData.push_back(ins.ins3);
 
     /* Relative RIP addressing (Displacement from end of instruction) */
 
-    program[count++] = (((dst % 8) & 0x7) << 3) | 0x5 | (0x0 << 6);
-    program[count++] = (unsigned char)(disp32 & 0xff);
-    program[count++] = (unsigned char)((disp32 >> 8) & 0xff);
-    program[count++] = (unsigned char)((disp32 >> 16) & 0xff);
-    program[count++] = (unsigned char)((disp32 >> 24) & 0xff);
+    _programData.push_back((((dst % 8) & 0x7) << 3) | 0x5 | (0x0 << 6));
+    _programData.push_back((unsigned char)(disp32 & 0xff));
+    _programData.push_back((unsigned char)((disp32 >> 8) & 0xff));
+    _programData.push_back((unsigned char)((disp32 >> 16) & 0xff));
+    _programData.push_back((unsigned char)((disp32 >> 24) & 0xff));
 }
 
 //================
 #define VM_ALIGN_16(x) ((x + 0xf) & ~(0xf))
 
-static void vm_reserve(unsigned char* program, int& count)
-{
-    program[count++] = 0x90; // nop
-}
 
-static void vm_reserve2(unsigned char* program, int& count)
+void poAsm::mc_reserve()
 {
-    program[count++] = 0x90; // nop
-    program[count++] = 0x90; // nop
+    _programData.push_back(0x90); // nop
 }
-
-static void vm_reserve3(unsigned char* program, int& count)
+void poAsm::mc_reserve2()
 {
-    program[count++] = 0x90; // nop
-    program[count++] = 0x90; // nop
-    program[count++] = 0x90; // nop
+    _programData.push_back(0x90); // nop
+    _programData.push_back(0x90); // nop
 }
-
-static void vm_cdq(unsigned char* program, int& count)
+void poAsm::mc_reserve3()
 {
-    program[count++] = 0x99;
+    _programData.push_back(0x90); // nop
+    _programData.push_back(0x90); // nop
+    _programData.push_back(0x90); // nop
 }
-
-static void vm_return(unsigned char* program, int& count)
+void poAsm::mc_cdq()
 {
+    _programData.push_back(0x99);
+}
+void poAsm::mc_return()
+{   
     //vm_emit(table.ret, program, count);
 
-    vm_emit(gInstructions[VMI_NEAR_RETURN], program, count);
+    emit(gInstructions[VMI_NEAR_RETURN]);
 }
-
-static void vm_push_32(unsigned char* program, int& count, const int imm)
+void poAsm::mc_push_32(const int imm)
 {
-    program[count++] = 0x68;
-    program[count++] = (unsigned char)(imm & 0xFF);
-    program[count++] = (unsigned char)((imm >> 8) & 0xFF);
-    program[count++] = (unsigned char)((imm >> 16) & 0xFF);
-    program[count++] = (unsigned char)((imm >> 24) & 0xFF);
+    _programData.push_back(0x68);
+    _programData.push_back((unsigned char)(imm & 0xFF));
+    _programData.push_back((unsigned char)((imm >> 8) & 0xFF));
+    _programData.push_back((unsigned char)((imm >> 16) & 0xFF));
+    _programData.push_back((unsigned char)((imm >> 24) & 0xFF));
 }
-
-static void vm_push_reg(unsigned char* program, int& count, char reg)
+void poAsm::mc_push_reg(char reg)
 {
     if (reg >= VM_REGISTER_R8)
     {
-        program[count++] = 0x48 | 0x1;
+        _programData.push_back(0x48 | 0x1);
     }
 
-    program[count++] = 0x50 | ((reg % 8) & 0x7);
+    _programData.push_back(0x50 | ((reg % 8) & 0x7));
 }
-
-static void vm_pop_reg(unsigned char* program, int& count, char reg)
+void poAsm::mc_pop_reg(char reg)
 {
     if (reg >= VM_REGISTER_R8)
     {
-        program[count++] = 0x48 | 0x1;
+        _programData.push_back(0x48 | 0x1);
     }
 
-    program[count++] = 0x58 | ((reg % 8) & 0x7);
+    _programData.push_back(0x58 | ((reg % 8) & 0x7));
 }
-
-static void vm_mov_imm_to_reg(unsigned char* program, int& count, char dst, int imm)
+void poAsm::mc_mov_imm_to_reg(char dst, int imm)
 {
-    vm_emit_bri(gInstructions[VMI_MOV32_SRC_IMM_DST_REG], program, count, dst, imm);
+    emit_bri(gInstructions[VMI_MOV32_SRC_IMM_DST_REG], dst, imm);
 }
-
-static void vm_mov_imm_to_reg_x64(unsigned char* program, int& count, char dst, long long imm)
-{
+void poAsm::mc_mov_imm_to_reg_x64(char dst, long long imm)
+{ 
     //vm_emit_bri(gInstructions[VMI_MOV64_SRC_IMM_DST_REG], program, count, dst, imm);
 
-    program[count++] = 0x48 | (dst >= VM_REGISTER_R8 ? 0x1 : 0x0);
-    program[count++] = 0xB8 | (dst % 8);
-    program[count++] = (unsigned char)(imm & 0xff);
-    program[count++] = (unsigned char)((imm >> 8) & 0xff);
-    program[count++] = (unsigned char)((imm >> 16) & 0xff);
-    program[count++] = (unsigned char)((imm >> 24) & 0xff);
-    program[count++] = (unsigned char)((imm >> 32) & 0xff);
-    program[count++] = (unsigned char)((imm >> 40) & 0xff);
-    program[count++] = (unsigned char)((imm >> 48) & 0xff);
-    program[count++] = (unsigned char)((imm >> 56) & 0xff);
+    _programData.push_back(0x48 | (dst >= VM_REGISTER_R8 ? 0x1 : 0x0));
+    _programData.push_back(0xB8 | (dst % 8));
+    _programData.push_back((unsigned char)(imm & 0xff));
+    _programData.push_back((unsigned char)((imm >> 8) & 0xff));
+    _programData.push_back((unsigned char)((imm >> 16) & 0xff));
+    _programData.push_back((unsigned char)((imm >> 24) & 0xff));
+    _programData.push_back((unsigned char)((imm >> 32) & 0xff));
+    _programData.push_back((unsigned char)((imm >> 40) & 0xff));
+    _programData.push_back((unsigned char)((imm >> 48) & 0xff));
+    _programData.push_back((unsigned char)((imm >> 56) & 0xff));
 }
-
-inline static void vm_mov_reg_to_memory_x64(unsigned char* program, int& count, char dst, int dst_offset, char src)
+void poAsm::mc_mov_reg_to_memory_x64(char dst, int dst_offset, char src)
 {
-    vm_emit_bmro(gInstructions[VMI_MOV64_SRC_REG_DST_MEM], program, count, dst, src, dst_offset);
+    emit_bmro(gInstructions[VMI_MOV64_SRC_REG_DST_MEM], dst, src, dst_offset);
 }
-
-inline static void vm_mov_memory_to_reg_x64(unsigned char* program, int& count, char dst, char src, int src_offset)
+void poAsm::mc_mov_memory_to_reg_x64(char dst, char src, int src_offset)
 {
-    vm_emit_brmo(gInstructions[VMI_MOV64_SRC_MEM_DST_REG], program, count, dst, src, src_offset);
+    emit_brmo(gInstructions[VMI_MOV64_SRC_MEM_DST_REG], dst, src, src_offset);
 }
-
-inline static void vm_mov_reg_to_reg_x64(unsigned char* program, int& count, char dst, char src)
+void poAsm::mc_mov_reg_to_reg_x64(char dst, char src)
 {
-    vm_emit_brr(gInstructions[VMI_MOV64_SRC_REG_DST_REG], program, count, dst, src);
+    emit_brr(gInstructions[VMI_MOV64_SRC_REG_DST_REG], dst, src);
 }
-
-inline static void vm_add_reg_to_reg_x64(unsigned char* program, int& count, char dst, char src)
+void poAsm::mc_add_reg_to_reg_x64(char dst, char src)
 {
-    vm_emit_brr(gInstructions[VMI_ADD64_SRC_REG_DST_REG], program, count, dst, src);
+    emit_brr(gInstructions[VMI_ADD64_SRC_REG_DST_REG], dst, src);
 }
-
-inline static void vm_add_memory_to_reg_x64(unsigned char* program, int& count, char dst, char src, int src_offset)
+void poAsm::mc_add_memory_to_reg_x64(char dst, char src, int src_offset)
 {
-    vm_emit_brmo(gInstructions[VMI_ADD64_SRC_MEM_DST_REG], program, count, dst, src, src_offset);
+    emit_brmo(gInstructions[VMI_ADD64_SRC_MEM_DST_REG], dst, src, src_offset);
 }
-
-inline static void vm_add_reg_to_memory_x64(unsigned char* program, int& count, char dst, char src, int dst_offset)
+void poAsm::mc_add_reg_to_memory_x64(char dst, char src, int dst_offset)
 {
-    vm_emit_bmro(gInstructions[VMI_ADD64_SRC_REG_DST_MEM], program, count, dst, src, dst_offset);
+    emit_bmro(gInstructions[VMI_ADD64_SRC_REG_DST_MEM], dst, src, dst_offset);
 }
-
-inline static void vm_add_imm_to_reg_x64(unsigned char* program, int& count, char dst, int imm)
+void poAsm::mc_add_imm_to_reg_x64(char dst, int imm)
 {
-    vm_emit_bri(gInstructions[VMI_ADD64_SRC_IMM_DST_REG], program, count, dst, imm);
+    emit_bri(gInstructions[VMI_ADD64_SRC_IMM_DST_REG], dst, imm);
 }
-
-inline static void vm_sub_reg_to_memory_x64(unsigned char* program, int& count, char dst, char src, int dst_offset)
+void poAsm::mc_sub_reg_to_memory_x64(char dst, char src, int dst_offset) 
 {
-    vm_emit_bmro(gInstructions[VMI_SUB64_SRC_REG_DST_MEM], program, count, dst, src, dst_offset);
+    emit_bmro(gInstructions[VMI_SUB64_SRC_REG_DST_MEM], dst, src, dst_offset);
 }
-
-inline static void vm_sub_reg_to_reg_x64(unsigned char* program, int& count, char dst, char src)
+void poAsm::mc_sub_reg_to_reg_x64(char dst, char src)
 {
-    vm_emit_brr(gInstructions[VMI_SUB64_SRC_REG_DST_REG], program, count, dst, src);
+    emit_brr(gInstructions[VMI_SUB64_SRC_REG_DST_REG], dst, src);
 }
-
-inline static void vm_sub_memory_to_reg_x64(unsigned char* program, int& count, char dst, char src, int src_offset)
+void poAsm::mc_sub_memory_to_reg_x64(char dst, char src, int src_offset)
 {
-    vm_emit_brmo(gInstructions[VMI_SUB64_SRC_MEM_DST_REG], program, count, dst, src, src_offset);
+    emit_brmo(gInstructions[VMI_SUB64_SRC_MEM_DST_REG], dst, src, src_offset);
 }
-
-inline static void vm_sub_imm_to_reg_x64(unsigned char* program, int& count, char reg, int imm)
+void poAsm::mc_sub_imm_to_reg_x64(char reg, int imm)
 {
-    vm_emit_bri(gInstructions[VMI_SUB64_SRC_IMM_DST_REG], program, count, reg, imm);
+    emit_bri(gInstructions[VMI_SUB64_SRC_IMM_DST_REG], reg, imm);
 }
-
-inline static void vm_mul_reg_to_reg_x64(unsigned char* program, int& count, char dst, char src)
+void poAsm::mc_mul_reg_to_reg_x64(char dst, char src)
 {
-    vm_emit_brr(gInstructions[VMI_MUL64_SRC_REG_DST_REG], program, count, dst, src);
+    emit_brr(gInstructions[VMI_MUL64_SRC_REG_DST_REG], dst, src);
 }
-
-inline static void vm_mul_memory_to_reg_x64(unsigned char* program, int& count, char dst, char src, int src_offset)
+void poAsm::mc_mul_memory_to_reg_x64(char dst, char src, int src_offset)
 {
-    vm_emit_brmo(gInstructions[VMI_MUL64_SRC_MEM_DST_REG], program, count, dst, src, src_offset);
+    emit_brmo(gInstructions[VMI_MUL64_SRC_MEM_DST_REG], dst, src, src_offset);
 }
-
-inline static void vm_div_reg_x64(unsigned char* program, int& count, char reg)
+void poAsm::mc_div_reg_x64(char reg)
 {
-    vm_emit_ur(gInstructions[VMI_IDIV_SRC_REG], program, count, reg);
+    emit_ur(gInstructions[VMI_IDIV_SRC_REG], reg);
 }
-
-inline static void vm_div_memory_x64(unsigned char* program, int& count, char src, int src_offset)
+void poAsm::mc_div_memory_x64(char src, int src_offset)
 {
-    vm_emit_umo(gInstructions[VMI_IDIV_SRC_MEM], program, count, src, src_offset);
+    emit_umo(gInstructions[VMI_IDIV_SRC_MEM], src, src_offset);
 }
-
-inline static void vm_cmp_reg_to_reg_x64(unsigned char* program, int& count, char dst, char src)
+void poAsm::mc_cmp_reg_to_reg_x64(char dst, char src)
 {
-    vm_emit_brr(gInstructions[VMI_CMP64_SRC_REG_DST_REG], program, count, dst, src);
+    emit_brr(gInstructions[VMI_CMP64_SRC_REG_DST_REG], dst, src);
 }
-
-inline static void vm_cmp_reg_to_memory_x64(unsigned char* program, int& count, char dst, int dst_offset, char src)
+void poAsm::mc_cmp_reg_to_memory_x64(char dst, int dst_offset, char src)
 {
-    vm_emit_bmro(gInstructions[VMI_CMP64_SRC_REG_DST_MEM], program, count, dst, src, dst_offset);
+    emit_bmro(gInstructions[VMI_CMP64_SRC_REG_DST_MEM], dst, src, dst_offset);
 }
-
-inline static void vm_cmp_memory_to_reg_x64(unsigned char* program, int& count, char dst, char src, int src_offset)
+void poAsm::mc_cmp_memory_to_reg_x64(char dst, char src, int src_offset)
 {
-    vm_emit_brmo(gInstructions[VMI_CMP64_SRC_MEM_DST_REG], program, count, dst, src, src_offset);
+    emit_brmo(gInstructions[VMI_CMP64_SRC_MEM_DST_REG], dst, src, src_offset);
 }
-
-inline static void vm_jump_unconditional_8(unsigned char* program, int& count, char imm)
+void poAsm::mc_jump_unconditional_8(int imm)
 {
-    vm_emit_ui(gInstructions[VMI_J8], program, count, imm);
+    emit_ui(gInstructions[VMI_J8], imm);
 }
-
-inline static void vm_jump_equals_8(unsigned char* program, int& count, char imm)
+void poAsm::mc_jump_equals_8(int imm)
 {
-    vm_emit_ui(gInstructions[VMI_JE8], program, count, imm);
+    emit_ui(gInstructions[VMI_JE8], imm);
 }
-
-inline static void vm_jump_not_equals_8(unsigned char* program, int& count, char imm)
+void poAsm::mc_jump_not_equals_8(int imm)
 {
-    vm_emit_ui(gInstructions[VMI_JNE8], program, count, imm);
+    emit_ui(gInstructions[VMI_JNE8], imm);
 }
-
-inline static void vm_jump_less_8(unsigned char* program, int& count, char imm)
+void poAsm::mc_jump_less_8(int imm)
 {
-    vm_emit_ui(gInstructions[VMI_JL8], program, count, imm);
+    emit_ui(gInstructions[VMI_JL8], imm);
 }
-
-inline static void vm_jump_less_equal_8(unsigned char* program, int& count, char imm)
+void poAsm::mc_jump_less_equal_8(int imm)
 {
-    vm_emit_ui(gInstructions[VMI_JLE8], program, count, imm);
+    emit_ui(gInstructions[VMI_JLE8], imm);
 }
-
-inline static void vm_jump_greater_8(unsigned char* program, int& count, char imm)
+void poAsm::mc_jump_greater_8(int imm)
 {
-    vm_emit_ui(gInstructions[VMI_JG8], program, count, imm);
+    emit_ui(gInstructions[VMI_JG8], imm);
 }
-
-inline static void vm_jump_greater_equal_8(unsigned char* program, int& count, char imm)
+void poAsm::mc_jump_greater_equal_8(int imm) 
 {
-    vm_emit_ui(gInstructions[VMI_JGE8], program, count, imm);
+    emit_ui(gInstructions[VMI_JGE8], imm);
 }
-
-inline static void vm_jump_unconditional(unsigned char* program, int& count, int imm)
+void poAsm::mc_jump_unconditional(int imm)
 {
-    vm_emit_ui(gInstructions[VMI_J32], program, count, imm);
+    emit_ui(gInstructions[VMI_J32], imm);
 }
-
-inline static void vm_jump_equals(unsigned char* program, int& count, int imm)
+void poAsm::mc_jump_equals(int imm)
 {
-    vm_emit_ui(gInstructions[VMI_JE32], program, count, imm);
+    emit_ui(gInstructions[VMI_JE32], imm);
 }
-
-inline static void vm_jump_not_equals(unsigned char* program, int& count, int imm)
+void poAsm::mc_jump_not_equals(int imm)
 {
-    vm_emit_ui(gInstructions[VMI_JNE32], program, count, imm);
+    emit_ui(gInstructions[VMI_JNE32], imm);
 }
-
-inline static void vm_jump_less(unsigned char* program, int& count, int imm)
+void poAsm::mc_jump_less(int imm)
 {
-    vm_emit_ui(gInstructions[VMI_JL32], program, count, imm);
+    emit_ui(gInstructions[VMI_JL32], imm);
 }
-
-inline static void vm_jump_less_equal(unsigned char* program, int& count, int imm)
+void poAsm::mc_jump_less_equal(int imm)
 {
-    vm_emit_ui(gInstructions[VMI_JLE32], program, count, imm);
+    emit_ui(gInstructions[VMI_JLE32], imm);
 }
-
-inline static void vm_jump_greater(unsigned char* program, int& count, int imm)
+void poAsm::mc_jump_greater(int imm)
 {
-    vm_emit_ui(gInstructions[VMI_JG32], program, count, imm);
+    emit_ui(gInstructions[VMI_JG32], imm);
 }
-
-inline static void vm_jump_greater_equal(unsigned char* program, int& count, int imm)
+void poAsm::mc_jump_greater_equal(int imm)
 {
-    vm_emit_ui(gInstructions[VMI_JGE32], program, count, imm);
+    emit_ui(gInstructions[VMI_JGE32], imm);
 }
-
-inline static void vm_jump_absolute(unsigned char* program, int& count, char reg)
+void poAsm::mc_jump_absolute(int reg)
 {
-    vm_emit_ur(gInstructions[VMI_JA64], program, count, reg);
+    emit_ur(gInstructions[VMI_JA64], reg);
 }
-
-static void vm_call(unsigned char* program, int& count, int offset)
+void poAsm::mc_call(int offset)
 {
     offset -= 5;
 
-    program[count++] = 0xE8;
-    program[count++] = (unsigned char)(offset & 0xff);
-    program[count++] = (unsigned char)((offset >> 8) & 0xff);
-    program[count++] = (unsigned char)((offset >> 16) & 0xff);
-    program[count++] = (unsigned char)((offset >> 24) & 0xff);
+    _programData.push_back(0xE8);
+    _programData.push_back((unsigned char)(offset & 0xff));
+    _programData.push_back((unsigned char)((offset >> 8) & 0xff));
+    _programData.push_back((unsigned char)((offset >> 16) & 0xff));
+    _programData.push_back((unsigned char)((offset >> 24) & 0xff));
 }
-
-inline static void vm_call_absolute(unsigned char* program, int& count, int reg)
+void poAsm::mc_call_absolute(int reg)
 {
     if (reg >= VM_REGISTER_R8)
     {
-        program[count++] = 0x1 | (0x1 << 6);
+        _programData.push_back(0x1 | (0x1 << 6));
     }
 
-    program[count++] = 0xFF;
-    program[count++] = (0x2 << 3) | (reg % 8) | (0x3 << 6);
+    _programData.push_back(0xFF);
+    _programData.push_back((0x2 << 3) | (reg % 8) | (0x3 << 6));
 }
-
-inline static void vm_inc_reg_x64(unsigned char* program, int& count, int reg)
+void poAsm::mc_inc_reg_x64(int reg)
 {
-    vm_emit_ur(gInstructions[VMI_INC64_DST_REG], program, count, reg);
+    emit_ur(gInstructions[VMI_INC64_DST_REG], reg);
 }
-
-inline static void vm_inc_memory_x64(unsigned char* program, int& count, int reg, int offset)
+void poAsm::mc_inc_memory_x64(int reg, int offset)
 {
-    vm_emit_umo(gInstructions[VMI_INC64_DST_MEM], program, count, reg, offset);
+    emit_umo(gInstructions[VMI_INC64_DST_MEM], reg, offset);
 }
-
-inline static void vm_dec_reg_x64(unsigned char* program, int& count, int reg)
+void poAsm::mc_dec_reg_x64(int reg)
 {
-    vm_emit_ur(gInstructions[VMI_DEC64_DST_REG], program, count, reg);
+    emit_ur(gInstructions[VMI_DEC64_DST_REG], reg);
 }
-
-inline static void vm_dec_memory_x64(unsigned char* program, int& count, int reg, int offset)
+void poAsm::mc_dec_memory_x64(int reg, int offset)
 {
-    vm_emit_umo(gInstructions[VMI_DEC64_DST_MEM], program, count, reg, offset);
+    emit_umo(gInstructions[VMI_DEC64_DST_MEM], reg, offset);
 }
-
-inline static void vm_neg_memory_x64(unsigned char* program, int& count, int reg, int offset)
+void poAsm::mc_neg_memory_x64(int reg, int offset)
 {
-    vm_emit_umo(gInstructions[VMI_NEG64_DST_MEM], program, count, reg, offset);
+    emit_umo(gInstructions[VMI_NEG64_DST_MEM], reg, offset);
 }
-
-inline static void vm_neg_reg_x64(unsigned char* program, int& count, int reg)
+void poAsm::mc_neg_reg_x64(int reg)
 {
-    vm_emit_ur(gInstructions[VMI_NEG64_DST_REG], program, count, reg);
+    emit_ur(gInstructions[VMI_NEG64_DST_REG], reg);
 }
-
-inline static void vm_movsd_reg_to_reg_x64(unsigned char* program, int& count, int dst, int src)
+void poAsm::mc_movsd_reg_to_reg_x64(int dst, int src)
 {
 #ifdef USE_SUN_FLOAT
-    vm_emit_sse_brr(gInstructions_SSE[VMI_SSE_MOVSS_SRC_REG_DST_REG], program, count, src, dst);
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_MOVSS_SRC_REG_DST_REG], src, dst);
 #else
-    vm_emit_sse_brr(gInstructions_SSE[VMI_SSE_MOVSD_SRC_REG_DST_REG], program, count, src, dst);
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_MOVSD_SRC_REG_DST_REG], src, dst);
+#endif
+}
+void poAsm::mc_movsd_reg_to_memory_x64(int dst, int src, int dst_offset)
+{
+#ifdef USE_SUN_FLOAT
+    emit_sse_bmro(gInstructions_SSE[VMI_SSE_MOVSS_SRC_REG_DST_MEM], src, dst, dst_offset);
+#else
+    emit_sse_bmro(gInstructions_SSE[VMI_SSE_MOVSD_SRC_REG_DST_MEM], src, dst, dst_offset);
+#endif
+}
+void poAsm::mc_movsd_memory_to_reg_x64(int dst, int src, int src_offset)
+{
+#ifdef USE_SUN_FLOAT
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_MOVSS_SRC_MEM_DST_REG], src, dst, src_offset);
+#else
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_MOVSD_SRC_MEM_DST_REG], src, dst, src_offset);
+#endif
+}
+void poAsm::mc_movsd_memory_to_reg_x64(int dst, int addr)
+{
+#ifdef USE_SUN_FLOAT
+    emit_sse_brm(gInstructions_SSE[VMI_SSE_MOVSS_SRC_MEM_DST_REG], dst, addr);
+#else
+    emit_sse_brm(gInstructions_SSE[VMI_SSE_MOVSD_SRC_MEM_DST_REG], dst, addr);
+#endif
+}
+void poAsm::mc_addsd_reg_to_reg_x64(int dst, int src)
+{
+#ifdef USE_SUN_FLOAT
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_ADDSS_SRC_REG_DST_REG], src, dst);
+#else
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_ADDSD_SRC_REG_DST_REG], src, dst);
+#endif
+}
+void poAsm::mc_addsd_memory_to_reg_x64(int dst, int src, int src_offset)
+{
+#ifdef USE_SUN_FLOAT
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_ADDSS_SRC_MEM_DST_REG], src, dst, src_offset);
+#else
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_ADDSD_SRC_MEM_DST_REG], src, dst, src_offset);
+#endif
+}
+void poAsm::mc_subsd_reg_to_reg_x64(int dst, int src)
+{
+#ifdef USE_SUN_FLOAT
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_SUBSS_SRC_REG_DST_REG], src, dst);
+#else
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_SUBSD_SRC_REG_DST_REG], src, dst);
+#endif
+}
+void poAsm::mc_subsd_memory_to_reg_x64(int dst, int src, int src_offset)
+{
+#ifdef USE_SUN_FLOAT
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_SUBSS_SRC_MEM_DST_REG], src, dst, src_offset);
+#else
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_SUBSD_SRC_MEM_DST_REG], src, dst, src_offset);
+#endif
+}
+void poAsm::mc_mulsd_reg_to_reg_x64(int dst, int src)
+{
+#ifdef USE_SUN_FLOAT
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_MULSS_SRC_REG_DST_REG], src, dst);
+#else
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_MULSD_SRC_REG_DST_REG], src, dst);
+#endif
+}
+void poAsm::mc_mulsd_memory_to_reg_x64(int dst, int src, int dst_offset)
+{
+#ifdef USE_SUN_FLOAT
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_MULSS_SRC_MEM_DST_REG], src, dst, dst_offset);
+#else
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_MULSD_SRC_MEM_DST_REG], src, dst, dst_offset);
+#endif
+}
+void poAsm::mc_divsd_reg_to_reg_x64(int dst, int src)
+{
+#ifdef USE_SUN_FLOAT
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_DIVSS_SRC_REG_DST_REG], src, dst);
+#else
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_DIVSD_SRC_REG_DST_REG], src, dst);
+#endif
+}
+void poAsm::mc_divsd_memory_to_reg_x64(int dst, int src, int dst_offset)
+{
+#ifdef USE_SUN_FLOAT
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_DIVSS_SRC_MEM_DST_REG], src, dst, dst_offset);
+#else
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_DIVSD_SRC_MEM_DST_REG], src, dst, dst_offset);
+#endif
+}
+void poAsm::mc_cvtitod_memory_to_reg_x64(int dst, int src, int src_offset)
+{
+#ifdef USE_SUN_FLOAT
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_CVTSI2SS_SRC_MEM_DST_REG], src, dst, src_offset);
+#else
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_CVTSI2SD_SRC_MEM_DST_REG], src, dst, src_offset);
+#endif
+}
+void poAsm::mc_cvtitod_reg_to_reg_x64(int dst, int src)
+{
+#ifdef USE_SUN_FLOAT
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_CVTSI2SS_SRC_REG_DST_REG], src, dst);
+#else
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_CVTSI2SD_SRC_REG_DST_REG], src, dst);
+#endif
+}
+void poAsm::mc_ucmpd_reg_to_reg_x64(int dst, int src)
+{
+#ifdef USE_SUN_FLOAT
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_UCOMISS_SRC_REG_DST_REG], src, dst);
+#else
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_UCOMISD_SRC_REG_DST_REG], src, dst);
+#endif
+}
+void poAsm::mc_ucmpd_memory_to_reg_x64(int dst, int src, int src_offset)
+{
+#ifdef USE_SUN_FLOAT
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_UCOMISS_SRC_MEM_DST_REG], src, dst, src_offset);
+#else
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_UCOMISD_SRC_MEM_DST_REG], src, dst, src_offset);
+#endif
+}
+void poAsm::mc_xorpd_reg_to_reg_x64(int dst, int src)
+{
+#ifdef USE_SUN_FLOAT
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_XORPS_SRC_REG_DST_REG], src, dst);
+#else
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_XORPD_SRC_REG_DST_REG], src, dst);
 #endif
 }
 
-inline static void vm_movsd_reg_to_memory_x64(unsigned char* program, int& count, int dst, int src, int dst_offset)
+
+//================
+
+void poAsm::ir_add(poRegLinear& linear, const poInstruction& ins)
 {
-#ifdef USE_SUN_FLOAT
-    vm_emit_sse_bmro(gInstructions_SSE[VMI_SSE_MOVSS_SRC_REG_DST_MEM], program, count, src, dst, dst_offset);
-#else
-    vm_emit_sse_bmro(gInstructions_SSE[VMI_SSE_MOVSD_SRC_REG_DST_MEM], program, count, src, dst, dst_offset);
-#endif
+    const int dst = linear.getRegisterByVariable(ins.name());
+    const int src1 = linear.getRegisterByVariable(ins.left());
+    const int src2 = linear.getRegisterByVariable(ins.right());
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+        if (dst != src1) { mc_mov_reg_to_reg_x64(dst, src1); }
+        mc_add_reg_to_reg_x64(dst, src2);
+        break;
+    }
 }
 
-inline static void vm_movsd_memory_to_reg_x64(unsigned char* program, int& count, int dst, int src, int src_offset)
+void poAsm::ir_sub(poRegLinear& linear, const poInstruction& ins)
 {
-#ifdef USE_SUN_FLOAT
-    vm_emit_sse_brmo(gInstructions_SSE[VMI_SSE_MOVSS_SRC_MEM_DST_REG], program, count, src, dst, src_offset);
-#else
-    vm_emit_sse_brmo(gInstructions_SSE[VMI_SSE_MOVSD_SRC_MEM_DST_REG], program, count, src, dst, src_offset);
-#endif
+    const int dst = linear.getRegisterByVariable(ins.name());
+    const int src1 = linear.getRegisterByVariable(ins.left());
+    const int src2 = linear.getRegisterByVariable(ins.right());
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+        if (dst != src1) {
+            mc_mov_reg_to_reg_x64(dst, src1);
+        }
+        mc_sub_reg_to_reg_x64(dst, src2);
+        break;
+    }
 }
 
-inline static void vm_movsd_memory_to_reg_x64(unsigned char* program, int& count, int dst, int addr)
+void poAsm::ir_mul(poRegLinear& linear, const poInstruction& ins)
 {
-#ifdef USE_SUN_FLOAT
-    vm_emit_sse_brm(gInstructions_SSE[VMI_SSE_MOVSS_SRC_MEM_DST_REG], program, count, dst, addr);
-#else
-    vm_emit_sse_brm(gInstructions_SSE[VMI_SSE_MOVSD_SRC_MEM_DST_REG], program, count, dst, addr);
-#endif
+    const int dst = linear.getRegisterByVariable(ins.name());
+    const int src1 = linear.getRegisterByVariable(ins.left());
+    const int src2 = linear.getRegisterByVariable(ins.right());
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+        if (dst != src1) {
+            mc_mov_reg_to_reg_x64(dst, src1);
+        }
+        mc_mul_reg_to_reg_x64(dst, src2);
+        break;
+    }
 }
 
-inline static void vm_addsd_reg_to_reg_x64(unsigned char* program, int& count, int dst, int src)
+void poAsm::ir_div(poRegLinear& linear, const poInstruction& ins)
 {
-#ifdef USE_SUN_FLOAT
-    vm_emit_sse_brr(gInstructions_SSE[VMI_SSE_ADDSS_SRC_REG_DST_REG], program, count, src, dst);
-#else
-    vm_emit_sse_brr(gInstructions_SSE[VMI_SSE_ADDSD_SRC_REG_DST_REG], program, count, src, dst);
-#endif
+    const int dst = linear.getRegisterByVariable(ins.name());
+    const int src1 = linear.getRegisterByVariable(ins.left());
+    const int src2 = linear.getRegisterByVariable(ins.right());
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+        mc_mov_reg_to_reg_x64(VM_ARG1, src1);
+        mc_mov_reg_to_reg_x64(VM_ARG2, src2);
+        mc_div_reg_x64(dst);
+        break;
+    }
 }
 
-inline static void vm_addsd_memory_to_reg_x64(unsigned char* program, int& count, int dst, int src, int src_offset)
+void poAsm::ir_cmp(poRegLinear& linear, const poInstruction& ins)
 {
-#ifdef USE_SUN_FLOAT
-    vm_emit_sse_brmo(gInstructions_SSE[VMI_SSE_ADDSS_SRC_MEM_DST_REG], program, count, src, dst, src_offset);
-#else
-    vm_emit_sse_brmo(gInstructions_SSE[VMI_SSE_ADDSD_SRC_MEM_DST_REG], program, count, src, dst, src_offset);
-#endif
+    const int src1 = linear.getRegisterByVariable(ins.left());
+    const int src2 = linear.getRegisterByVariable(ins.right());
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+        mc_cmp_reg_to_reg_x64(src1, src2);
+        break;
+    }
 }
 
-inline static void vm_subsd_reg_to_reg_x64(unsigned char* program, int& count, int dst, int src)
+void poAsm::ir_br(poRegLinear& linear, const poInstruction& ins, poBasicBlock* bb)
 {
-#ifdef USE_SUN_FLOAT
-    vm_emit_sse_brr(gInstructions_SSE[VMI_SSE_SUBSS_SRC_REG_DST_REG], program, count, src, dst);
-#else
-    vm_emit_sse_brr(gInstructions_SSE[VMI_SSE_SUBSD_SRC_REG_DST_REG], program, count, src, dst);
-#endif
+    poBasicBlock* targetBB = bb->getBranch();
+
+    // Check if the targetBB has been visited already, is which case 
+
+    poAsmBasicBlock& targetAsmBB = _basicBlocks[_basicBlockMap[targetBB]];
+    if (targetAsmBB.getPos() != 0)
+    {
+        const int imm = targetAsmBB.getPos() - (int(_programData.size()) + 5/*TODO*/);
+
+        switch (ins.type())
+        {
+        case IR_JUMP_EQUALS:
+            mc_jump_equals(imm);
+            break;
+        case IR_JUMP_GREATER:
+            mc_jump_greater(imm);
+            break;
+        case IR_JUMP_LESS:
+            mc_jump_less(imm);
+            break;
+        case IR_JUMP_GREATER_EQUALS:
+            mc_jump_greater_equal(imm);
+            break;
+        case IR_JUMP_LESS_EQUALS:
+            mc_jump_less_equal(imm);
+            break;
+        case IR_JUMP_NOT_EQUALS:
+            mc_jump_not_equals(imm);
+            break;
+        case IR_JUMP_UNCONDITIONAL:
+            mc_jump_unconditional(imm);
+            break;
+        }
+    }
+    else
+    {
+        // Insert patch
+
+        const int pos = int(_programData.size());
+        mc_jump_equals(0);
+        const int size = int(_programData.size()) - pos;
+
+        poAsmBasicBlock* asmBB = &_basicBlocks[_basicBlockMap[bb]];
+        asmBB->jumps().push_back(poAsmJump(pos, ins.type(), size, targetBB));
+    }
 }
 
-inline static void vm_subsd_memory_to_reg_x64(unsigned char* program, int& count, int dst, int src, int src_offset)
+void poAsm::ir_constant(poConstantPool& constants, poRegLinear& linear, const poInstruction& ins)
 {
-#ifdef USE_SUN_FLOAT
-    vm_emit_sse_brmo(gInstructions_SSE[VMI_SSE_SUBSS_SRC_MEM_DST_REG], program, count, src, dst, src_offset);
-#else
-    vm_emit_sse_brmo(gInstructions_SSE[VMI_SSE_SUBSD_SRC_MEM_DST_REG], program, count, src, dst, src_offset);
-#endif
+    const int dst = linear.getRegisterByVariable(ins.name());
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+        mc_mov_imm_to_reg_x64(dst, constants.getI64(ins.constant()));
+        break;
+    case TYPE_I32:
+        mc_mov_imm_to_reg(dst, constants.getI32(ins.constant()));
+        break;
+    default:
+        break;
+    }
 }
 
-inline static void vm_mulsd_reg_to_reg_x64(unsigned char* program, int& count, int dst, int src)
+void poAsm::ir_ret(poRegLinear& linear, const poInstruction& ins)
 {
-#ifdef USE_SUN_FLOAT
-    vm_emit_sse_brr(gInstructions_SSE[VMI_SSE_MULSS_SRC_REG_DST_REG], program, count, src, dst);
-#else
-    vm_emit_sse_brr(gInstructions_SSE[VMI_SSE_MULSD_SRC_REG_DST_REG], program, count, src, dst);
-#endif
+    const int left = ins.left();
+    if (left != -1)
+    {
+        switch (ins.type())
+        {
+        case TYPE_I64:
+        case TYPE_I32:
+        case TYPE_I8:
+            mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, linear.getRegisterByVariable(left));
+            break;
+        default:
+            break;
+        }
+    }
+
+    // Epilogue
+    mc_add_imm_to_reg_x64(VM_REGISTER_ESP, 8);
+
+    mc_return();
 }
 
-inline static void vm_mulsd_memory_to_reg_x64(unsigned char* program, int& count, int dst, int src, int dst_offset)
+void poAsm::ir_unary_minus(poRegLinear& linear, const poInstruction& ins)
 {
-#ifdef USE_SUN_FLOAT
-    vm_emit_sse_brmo(gInstructions_SSE[VMI_SSE_MULSS_SRC_MEM_DST_REG], program, count, src, dst, dst_offset);
-#else
-    vm_emit_sse_brmo(gInstructions_SSE[VMI_SSE_MULSD_SRC_MEM_DST_REG], program, count, src, dst, dst_offset);
-#endif
+    const int src = linear.getRegisterByVariable(ins.left());
+    const int dst = linear.getRegisterByVariable(ins.name());
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+        if (dst != src)
+        {
+            mc_mov_reg_to_reg_x64(dst, src);
+        }
+        mc_neg_reg_x64(dst);
+        break;
+    default:
+        break;
+    }
 }
 
-inline static void vm_divsd_reg_to_reg_x64(unsigned char* program, int& count, int dst, int src)
+void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& ins, const std::vector<poInstruction>& args)
 {
-#ifdef USE_SUN_FLOAT
-    vm_emit_sse_brr(gInstructions_SSE[VMI_SSE_DIVSS_SRC_REG_DST_REG], program, count, src, dst);
-#else
-    vm_emit_sse_brr(gInstructions_SSE[VMI_SSE_DIVSD_SRC_REG_DST_REG], program, count, src, dst);
-#endif
+    static const int generalArgs[] = { VM_ARG1, VM_ARG2, VM_ARG3, VM_ARG4, VM_ARG5, VM_ARG6 };
+    static const int sseArgs[] = { VM_SSE_ARG1, VM_SSE_ARG2, VM_SSE_ARG3, VM_SSE_ARG4, VM_SSE_ARG5, VM_SSE_ARG6, VM_SSE_ARG7, VM_SSE_ARG8 };
+
+    const int numArgs = ins.left();
+    for (int i = 0; i < numArgs; i++)
+    {
+        switch (args[i].type()) {
+        case TYPE_I64:
+        case TYPE_I32:
+        case TYPE_I8:
+            mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].name()));
+            break;
+        }
+    }
+
+    const int symbol = ins.right();
+    std::string symbolName;
+    module.getSymbol(symbol, symbolName);
+
+    // Add patch this call
+
+    _calls.push_back(poAsmCall(int(_programData.size()), numArgs, symbolName));
+    mc_call(0);
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+        mc_mov_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()), VM_REGISTER_EAX);
+        break;
+    }
 }
 
-inline static void vm_divsd_memory_to_reg_x64(unsigned char* program, int& count, int dst, int src, int dst_offset)
+void poAsm::ir_param(poRegLinear& linear, const poInstruction& ins)
 {
-#ifdef USE_SUN_FLOAT
-    vm_emit_sse_brmo(gInstructions_SSE[VMI_SSE_DIVSS_SRC_MEM_DST_REG], program, count, src, dst, dst_offset);
-#else
-    vm_emit_sse_brmo(gInstructions_SSE[VMI_SSE_DIVSD_SRC_MEM_DST_REG], program, count, src, dst, dst_offset);
-#endif
+    const int dst = linear.getRegisterByVariable(ins.name());
+    static const int generalArgs[] = { VM_ARG1, VM_ARG2, VM_ARG3, VM_ARG4, VM_ARG5, VM_ARG6 };
+    static const int sseArgs[] = { VM_SSE_ARG1, VM_SSE_ARG2, VM_SSE_ARG3, VM_SSE_ARG4, VM_SSE_ARG5, VM_SSE_ARG6, VM_SSE_ARG7, VM_SSE_ARG8 };
+    const int param = ins.left();
+    switch (ins.type())
+    {
+    case TYPE_I64:
+    case TYPE_I32:
+    case TYPE_I8:
+        if (param < VM_MAX_ARGS)
+        {
+            const int src = generalArgs[param];
+            mc_mov_reg_to_reg_x64(dst, src);
+        }
+        break;
+    case TYPE_F64:
+        mc_movsd_reg_to_reg_x64(dst, sseArgs[param]);
+        break;
+    }
 }
 
-inline static void vm_cvtitod_memory_to_reg_x64(unsigned char* program, int& count, int dst, int src, int src_offset)
+//================
+
+poAsm::poAsm()
+    :
+    _entryPoint(-1)
 {
-#ifdef USE_SUN_FLOAT
-    vm_emit_sse_brmo(gInstructions_SSE[VMI_SSE_CVTSI2SS_SRC_MEM_DST_REG], program, count, src, dst, src_offset);
-#else
-    vm_emit_sse_brmo(gInstructions_SSE[VMI_SSE_CVTSI2SD_SRC_MEM_DST_REG], program, count, src, dst, src_offset);
-#endif
 }
 
-inline static void vm_cvtitod_reg_to_reg_x64(unsigned char* program, int& count, int dst, int src)
+void poAsm::patchJump(const poAsmJump& jump)
 {
-#ifdef USE_SUN_FLOAT
-    vm_emit_sse_brr(gInstructions_SSE[VMI_SSE_CVTSI2SS_SRC_REG_DST_REG], program, count, src, dst);
-#else
-    vm_emit_sse_brr(gInstructions_SSE[VMI_SSE_CVTSI2SD_SRC_REG_DST_REG], program, count, src, dst);
-#endif
+    const int pos = int(_programData.size());
+    const int size = jump.getSize();
+    const int imm = pos - (jump.getProgramDataPos() + size);
+
+    switch (jump.getJumpType())
+    {
+    case IR_JUMP_EQUALS:
+        mc_jump_equals(imm);
+        break;
+    case IR_JUMP_GREATER:
+        mc_jump_greater(imm);
+        break;
+    case IR_JUMP_LESS:
+        mc_jump_less(imm);
+        break;
+    case IR_JUMP_GREATER_EQUALS:
+        mc_jump_greater_equal(imm);
+        break;
+    case IR_JUMP_LESS_EQUALS:
+        mc_jump_less_equal(imm);
+        break;
+    case IR_JUMP_NOT_EQUALS:
+        mc_jump_not_equals(imm);
+        break;
+    case IR_JUMP_UNCONDITIONAL:
+        mc_jump_unconditional(imm);
+        break;
+    default:
+        return;
+    }
+
+    std::memcpy(_programData.data() + jump.getProgramDataPos(), _programData.data() + pos, size);
+    _programData.resize(_programData.size() - size);
 }
 
-inline static void vm_ucmpd_reg_to_reg_x64(unsigned char* program, int& count, int dst, int src)
+void po::poAsm::patchForwardJumps(po::poBasicBlock* bb)
 {
-#ifdef USE_SUN_FLOAT
-    vm_emit_sse_brr(gInstructions_SSE[VMI_SSE_UCOMISS_SRC_REG_DST_REG], program, count, src, dst);
-#else
-    vm_emit_sse_brr(gInstructions_SSE[VMI_SSE_UCOMISD_SRC_REG_DST_REG], program, count, src, dst);
-#endif
+    auto& incoming = bb->getIncoming();
+    for (poBasicBlock* inc : incoming)
+    {
+        auto& asmBB = _basicBlocks[_basicBlockMap.find(inc)->second];
+        auto& jumps = asmBB.jumps();
+        for (auto& jump : jumps)
+        {
+            if (!jump.isApplied() && jump.getBasicBlock() == bb)
+            {
+                jump.setApplied(true);
+                patchJump(jump);
+            }
+        }
+    }
 }
 
-inline static void vm_ucmpd_memory_to_reg_x64(unsigned char* program, int& count, int dst, int src, int src_offset)
+void poAsm::scanBasicBlocks(poFlowGraph& cfg)
 {
-#ifdef USE_SUN_FLOAT
-    vm_emit_sse_brmo(gInstructions_SSE[VMI_SSE_UCOMISS_SRC_MEM_DST_REG], program, count, src, dst, src_offset);
-#else
-    vm_emit_sse_brmo(gInstructions_SSE[VMI_SSE_UCOMISD_SRC_MEM_DST_REG], program, count, src, dst, src_offset);
-#endif
+    _basicBlocks.clear();
+    _basicBlockMap.clear();
+
+    poBasicBlock* bb = cfg.getFirst();
+    while (bb)
+    {
+        auto& asmBB = _basicBlocks.emplace_back();
+        _basicBlockMap.insert(std::pair<poBasicBlock*, int>(bb, int(_basicBlocks.size()) - 1));
+
+        bb = bb->getNext();
+    }
 }
 
-inline static void vm_xorpd_reg_to_reg_x64(unsigned char* program, int& count, int dst, int src)
+void poAsm::ssaDestruction(poFlowGraph& cfg)
 {
-#ifdef USE_SUN_FLOAT
-    vm_emit_sse_brr(gInstructions_SSE[VMI_SSE_XORPS_SRC_REG_DST_REG], program, count, src, dst);
-#else
-    vm_emit_sse_brr(gInstructions_SSE[VMI_SSE_XORPD_SRC_REG_DST_REG], program, count, src, dst);
+    _web.findPhiWebs(cfg);
+
+    std::unordered_map<int, int> phiWebVariable;
+
+    poBasicBlock* bb = cfg.getFirst();
+    while (bb)
+    {
+        for (int i = 0; i < int(bb->numInstructions()); i++)
+        {
+            auto& ins = bb->getInstruction(i);
+            const int id = _web.find(ins.name());
+            if (id != -1)
+            {
+                // Involved in a phi web; rename the variable
+                const auto& it = phiWebVariable.find(id);
+                if (it != phiWebVariable.end())
+                {
+                    ins.setName(it->second);
+                }
+                else
+                {
+                    phiWebVariable.insert(std::pair<int, int>(id, ins.name()));
+                }
+            }
+        }
+
+        bb = bb->getNext();
+    }
+
+    bb = cfg.getFirst();
+    while (bb)
+    {
+        for (int i = 0; i < int(bb->numInstructions()); i++)
+        {
+            auto& ins = bb->getInstruction(i);
+            const int left = ins.left();
+            const int right = ins.right();
+
+            const int leftId = _web.find(left);
+            const int rightId = _web.find(right);
+
+            if (leftId != -1)
+            {
+                // Update the name to the new name
+                ins.setLeft(phiWebVariable[leftId]);
+            }
+            if (rightId != -1)
+            {
+                // Update the name to the new name
+                ins.setRight(phiWebVariable[rightId]);
+            }
+        }
+
+        bb = bb->getNext();
+    }
+}
+
+void poAsm::generate(poModule& module, poFlowGraph& cfg)
+{
+    ssaDestruction(cfg);
+
+    poRegLinear linear;
+    linear.setNumRegisters(VM_REGISTER_MAX + VM_SSE_REGISTER_MAX);
+    
+    linear.setVolatile(VM_REGISTER_ESP, true);
+    linear.setVolatile(VM_REGISTER_EBP, true);
+    linear.setVolatile(VM_REGISTER_EAX, true);
+    linear.setVolatile(VM_REGISTER_R10, true);
+    linear.setVolatile(VM_REGISTER_R11, true);
+
+    linear.setVolatile(VM_ARG1, true);
+    linear.setVolatile(VM_ARG2, true);
+    linear.setVolatile(VM_ARG3, true);
+    linear.setVolatile(VM_ARG4, true);
+
+#if VM_MAX_ARGS == 6
+    linear.setVolatile(VM_ARG5, true);
+    linear.setVolatile(VM_ARG6, true);
 #endif
+
+    linear.setVolatile(VM_SSE_ARG1 + VM_REGISTER_MAX, true);
+    linear.setVolatile(VM_SSE_ARG2 + VM_REGISTER_MAX, true);
+    linear.setVolatile(VM_SSE_ARG3 + VM_REGISTER_MAX, true);
+    linear.setVolatile(VM_SSE_ARG4 + VM_REGISTER_MAX, true);
+    linear.setVolatile(VM_SSE_ARG5 + VM_REGISTER_MAX, true);
+    linear.setVolatile(VM_SSE_ARG6 + VM_REGISTER_MAX, true);
+
+#if VM_MAX_SSE_ARGS == 8
+    linear.setVolatile(VM_SSE_ARG7 + VM_REGISTER_MAX, true);
+    linear.setVolatile(VM_SSE_ARG8 + VM_REGISTER_MAX, true);
+#endif
+
+    for (int i = 0; i < VM_REGISTER_MAX + VM_SSE_REGISTER_MAX; i++)
+    {
+        linear.setType(i, i < VM_REGISTER_MAX ? poRegType::General : poRegType::SSE);
+    }
+
+    linear.allocateRegisters(cfg);
+
+    // Prologue
+    mc_sub_imm_to_reg_x64(VM_REGISTER_ESP, 8);
+
+    // Generate the machine code
+    //
+    scanBasicBlocks(cfg);
+    poBasicBlock* bb = cfg.getFirst();
+    while (bb)
+    {
+        _basicBlocks[_basicBlockMap[bb]].setPos(int(_programData.size()));
+        patchForwardJumps(bb);
+
+        auto& instructions = bb->instructions();
+        for (int i = 0; i < int(instructions.size()); i++)
+        {
+            auto& ins = instructions[i];
+            switch (ins.code())
+            {
+            case IR_ADD:
+                ir_add(linear, ins);
+                break;
+            case IR_ARG:
+                // do nothing
+                break;
+            case IR_BR:
+                ir_br(linear, ins, bb);
+                break;
+            case IR_CALL:
+            {
+                std::vector<poInstruction> args;
+                for (int j = 0; j < ins.left(); j++)
+                {
+                    args.push_back(instructions[i + j + 1]);
+                }
+
+                ir_call(module, linear, ins, args);
+                i += ins.left();
+            }
+                break;
+            case IR_CMP:
+                ir_cmp(linear, ins);
+                break;
+            case IR_CONSTANT:
+                ir_constant(module.constants(), linear, ins);
+                break;
+            case IR_DIV:
+                ir_div(linear, ins);
+                break;
+            case IR_MUL:
+                ir_mul(linear, ins);
+                break;
+            case IR_PARAM:
+                ir_param(linear, ins);
+                break;
+            case IR_PHI:
+                // do nothing
+                break;
+            case IR_RETURN:
+                ir_ret(linear, ins);
+                break;
+            case IR_SUB:
+                ir_sub(linear, ins);
+                break;
+            case IR_UNARY_MINUS:
+                ir_unary_minus(linear, ins);
+                break;
+            }
+        }
+
+        bb = bb->getNext();
+    }
+}
+
+void poAsm::generate(poModule& module)
+{
+    std::vector<poNamespace>& namespaces = module.namespaces();
+    for (poNamespace& ns : namespaces)
+    {
+        std::vector<poFunction>& functions = ns.functions();
+        for (poFunction& function : functions)
+        {
+            _mapping.insert(std::pair<std::string, int>(function.name(), int(_programData.size())));
+
+            generate(module, function.cfg());
+        }
+    }
+
+    patchCalls();
+
+    const int mainImm =_mapping["main"] - int(_programData.size());
+    _entryPoint = int(_programData.size());
+    mc_call(mainImm);
+    mc_return();
+}
+
+void poAsm::patchCalls()
+{
+    for (poAsmCall& call : _calls)
+    {
+        const int pos = call.getPos();
+        const std::string& symbol = call.getSymbol();
+        const auto& it = _mapping.find(symbol);
+
+        if (it != _mapping.end())
+        {
+            const int size = 5;
+            const int dataPos = int(_programData.size());
+            mc_call(it->second - pos);
+            std::memcpy(_programData.data() + pos, _programData.data() + dataPos, size);
+            _programData.resize(_programData.size() - size);
+        }
+    }
 }

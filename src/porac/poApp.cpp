@@ -38,9 +38,18 @@ int main(const int numArgs, const char** const args)
             return 0;
         }
 
+        if (compiler.assembler().entryPoint() == -1)
+        {
+            std::cout << "No entry point defined." << std::endl;
+            return 0;
+        }
+
+        const std::vector<unsigned char>& programData = compiler.assembler().programData();
+
         // Create the data sections
         poPortableExecutableSection text(poSectionType::TEXT);
         text.data().resize(1024);
+        std::memcpy(text.data().data(), programData.data(), programData.size());
 
         poPortableExecutableSection initialized(poSectionType::INITIALIZED);
         initialized.data().resize(1024);
@@ -53,6 +62,7 @@ int main(const int numArgs, const char** const args)
         
         // Write the executable file
         poPortableExecutable exe;
+        exe.setEntryPoint(compiler.assembler().entryPoint());
         exe.addSection(text);
         exe.addSection(initialized);
         exe.addSection(uninitialized);

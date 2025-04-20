@@ -11,6 +11,10 @@ set (PORA_TEST_SOURCES
     "poDominatorTest.cpp"
     "poSSATests.h"
     "poSSATests.cpp"
+    "poLiveTests.h"
+    "poLiveTests.cpp"
+    "poRegLinearTests.h"
+    "poRegLinearTests.cpp"
 )
 
 project ("poratest")

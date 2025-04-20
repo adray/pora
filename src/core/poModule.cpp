@@ -183,6 +183,16 @@ int poConstantPool::getConstant(const float f32)
     return -1;
 }
 
+int64_t poConstantPool::getI64(const int id)
+{
+    return _constants[id].i64();
+}
+
+int32_t poConstantPool::getI32(const int id)
+{
+    return _constants[id].i32();
+}
+
 //=================
 // Function
 //================
@@ -251,6 +261,24 @@ poResult<poNamespace> poModule::getNamespace(const std::string& name)
     }
 
     return poResult<poNamespace>(_namespaces, index);
+}
+
+int poModule::addSymbol(const std::string& symbol)
+{
+    int id = int(_symbols.size());
+    _symbols.insert(std::pair<int, std::string>(id, symbol));
+    return id;
+}
+
+bool poModule::getSymbol(const int id, std::string& symbol)
+{
+    const auto& it = _symbols.find(id);
+    if (it != _symbols.end())
+    {
+        symbol = it->second;
+        return true;
+    }
+    return false;
 }
 
 void poModule::dump()

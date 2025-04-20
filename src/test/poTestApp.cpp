@@ -2,6 +2,8 @@
 #include "poDominatorTest.h"
 #include "poSyntaxTests.h"
 #include "poSSATests.h"
+#include "poLiveTests.h"
+#include "poRegLinearTests.h"
 
 #include <iostream>
 
@@ -13,6 +15,8 @@ int main(int numArgs, const char* const args)
     syntaxTest();
     runDominatorTests();
     runSsaTests();
+    runLiveTests();
+    runRegLinearTests();
 
     return 0;
 }

@@ -31,13 +31,20 @@ namespace po
     class poSSABasicBlock
     {
     public:
+        poSSABasicBlock();
         void addPhi(const int name);
         inline std::vector<poSSAPhi>& phis() {
             return _phis;
         }
+        inline const int maxUse()const { return _maxUse; }
+        inline const int maxDef()const { return _maxDef; }
+        inline void setMaxUse(const int use) { _maxUse = use; }
+        inline void setMaxDef(const int def) { _maxDef = def; }
 
     private:
         std::vector<poSSAPhi> _phis;
+        int _maxUse;
+        int _maxDef;
     };
 
     class poSSA

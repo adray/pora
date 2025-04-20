@@ -13,8 +13,12 @@ set (PORACORE_SOURCES
     "poDom.cpp"
     "poPE.h"
     "poPE.cpp"
+    "poPhiWeb.h"
+    "poPhiWeb.cpp"
     "poLex.h"
     "poLex.cpp"
+    "poLive.h"
+    "poLive.cpp"
     "poOptFold.h"
     "poOptFold.cpp"
     "poParser.h"
@@ -25,6 +29,8 @@ set (PORACORE_SOURCES
     "poModule.cpp"
     "poSSA.h"
     "poSSA.cpp"
+    "poRegLinear.h"
+    "poRegLinear.cpp"
 )
 
 project ("poracore")

@@ -120,6 +120,9 @@ namespace po
 
         void dumpExports();
 
+        inline void setEntryPoint(const int entryPoint) { _entryPoint = entryPoint; }
+        inline const int getEntryPoint() const { return _entryPoint; }
+
     private:
         void genImports(const int imagePos, poPortableExecutableSection& section, const poPortableExecutableData& data);
 
@@ -134,5 +137,6 @@ namespace po
         int _uninitializedSection;
         int _readonlySection;
         int _iData;
+        int _entryPoint;
     };
 }

@@ -42,8 +42,8 @@ namespace po
         poConstant(const double f64);
         inline int type() const { return _type; }
         inline int64_t i64() const { return _i64; }
-        inline int64_t i32() const { return _i32; }
-        inline int64_t i8() const { return _i8; }
+        inline int32_t i32() const { return _i32; }
+        inline int8_t i8() const { return _i8; }
 
     private:
         int _type;
@@ -114,6 +114,8 @@ namespace po
         int getConstant(const int8_t i8);
         int getConstant(const double f64);
         int getConstant(const float f32);
+        int64_t getI64(const int id);
+        int32_t getI32(const int id);
 
     private:
         std::unordered_map<int64_t, int> _i64;
@@ -131,9 +133,12 @@ namespace po
         poResult<poNamespace> getNamespace(const std::string& name);
         inline std::vector<poNamespace>& namespaces() { return _namespaces; }
         inline poConstantPool& constants() { return _constants; }
+        int addSymbol(const std::string& symbol);
+        bool getSymbol(const int id, std::string& symbol);
         void dump();
 
     private:
+        std::unordered_map<int, std::string> _symbols;
         std::vector<poNamespace> _namespaces;
         poConstantPool _constants;
     };

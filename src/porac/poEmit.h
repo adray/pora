@@ -94,7 +94,7 @@ namespace po
         void emitBody(poNode* node, poFlowGraph& cfg);
         void emitArgs(poNode* node, poFlowGraph& cfg);
         void emitStatement(poNode* node, poFlowGraph& cfg);
-        void emitCall(poNode* node, poFlowGraph& cfg);
+        int emitCall(poNode* node, poFlowGraph& cfg);
         void emitReturn(poNode* node, poFlowGraph& cfg);
         void emitDecl(poNode* node, poFlowGraph& cfg);
         void emitAssignment(poNode* node, poFlowGraph& cfg);

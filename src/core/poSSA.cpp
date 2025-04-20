@@ -1,6 +1,7 @@
 #include "poSSA.h"
 #include "poModule.h"
 #include "poDom.h"
+#include "poLive.h"
 
 using namespace po;
 
@@ -22,6 +23,13 @@ void poSSAPhi::addValue(const int value)
 //=================
 // poSSABasicBlock
 //=================
+
+poSSABasicBlock::poSSABasicBlock()
+    :
+    _maxDef(-1),
+    _maxUse(-1)
+{
+}
 
 void poSSABasicBlock::addPhi(const int name)
 {
@@ -173,11 +181,11 @@ void poSSA::ssaRename(const std::vector<int>& variables, poDom& dom, int bb_id)
         auto& ins = bb->getInstruction(int(i));
         if (ins.code() != IR_PHI)
         {
-            if (ins.left() != -1 && ins.code() != IR_CONSTANT && ins.code() != IR_CALL && ins.code() != IR_BR)
+            if (ins.left() != -1 && ins.code() != IR_CONSTANT && ins.code() != IR_CALL && ins.code() != IR_BR && ins.code() != IR_PARAM)
             {
                 ins.setLeft(getTopStack(ins.left()));
             }
-            if (ins.right() != -1 && ins.code() != IR_CONSTANT && ins.code() != IR_CALL && ins.code() != IR_BR)
+            if (ins.right() != -1 && ins.code() != IR_CONSTANT && ins.code() != IR_CALL && ins.code() != IR_BR && ins.code() != IR_PARAM)
             {
                 ins.setRight(getTopStack(ins.right()));
             }

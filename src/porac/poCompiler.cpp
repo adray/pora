@@ -72,15 +72,16 @@ int poCompiler:: compile()
     poModule module;
     poCodeGenerator generator(module);
     generator.generate(nodes);
-    module.dump();
+    //module.dump();
 
     // Convert to SSA form and insert PHI nodes
     poSSA ssa;
     ssa.construct(module);
+    //module.dump();
+
+    // Convert the basic blocks/cfg to machine code
+    _assembler.generate(module);
     module.dump();
-
-    // TODO: Convert the basic blocks/cfg to machine code
-
 
     return 1;
 }
