@@ -4,6 +4,7 @@
 #include "poTypeChecker.h"
 
 #include <assert.h>
+#include <sstream>
 
 using namespace po;
 
@@ -140,10 +141,20 @@ enum vm_instructions
     VMI_ADD64_SRC_MEM_DST_REG,
     VMI_ADD64_SRC_REG_DST_MEM,
 
+    VMI_ADD8_SRC_IMM_DST_REG,
+    VMI_ADD8_SRC_REG_DST_REG,
+    VMI_ADD8_SRC_MEM_DST_REG,
+    VMI_ADD8_SRC_REG_DST_MEM,
+
     VMI_SUB64_SRC_REG_DST_REG,
     VMI_SUB64_SRC_IMM_DST_REG,
     VMI_SUB64_SRC_MEM_DST_REG,
     VMI_SUB64_SRC_REG_DST_MEM,
+
+    VMI_SUB8_SRC_REG_DST_REG,
+    VMI_SUB8_SRC_IMM_DST_REG,
+    VMI_SUB8_SRC_REG_DST_MEM,
+    VMI_SUB8_SRC_MEM_DST_REG,
 
     VMI_MOV64_SRC_REG_DST_REG,
     VMI_MOV64_SRC_REG_DST_MEM,
@@ -152,8 +163,16 @@ enum vm_instructions
 
     VMI_MOV32_SRC_IMM_DST_REG,
 
+    VMI_MOV8_SRC_IMM_DST_REG,
+    VMI_MOV8_SRC_REG_DST_REG,
+    VMI_MOV8_SRC_MEM_DST_REG,
+    VMI_MOV8_SRC_REG_DST_MEM,
+
     VMI_MUL64_SRC_REG_DST_REG,
     VMI_MUL64_SRC_MEM_DST_REG,
+
+    VMI_IMUL8_SRC_REG,
+    VMI_MUL8_SRC_REG,
 
     VMI_INC64_DST_MEM,
     VMI_INC64_DST_REG,
@@ -168,6 +187,10 @@ enum vm_instructions
     VMI_CMP64_SRC_REG_DST_MEM,
     VMI_CMP64_SRC_MEM_DST_REG,
 
+    VMI_CMP8_SRC_REG_DST_REG,
+    VMI_CMP8_SRC_MEM_DST_REG,
+    VMI_CMP8_SRC_REG_DST_MEM,
+
     VMI_J8,
     VMI_JE8,
     VMI_JNE8,
@@ -180,15 +203,25 @@ enum vm_instructions
     VMI_J32,
     VMI_JE32,
     VMI_JNE32,
-    VMI_JL32,
-    VMI_JG32,
-    VMI_JLE32,
-    VMI_JGE32,
+    VMI_JNAE32, /*unsigned*/
+    VMI_JNBE32, /*unsigned*/
+    VMI_JNA32, /*unsigned*/
+    VMI_JNB32, /*unsigned*/
+    VMI_JG32, /*signed*/ /*0F 8F*/
+    VMI_JGE32, /*signed*/ /*0F 8D*/
+    VMI_JL32, /*signed*/ /*0F 8C*/
+    VMI_JLE32, /*signed*/ /*0F 8E*/
 
     VMI_NEG64_DST_MEM,
     VMI_NEG64_DST_REG,
-    VMI_IDIV_SRC_REG,
-    VMI_IDIV_SRC_MEM,
+    VMI_IDIV64_SRC_REG,
+    VMI_IDIV64_SRC_MEM,
+
+    VMI_IDIV8_SRC_REG,
+    VMI_IDIV8_SRC_MEM,
+
+    VMI_DIV8_SRC_REG,
+    VMI_DIV8_SRC_MEM,
 
     // End of instructions
     VMI_MAX_INSTRUCTIONS
@@ -285,10 +318,20 @@ static constexpr vm_instruction gInstructions[VMI_MAX_INSTRUCTIONS] = {
     INS(0x48, 0x3, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRMO, VMI_ENC_RM),    // VMI_ADD64_SRC_MEM_DST_REG
     INS(0x48, 0x1, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BMRO, VMI_ENC_MR),    // VMI_ADD64_SRC_REG_DST_MEM
 
+    INS(0x48, 0xB0, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRI, VMI_ENC_MI), // VMI_ADD8_SRC_IMM_DST_REG,
+    INS(0x48, 0x2, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_RM), // VMI_ADD8_SRC_REG_DST_REG,
+    INS(0x48, 0x2, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRM, VMI_ENC_RM), // VMI_ADD8_SRC_MEM_DST_REG,
+    INS(0x48, 0x0, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BMR, VMI_ENC_MR), // VMI_ADD8_SRC_REG_DST_MEM,
+
     INS(0x48, 0x29, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_MR),    // VMI_SUB64_SRC_REG_DST_REG
     INS(0x48, 0x81, 5, VM_INSTRUCTION_BINARY, CODE_BRI, VMI_ENC_MI),    // VMI_SUB64_SRC_IMM_DST_REG
     INS(0x48, 0x2B, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRMO, VMI_ENC_RM),   // VMI_SUB64_SRC_MEM_DST_REG
     INS(0x48, 0x29, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BMRO, VMI_ENC_MR),   // VMI_SUB64_SRC_REG_DST_MEM
+
+    INS(0x48, 0x28, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_MR), // VMI_SUB8_SRC_REG_DST_REG
+    INS(0x48, 0x29, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRI, VMI_ENC_MI), // VMI_SUB8_SRC_IMM_DST_REG
+    INS(0x48, 0x28, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BMR, VMI_ENC_MR),  // VMI_SUB8_SRC_REG_DST_MEM
+    INS(0x48, 0x2A, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRM, VMI_ENC_RM), // VMI_SUB8_SRC_MEM_DST_REG
 
     INS(0x48, 0x89, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_MR),    // VMI_MOV64_SRC_REG_DST_REG
     INS(0x48, 0x89, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BMRO, VMI_ENC_MR),   // VMI_MOV64_SRC_REG_DST_MEM
@@ -297,8 +340,17 @@ static constexpr vm_instruction gInstructions[VMI_MAX_INSTRUCTIONS] = {
 
     INS(0x0, 0xB8, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRI, VMI_ENC_OI),    // VMI_MOV32_SRC_IMM_DST_REG
 
+    INS(0x48, 0xB0, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRI, VMI_ENC_OI), //VMI_MOV8_SRC_IMM_DST_REG
+    INS(0x48, 0x88, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_MR), //VMI_MOV8_SRC_REG_DST_REG,
+    INS(0x48, 0x8A, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRM, VMI_ENC_RM), //VMI_MOV8_SRC_MEM_DST_REG,
+    INS(0x48, 0x88, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BMR, VMI_ENC_MR), //VMI_MOV8_SRC_REG_DST_MEM,
+
     INS(0x48, 0x0F, 0xAF, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_RM), // VMI_MUL64_SRC_REG_DST_REG
     INS(0x48, 0x0F, 0xAF, VM_INSTRUCTION_BINARY, CODE_BRMO, VMI_ENC_RM), // VMI_MUL64_SRC_MEM_DST_REG
+
+    INS(0x48, 0xF6, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_UR, VMI_ENC_M), // VMI_IMUL8_SRC_REG /*signed*/
+    INS(0x40, 0xF6, 0x4, VM_INSTRUCTION_BINARY, CODE_UR, VMI_ENC_M), // VMI_MUL8_SRC_REG /*unsigned*/
+
 
     INS(0x48, 0xFF, 0x0, VM_INSTRUCTION_UNARY, CODE_UMO, VMI_ENC_M),    // VMI_INC64_DST_MEM
     INS(0x48, 0xFF, 0x0, VM_INSTRUCTION_UNARY, CODE_UR, VMI_ENC_M),    // VMI_INC64_DST_REG
@@ -313,6 +365,10 @@ static constexpr vm_instruction gInstructions[VMI_MAX_INSTRUCTIONS] = {
     INS(0x48, 0x39, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BMRO, VMI_ENC_MR), // VMI_CMP64_SRC_REG_DST_MEM
     INS(0x48, 0x3B, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRMO, VMI_ENC_RM), // VMI_CMP64_SRC_MEM_DST_REG
 
+    INS(0x40, 0x38, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_MR), // VMI_CMP8_SRC_REG_DST_REG
+    INS(0x40, 0x3A, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRM, VMI_ENC_RM), // VMI_CMP8_SRC_MEM_DST_REG
+    INS(0x40, 0x38, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BMR, VMI_ENC_MR), // VMI_CMP8_SRC_REG_DST_MEM
+
     INS(0x0, 0xEB, VMI_UNUSED, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), // VMI_J8
     INS(0x0, 0x74, VMI_UNUSED, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), // VMI_JE8
     INS(0x0, 0x75, VMI_UNUSED, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), // VMI_JNE8
@@ -324,17 +380,27 @@ static constexpr vm_instruction gInstructions[VMI_MAX_INSTRUCTIONS] = {
 
     INS(0x0, 0xE9, VMI_UNUSED, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), // VMI_J32
     INS(0x0, 0x0F, 0x84, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), // VMI_JE32
-    INS(0x0, 0x0F, 0x85, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), // VMI_JNE32
-    INS(0x0, 0x0F, 0x82, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), // VMI_JL32,
-    INS(0x0, 0x0F, 0x87, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), // VMI_JG32,
-    INS(0x0, 0x0F, 0x86, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), // VMI_JLE32,
-    INS(0x0, 0x0F, 0x83, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), // VMI_JGE32,
+    INS(0x0, 0x0F, 0x85, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), // VMI_JNE32, /*unsigned*/
+    INS(0x0, 0x0F, 0x82, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), // VMI_JNAE32, /*unsigned*/
+    INS(0x0, 0x0F, 0x87, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), // VMI_JNBE32, /*unsigned*/
+    INS(0x0, 0x0F, 0x86, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), // VMI_JNB32, /*unsigned*/
+    INS(0x0, 0x0F, 0x83, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), // VMI_JNA32, /*unsigned*/
+    INS(0x0, 0x0F, 0x8F, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D),  //VMI_JG32, /*signed*/
+    INS(0x0, 0x0F, 0x8D, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), //VMI_JGE32, /*signed*/
+    INS(0x0, 0x0F, 0x8C, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), //VMI_JL32, /*signed*/
+    INS(0x0, 0x0F, 0x8E, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), //VMI_JLE32, /*signed*/
 
     INS(0x48, 0xF7, 0x3, VM_INSTRUCTION_UNARY, CODE_UMO, VMI_ENC_M),     // VMI_NEG64_DST_MEM
     INS(0x48, 0xF7, 0x3, VM_INSTRUCTION_UNARY, CODE_UR, VMI_ENC_M),     // VMI_NEG64_DST_REG
 
-    INS(0x48, 0xF7, 0x7, VM_INSTRUCTION_UNARY, CODE_UR, VMI_ENC_M),     // VMI_IDIV_SRC_REG
-    INS(0x48, 0xF7, 0x7, VM_INSTRUCTION_UNARY, CODE_UMO, VMI_ENC_M),     // VMI_IDIV_SRC_MEM
+    INS(0x48, 0xF7, 0x7, VM_INSTRUCTION_UNARY, CODE_UR, VMI_ENC_M),     // VMI_IDIV64_SRC_REG /* signed */
+    INS(0x48, 0xF7, 0x7, VM_INSTRUCTION_UNARY, CODE_UMO, VMI_ENC_M),     // VMI_IDIV64_SRC_MEM /* signed */
+
+    INS(0x40, 0xF6, 0x7, VM_INSTRUCTION_UNARY, CODE_UR, VMI_ENC_M),     // VMI_IDIV8_SRC_REG /* signed */
+    INS(0x40, 0xF6, 0x7, VM_INSTRUCTION_UNARY, CODE_UMO, VMI_ENC_M),     // VMI_IDIV8_SRC_MEM /* signed */
+
+    INS(0x40, 0xF6, 0x6, VM_INSTRUCTION_UNARY, CODE_UR, VMI_ENC_M),     // VMI_IDIV8_SRC_REG /* unsigned */
+    INS(0x40, 0xF6, 0x6, VM_INSTRUCTION_UNARY, CODE_UMO, VMI_ENC_M),     // VMI_IDIV8_SRC_MEM /* unsigned */
 };
 
 static constexpr vm_sse_instruction gInstructions_SSE[VMI_SSE_MAX_INSTRUCTIONS] = {
@@ -395,10 +461,11 @@ static constexpr vm_sse_instruction gInstructions_SSE[VMI_SSE_MAX_INSTRUCTIONS] 
 // poAsmJump
 //=================
 
-poAsmJump::poAsmJump(const int programDataPos, const int jumpType, const int size, poBasicBlock* bb)
+poAsmJump::poAsmJump(const int programDataPos, const int jumpType, const int size, poBasicBlock* bb, const int type)
     :
     _programDataPos(programDataPos),
     _jumpType(jumpType),
+    _type(type),
     _size(size),
     _bb(bb),
     _applied(false)
@@ -773,8 +840,6 @@ void poAsm::emit_sse_brm(const vm_sse_instruction& ins, int dst, int disp32)
 }
 
 //================
-#define VM_ALIGN_16(x) ((x + 0xf) & ~(0xf))
-
 
 void poAsm::mc_reserve()
 {
@@ -826,6 +891,96 @@ void poAsm::mc_pop_reg(char reg)
     }
 
     _programData.push_back(0x58 | ((reg % 8) & 0x7));
+}
+void poAsm::mc_mov_imm_to_reg_8(char dst, char imm)
+{
+    auto& ins = gInstructions[VMI_MOV8_SRC_IMM_DST_REG];
+
+    _programData.push_back(ins.rex | (dst >= VM_REGISTER_R8 ? 0x1 : 0x0));
+    _programData.push_back(ins.ins | (dst % 8));
+    _programData.push_back((unsigned char)(imm & 0xff));
+}
+void poAsm::mc_mov_reg_to_reg_8(char dst, char src)
+{
+    emit_brr(gInstructions[VMI_MOV8_SRC_REG_DST_REG], dst, src);
+}
+void poAsm::mc_mov_memory_to_reg_8(char dst, char src, int src_offset)
+{
+    emit_brmo(gInstructions[VMI_MOV8_SRC_MEM_DST_REG], dst, src, src_offset);
+}
+void poAsm::mc_mov_reg_to_memory_8(char dst, char src, int dst_offset)
+{
+    emit_bmro(gInstructions[VMI_MOV8_SRC_REG_DST_MEM], dst, src, dst_offset);
+}
+void poAsm::mc_add_reg_to_reg_8(char dst, char src)
+{
+    emit_brr(gInstructions[VMI_ADD8_SRC_REG_DST_REG], dst, src);
+}
+void poAsm::mc_add_imm_to_reg_8(char dst, char imm)
+{
+    // TODO: the immediate in emit_bri takes an int not a byte
+    emit_bri(gInstructions[VMI_ADD8_SRC_IMM_DST_REG], dst, imm);
+}
+void poAsm::mc_add_memory_to_reg_8(char dst, char src, int src_offset)
+{
+    emit_brmo(gInstructions[VMI_ADD8_SRC_MEM_DST_REG], dst, src, src_offset);
+}
+void poAsm::mc_add_reg_to_memory_8(char dst, char src, int dst_offset)
+{
+    emit_bmro(gInstructions[VMI_ADD8_SRC_REG_DST_MEM], dst, src, dst_offset);
+}
+void poAsm::mc_sub_imm_to_reg_8(char dst, char imm)
+{
+    // TODO: the immediate in emit_bri takes an int not a byte
+    emit_bri(gInstructions[VMI_SUB8_SRC_IMM_DST_REG], dst, imm);
+}
+void poAsm::mc_sub_reg_to_reg_8(char dst, char src)
+{
+    emit_brr(gInstructions[VMI_SUB8_SRC_REG_DST_REG], dst, src);
+}
+void poAsm::mc_sub_memory_to_reg_8(char dst, char src, int src_offset)
+{
+    emit_brmo(gInstructions[VMI_SUB8_SRC_MEM_DST_REG], dst, src, src_offset);
+}
+void poAsm::mc_sub_reg_to_memory_8(char dst, char src, int dst_offset)
+{
+    emit_bmro(gInstructions[VMI_SUB8_SRC_REG_DST_MEM], dst, src, dst_offset);
+}
+void poAsm::mc_mul_reg_8(char reg)
+{
+    emit_ur(gInstructions[VMI_IMUL8_SRC_REG], reg);
+}
+void poAsm::mc_umul_reg_8(char reg)
+{
+    emit_ur(gInstructions[VMI_MUL8_SRC_REG], reg);
+}
+void poAsm::mc_div_reg_8(char reg)
+{
+    emit_ur(gInstructions[VMI_IDIV8_SRC_REG], reg);
+}
+void poAsm::mc_div_mem_8(char reg)
+{
+    emit_um(gInstructions[VMI_IDIV8_SRC_MEM], reg);
+}
+void poAsm::mc_udiv_reg_8(char reg)
+{
+    emit_ur(gInstructions[VMI_DIV8_SRC_REG], reg);
+}
+void poAsm::mc_udiv_mem_8(char reg)
+{
+    emit_um(gInstructions[VMI_DIV8_SRC_MEM], reg);
+}
+void poAsm::mc_cmp_reg_to_reg_8(char dst, char src)
+{
+    emit_brr(gInstructions[VMI_CMP8_SRC_REG_DST_REG], dst, src);
+}
+void poAsm::mc_cmp_memory_to_reg_8(char dst, char src, int src_offset)
+{
+    emit_brmo(gInstructions[VMI_CMP8_SRC_MEM_DST_REG], dst, src, src_offset);
+}
+void poAsm::mc_cmp_reg_to_memory_8(char dst, char src, int dst_offset)
+{
+    emit_bmro(gInstructions[VMI_CMP8_SRC_REG_DST_MEM], dst, src, dst_offset);
 }
 void poAsm::mc_mov_imm_to_reg(char dst, int imm)
 {
@@ -900,11 +1055,11 @@ void poAsm::mc_mul_memory_to_reg_x64(char dst, char src, int src_offset)
 }
 void poAsm::mc_div_reg_x64(char reg)
 {
-    emit_ur(gInstructions[VMI_IDIV_SRC_REG], reg);
+    emit_ur(gInstructions[VMI_IDIV64_SRC_REG], reg);
 }
 void poAsm::mc_div_memory_x64(char src, int src_offset)
 {
-    emit_umo(gInstructions[VMI_IDIV_SRC_MEM], src, src_offset);
+    emit_umo(gInstructions[VMI_IDIV64_SRC_MEM], src, src_offset);
 }
 void poAsm::mc_cmp_reg_to_reg_x64(char dst, char src)
 {
@@ -974,6 +1129,22 @@ void poAsm::mc_jump_greater_equal(int imm)
 {
     emit_ui(gInstructions[VMI_JGE32], imm);
 }
+void poAsm::mc_jump_not_above(int imm)
+{
+    emit_ui(gInstructions[VMI_JNA32], imm);
+}
+void poAsm::mc_jump_not_above_equal(int imm)
+{
+    emit_ui(gInstructions[VMI_JNAE32], imm);
+}
+void poAsm::mc_jump_not_below(int imm)
+{
+    emit_ui(gInstructions[VMI_JNB32], imm);
+}
+void poAsm::mc_jump_not_below_equal(int imm)
+{
+    emit_ui(gInstructions[VMI_JNBE32], imm);
+}
 void poAsm::mc_jump_absolute(int reg)
 {
     emit_ur(gInstructions[VMI_JA64], reg);
@@ -1024,141 +1195,140 @@ void poAsm::mc_neg_reg_x64(int reg)
 }
 void poAsm::mc_movsd_reg_to_reg_x64(int dst, int src)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_brr(gInstructions_SSE[VMI_SSE_MOVSS_SRC_REG_DST_REG], src, dst);
-#else
     emit_sse_brr(gInstructions_SSE[VMI_SSE_MOVSD_SRC_REG_DST_REG], src, dst);
-#endif
 }
 void poAsm::mc_movsd_reg_to_memory_x64(int dst, int src, int dst_offset)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_bmro(gInstructions_SSE[VMI_SSE_MOVSS_SRC_REG_DST_MEM], src, dst, dst_offset);
-#else
     emit_sse_bmro(gInstructions_SSE[VMI_SSE_MOVSD_SRC_REG_DST_MEM], src, dst, dst_offset);
-#endif
 }
 void poAsm::mc_movsd_memory_to_reg_x64(int dst, int src, int src_offset)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_brmo(gInstructions_SSE[VMI_SSE_MOVSS_SRC_MEM_DST_REG], src, dst, src_offset);
-#else
     emit_sse_brmo(gInstructions_SSE[VMI_SSE_MOVSD_SRC_MEM_DST_REG], src, dst, src_offset);
-#endif
 }
 void poAsm::mc_movsd_memory_to_reg_x64(int dst, int addr)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_brm(gInstructions_SSE[VMI_SSE_MOVSS_SRC_MEM_DST_REG], dst, addr);
-#else
     emit_sse_brm(gInstructions_SSE[VMI_SSE_MOVSD_SRC_MEM_DST_REG], dst, addr);
-#endif
 }
 void poAsm::mc_addsd_reg_to_reg_x64(int dst, int src)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_brr(gInstructions_SSE[VMI_SSE_ADDSS_SRC_REG_DST_REG], src, dst);
-#else
     emit_sse_brr(gInstructions_SSE[VMI_SSE_ADDSD_SRC_REG_DST_REG], src, dst);
-#endif
 }
 void poAsm::mc_addsd_memory_to_reg_x64(int dst, int src, int src_offset)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_brmo(gInstructions_SSE[VMI_SSE_ADDSS_SRC_MEM_DST_REG], src, dst, src_offset);
-#else
     emit_sse_brmo(gInstructions_SSE[VMI_SSE_ADDSD_SRC_MEM_DST_REG], src, dst, src_offset);
-#endif
 }
 void poAsm::mc_subsd_reg_to_reg_x64(int dst, int src)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_brr(gInstructions_SSE[VMI_SSE_SUBSS_SRC_REG_DST_REG], src, dst);
-#else
     emit_sse_brr(gInstructions_SSE[VMI_SSE_SUBSD_SRC_REG_DST_REG], src, dst);
-#endif
 }
 void poAsm::mc_subsd_memory_to_reg_x64(int dst, int src, int src_offset)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_brmo(gInstructions_SSE[VMI_SSE_SUBSS_SRC_MEM_DST_REG], src, dst, src_offset);
-#else
     emit_sse_brmo(gInstructions_SSE[VMI_SSE_SUBSD_SRC_MEM_DST_REG], src, dst, src_offset);
-#endif
 }
 void poAsm::mc_mulsd_reg_to_reg_x64(int dst, int src)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_brr(gInstructions_SSE[VMI_SSE_MULSS_SRC_REG_DST_REG], src, dst);
-#else
     emit_sse_brr(gInstructions_SSE[VMI_SSE_MULSD_SRC_REG_DST_REG], src, dst);
-#endif
 }
 void poAsm::mc_mulsd_memory_to_reg_x64(int dst, int src, int dst_offset)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_brmo(gInstructions_SSE[VMI_SSE_MULSS_SRC_MEM_DST_REG], src, dst, dst_offset);
-#else
     emit_sse_brmo(gInstructions_SSE[VMI_SSE_MULSD_SRC_MEM_DST_REG], src, dst, dst_offset);
-#endif
 }
 void poAsm::mc_divsd_reg_to_reg_x64(int dst, int src)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_brr(gInstructions_SSE[VMI_SSE_DIVSS_SRC_REG_DST_REG], src, dst);
-#else
     emit_sse_brr(gInstructions_SSE[VMI_SSE_DIVSD_SRC_REG_DST_REG], src, dst);
-#endif
 }
 void poAsm::mc_divsd_memory_to_reg_x64(int dst, int src, int dst_offset)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_brmo(gInstructions_SSE[VMI_SSE_DIVSS_SRC_MEM_DST_REG], src, dst, dst_offset);
-#else
     emit_sse_brmo(gInstructions_SSE[VMI_SSE_DIVSD_SRC_MEM_DST_REG], src, dst, dst_offset);
-#endif
 }
 void poAsm::mc_cvtitod_memory_to_reg_x64(int dst, int src, int src_offset)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_brmo(gInstructions_SSE[VMI_SSE_CVTSI2SS_SRC_MEM_DST_REG], src, dst, src_offset);
-#else
     emit_sse_brmo(gInstructions_SSE[VMI_SSE_CVTSI2SD_SRC_MEM_DST_REG], src, dst, src_offset);
-#endif
 }
 void poAsm::mc_cvtitod_reg_to_reg_x64(int dst, int src)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_brr(gInstructions_SSE[VMI_SSE_CVTSI2SS_SRC_REG_DST_REG], src, dst);
-#else
     emit_sse_brr(gInstructions_SSE[VMI_SSE_CVTSI2SD_SRC_REG_DST_REG], src, dst);
-#endif
 }
 void poAsm::mc_ucmpd_reg_to_reg_x64(int dst, int src)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_brr(gInstructions_SSE[VMI_SSE_UCOMISS_SRC_REG_DST_REG], src, dst);
-#else
     emit_sse_brr(gInstructions_SSE[VMI_SSE_UCOMISD_SRC_REG_DST_REG], src, dst);
-#endif
 }
 void poAsm::mc_ucmpd_memory_to_reg_x64(int dst, int src, int src_offset)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_brmo(gInstructions_SSE[VMI_SSE_UCOMISS_SRC_MEM_DST_REG], src, dst, src_offset);
-#else
     emit_sse_brmo(gInstructions_SSE[VMI_SSE_UCOMISD_SRC_MEM_DST_REG], src, dst, src_offset);
-#endif
 }
 void poAsm::mc_xorpd_reg_to_reg_x64(int dst, int src)
 {
-#ifdef USE_SUN_FLOAT
-    emit_sse_brr(gInstructions_SSE[VMI_SSE_XORPS_SRC_REG_DST_REG], src, dst);
-#else
     emit_sse_brr(gInstructions_SSE[VMI_SSE_XORPD_SRC_REG_DST_REG], src, dst);
-#endif
 }
-
+void poAsm::mc_movss_reg_to_reg_x64(int dst, int src)
+{
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_MOVSS_SRC_REG_DST_REG], src, dst);
+}
+void poAsm::mc_movss_reg_to_memory_x64(int dst, int src, int dst_offset)
+{
+    emit_sse_bmro(gInstructions_SSE[VMI_SSE_MOVSS_SRC_REG_DST_MEM], src, dst, dst_offset);
+}
+void poAsm::mc_movss_memory_to_reg_x64(int dst, int src, int src_offset)
+{
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_MOVSS_SRC_MEM_DST_REG], src, dst, src_offset);
+}
+void poAsm::mc_movss_memory_to_reg_x64(int dst, int addr)
+{
+    emit_sse_brm(gInstructions_SSE[VMI_SSE_MOVSS_SRC_MEM_DST_REG], dst, addr);
+}
+void poAsm::mc_addss_reg_to_reg_x64(int dst, int src)
+{
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_ADDSS_SRC_REG_DST_REG], src, dst);
+}
+void poAsm::mc_addss_memory_to_reg_x64(int dst, int src, int src_offset)
+{
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_ADDSS_SRC_MEM_DST_REG], src, dst, src_offset);
+}
+void poAsm::mc_subss_reg_to_reg_x64(int dst, int src)
+{
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_SUBSS_SRC_REG_DST_REG], src, dst);
+}
+void poAsm::mc_subss_memory_to_reg_x64(int dst, int src, int src_offset)
+{
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_SUBSS_SRC_MEM_DST_REG], src, dst, src_offset);
+}
+void poAsm::mc_mulss_reg_to_reg_x64(int dst, int src)
+{
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_MULSS_SRC_REG_DST_REG], src, dst);
+}
+void poAsm::mc_mulss_memory_to_reg_x64(int dst, int src, int dst_offset)
+{
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_MULSS_SRC_MEM_DST_REG], src, dst, dst_offset);
+}
+void poAsm::mc_divss_reg_to_reg_x64(int dst, int src)
+{
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_DIVSS_SRC_REG_DST_REG], src, dst);
+}
+void poAsm::mc_divss_memory_to_reg_x64(int dst, int src, int dst_offset)
+{
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_DIVSS_SRC_MEM_DST_REG], src, dst, dst_offset);
+}
+void poAsm::mc_cvtitos_memory_to_reg_x64(int dst, int src, int src_offset)
+{
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_CVTSI2SS_SRC_MEM_DST_REG], src, dst, src_offset);
+}
+void poAsm::mc_cvtitos_reg_to_reg_x64(int dst, int src)
+{
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_CVTSI2SS_SRC_REG_DST_REG], src, dst);
+}
+void poAsm::mc_ucmps_reg_to_reg_x64(int dst, int src)
+{
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_UCOMISS_SRC_REG_DST_REG], src, dst);
+}
+void poAsm::mc_ucmps_memory_to_reg_x64(int dst, int src, int src_offset)
+{
+    emit_sse_brmo(gInstructions_SSE[VMI_SSE_UCOMISS_SRC_MEM_DST_REG], src, dst, src_offset);
+}
+void poAsm::mc_xorps_reg_to_reg_x64(int dst, int src)
+{
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_XORPS_SRC_REG_DST_REG], src, dst);
+}
 
 //================
 
@@ -1168,11 +1338,29 @@ void poAsm::ir_add(poRegLinear& linear, const poInstruction& ins)
     const int src1 = linear.getRegisterByVariable(ins.left());
     const int src2 = linear.getRegisterByVariable(ins.right());
 
+    const int sse_dst = dst - VM_REGISTER_MAX;
+    const int sse_src1 = src1 - VM_REGISTER_MAX;
+    const int sse_src2 = src2 - VM_REGISTER_MAX;
+
     switch (ins.type())
     {
     case TYPE_I64:
+    case TYPE_U64:
         if (dst != src1) { mc_mov_reg_to_reg_x64(dst, src1); }
         mc_add_reg_to_reg_x64(dst, src2);
+        break;
+    case TYPE_F32:
+        if (sse_dst != sse_src1) { mc_movss_reg_to_reg_x64(sse_dst, sse_src1); }
+        mc_addss_reg_to_reg_x64(sse_dst, sse_src2);
+        break;
+    case TYPE_F64:
+        if (sse_dst != sse_src1) { mc_movsd_reg_to_reg_x64(sse_dst, sse_src1); }
+        mc_addsd_reg_to_reg_x64(sse_dst, sse_src2);
+        break;
+    case TYPE_I8:
+    case TYPE_U8:
+        if (dst != src1) { mc_mov_reg_to_reg_8(dst, src1); }
+        mc_add_reg_to_reg_8(dst, src2);
         break;
     }
 }
@@ -1186,10 +1374,19 @@ void poAsm::ir_sub(poRegLinear& linear, const poInstruction& ins)
     switch (ins.type())
     {
     case TYPE_I64:
+    case TYPE_U64:
         if (dst != src1) {
             mc_mov_reg_to_reg_x64(dst, src1);
         }
         mc_sub_reg_to_reg_x64(dst, src2);
+        break;
+    case TYPE_I8:
+    case TYPE_U8:
+        if (dst != src1)
+        {
+            mc_mov_reg_to_reg_8(dst, src1);
+        }
+        mc_sub_reg_to_reg_8(dst, src2);
         break;
     }
 }
@@ -1208,6 +1405,16 @@ void poAsm::ir_mul(poRegLinear& linear, const poInstruction& ins)
         }
         mc_mul_reg_to_reg_x64(dst, src2);
         break;
+    case TYPE_I8:
+        mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
+        mc_mul_reg_8(src2);
+        mc_mov_reg_to_reg_8(dst, VM_REGISTER_EAX);
+        break;
+    case TYPE_U8:
+        mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
+        mc_umul_reg_8(src2);
+        mc_mov_reg_to_reg_8(dst, VM_REGISTER_EAX);
+        break;
     }
 }
 
@@ -1220,9 +1427,22 @@ void poAsm::ir_div(poRegLinear& linear, const poInstruction& ins)
     switch (ins.type())
     {
     case TYPE_I64:
-        mc_mov_reg_to_reg_x64(VM_ARG1, src1);
-        mc_mov_reg_to_reg_x64(VM_ARG2, src2);
-        mc_div_reg_x64(dst);
+        mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, src1);
+        mc_mov_imm_to_reg_x64(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
+        mc_div_reg_x64(src2);
+        mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX);
+        break;
+    case TYPE_I8:
+        mc_mov_imm_to_reg_x64(VM_REGISTER_EAX, 0); // TODO: replace with XOR?
+        mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
+        mc_div_reg_8(src2);
+        mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX);
+        break;
+    case TYPE_U8:
+        mc_mov_imm_to_reg_x64(VM_REGISTER_EAX, 0); // TODO: replace with XOR?
+        mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
+        mc_udiv_reg_8(src2);
+        mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX);
         break;
     }
 }
@@ -1235,7 +1455,12 @@ void poAsm::ir_cmp(poRegLinear& linear, const poInstruction& ins)
     switch (ins.type())
     {
     case TYPE_I64:
+    case TYPE_U64:
         mc_cmp_reg_to_reg_x64(src1, src2);
+        break;
+    case TYPE_U8:
+    case TYPE_I8:
+        mc_cmp_reg_to_reg_8(src1, src2);
         break;
     }
 }
@@ -1251,7 +1476,212 @@ void poAsm::ir_br(poRegLinear& linear, const poInstruction& ins, poBasicBlock* b
     {
         const int imm = targetAsmBB.getPos() - (int(_programData.size()) + 5/*TODO*/);
 
+        ir_jump(ins.left(), imm, ins.type());
+    }
+    else
+    {
+        // Insert patch
+
+        const int pos = int(_programData.size());
+        mc_jump_equals(0);
+        const int size = int(_programData.size()) - pos;
+
+        poAsmBasicBlock* asmBB = &_basicBlocks[_basicBlockMap[bb]];
+        asmBB->jumps().push_back(poAsmJump(pos, ins.left(), size, targetBB, ins.type()));
+    }
+}
+
+void poAsm::ir_constant(poConstantPool& constants, poRegLinear& linear, const poInstruction& ins)
+{
+    const int dst = linear.getRegisterByVariable(ins.name());
+
+    if (ins.constant() == -1)
+    {
+        std::stringstream ss;
+        ss << "Internal Error: Malformed constant instruction " << ins.name();
+        setError(ss.str());
+        return;
+    }
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+        mc_mov_imm_to_reg_x64(dst, constants.getI64(ins.constant()));
+        break;
+    case TYPE_U64:
+        mc_mov_imm_to_reg_x64(dst, constants.getU64(ins.constant()));
+        break;
+    case TYPE_I32:
+        mc_mov_imm_to_reg(dst, constants.getI32(ins.constant()));
+        break;
+    case TYPE_U32:
+        mc_mov_imm_to_reg(dst, int(constants.getU32(ins.constant())));
+        break;
+    case TYPE_I8:
+        mc_mov_imm_to_reg_8(dst, constants.getI8(ins.constant()));
+        break;
+    case TYPE_U8:
+        mc_mov_imm_to_reg_8(dst, char(constants.getU8(ins.constant())));
+        break;
+    default:
+        break;
+    }
+}
+
+void poAsm::ir_ret(poRegLinear& linear, const poInstruction& ins)
+{
+    const int left = ins.left();
+    if (left != -1)
+    {
         switch (ins.type())
+        {
+        case TYPE_I64:
+        case TYPE_I32:
+        case TYPE_I8:
+            mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, linear.getRegisterByVariable(left));
+            break;
+        case TYPE_F64:
+            mc_movsd_reg_to_reg_x64(VM_REGISTER_EAX, linear.getRegisterByVariable(left) - VM_REGISTER_MAX);
+            break;
+        case TYPE_F32:
+            mc_movss_reg_to_reg_x64(VM_REGISTER_EAX, linear.getRegisterByVariable(left) - VM_REGISTER_MAX);
+            break;
+        default:
+            break;
+        }
+    }
+
+    // Epilogue
+    generateEpilogue(linear);
+
+    mc_return();
+}
+
+void poAsm::ir_unary_minus(poRegLinear& linear, const poInstruction& ins)
+{
+    const int src = linear.getRegisterByVariable(ins.left());
+    const int dst = linear.getRegisterByVariable(ins.name());
+
+    const int src_sse = src - VM_REGISTER_MAX;
+    const int dst_sse = dst - VM_REGISTER_MAX;
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+    case TYPE_U64:
+        if (dst != src)
+        {
+            mc_mov_reg_to_reg_x64(dst, src);
+        }
+        mc_neg_reg_x64(dst);
+        break;
+    case TYPE_F64:
+        if (dst_sse != src_sse)
+        {
+            mc_movsd_reg_to_reg_x64(dst_sse, src_sse);
+        }
+        //mc_
+        break;
+    default:
+        break;
+    }
+}
+
+void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& ins, const std::vector<poInstruction>& args)
+{
+    static const int generalArgs[] = { VM_ARG1, VM_ARG2, VM_ARG3, VM_ARG4, VM_ARG5, VM_ARG6 };
+    static const int sseArgs[] = { VM_SSE_ARG1, VM_SSE_ARG2, VM_SSE_ARG3, VM_SSE_ARG4, VM_SSE_ARG5, VM_SSE_ARG6, VM_SSE_ARG7, VM_SSE_ARG8 };
+
+    const int numArgs = ins.left();
+    for (int i = 0; i < numArgs; i++)
+    {
+        switch (args[i].type()) {
+        case TYPE_I64:
+        case TYPE_I32:
+        case TYPE_I8:
+            mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].name()));
+            break;
+        case TYPE_F64:
+            mc_movsd_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].name()) - VM_REGISTER_MAX);
+            break;
+        case TYPE_F32:
+            mc_movss_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].name()) - VM_REGISTER_MAX);
+            break;
+        }
+    }
+
+    const int symbol = ins.right();
+    std::string symbolName;
+    module.getSymbol(symbol, symbolName);
+
+    // Add patch this call
+
+    _calls.push_back(poAsmCall(int(_programData.size()), numArgs, symbolName));
+    mc_call(0);
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+    case TYPE_U64:
+        mc_mov_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()), VM_REGISTER_EAX);
+        break;
+    case TYPE_F64:
+        mc_movsd_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()) - VM_REGISTER_MAX, VM_SSE_REGISTER_XMM0);
+        break;
+    case TYPE_F32:
+        mc_movss_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()) - VM_REGISTER_MAX, VM_SSE_REGISTER_XMM0);
+        break;
+    }
+}
+
+void poAsm::ir_param(poRegLinear& linear, const poInstruction& ins)
+{
+    const int dst = linear.getRegisterByVariable(ins.name());
+    const int dst_sse = dst - VM_REGISTER_MAX;
+    static const int generalArgs[] = { VM_ARG1, VM_ARG2, VM_ARG3, VM_ARG4, VM_ARG5, VM_ARG6 };
+    static const int sseArgs[] = { VM_SSE_ARG1, VM_SSE_ARG2, VM_SSE_ARG3, VM_SSE_ARG4, VM_SSE_ARG5, VM_SSE_ARG6, VM_SSE_ARG7, VM_SSE_ARG8 };
+    const int param = ins.left();
+    switch (ins.type())
+    {
+    case TYPE_I64:
+    case TYPE_U64:
+    case TYPE_I32:
+    case TYPE_I8:
+        if (param < VM_MAX_ARGS)
+        {
+            const int src = generalArgs[param];
+            mc_mov_reg_to_reg_x64(dst, src);
+        }
+        break;
+    case TYPE_F64:
+        mc_movsd_reg_to_reg_x64(dst_sse, sseArgs[param]);
+        break;
+    case TYPE_F32:
+        mc_movss_reg_to_reg_x64(dst_sse, sseArgs[param]);
+        break;
+    }
+}
+
+//================
+
+poAsm::poAsm()
+    :
+    _entryPoint(-1),
+    _isError(false),
+    _prologueSize(0)
+{
+}
+
+bool poAsm::ir_jump(int jump, int imm, int type)
+{
+    switch (type)
+    {
+    case TYPE_F64:
+    case TYPE_F32:
+    case TYPE_I64:
+    case TYPE_I32:
+    case TYPE_I8:
+        switch (jump)
         {
         case IR_JUMP_EQUALS:
             mc_jump_equals(imm);
@@ -1274,143 +1704,43 @@ void poAsm::ir_br(poRegLinear& linear, const poInstruction& ins, poBasicBlock* b
         case IR_JUMP_UNCONDITIONAL:
             mc_jump_unconditional(imm);
             break;
+        default:
+            return false;
         }
-    }
-    else
-    {
-        // Insert patch
-
-        const int pos = int(_programData.size());
-        mc_jump_equals(0);
-        const int size = int(_programData.size()) - pos;
-
-        poAsmBasicBlock* asmBB = &_basicBlocks[_basicBlockMap[bb]];
-        asmBB->jumps().push_back(poAsmJump(pos, ins.type(), size, targetBB));
-    }
-}
-
-void poAsm::ir_constant(poConstantPool& constants, poRegLinear& linear, const poInstruction& ins)
-{
-    const int dst = linear.getRegisterByVariable(ins.name());
-
-    switch (ins.type())
-    {
-    case TYPE_I64:
-        mc_mov_imm_to_reg_x64(dst, constants.getI64(ins.constant()));
         break;
-    case TYPE_I32:
-        mc_mov_imm_to_reg(dst, constants.getI32(ins.constant()));
-        break;
-    default:
-        break;
-    }
-}
-
-void poAsm::ir_ret(poRegLinear& linear, const poInstruction& ins)
-{
-    const int left = ins.left();
-    if (left != -1)
-    {
-        switch (ins.type())
+    case TYPE_U64:
+    case TYPE_U32:
+    case TYPE_U8:
+        switch (jump)
         {
-        case TYPE_I64:
-        case TYPE_I32:
-        case TYPE_I8:
-            mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, linear.getRegisterByVariable(left));
+        case IR_JUMP_EQUALS:
+            mc_jump_equals(imm);
+            break;
+        case IR_JUMP_GREATER:
+            mc_jump_not_below_equal(imm); //mc_jump_greater(imm);
+            break;
+        case IR_JUMP_LESS:
+            mc_jump_not_above_equal(imm);  //mc_jump_less(imm);
+            break;
+        case IR_JUMP_GREATER_EQUALS:
+            mc_jump_not_below(imm); //mc_jump_greater_equal(imm);
+            break;
+        case IR_JUMP_LESS_EQUALS:
+            mc_jump_not_above(imm); //mc_jump_less_equal(imm);
+            break;
+        case IR_JUMP_NOT_EQUALS:
+            mc_jump_not_equals(imm);
+            break;
+        case IR_JUMP_UNCONDITIONAL:
+            mc_jump_unconditional(imm);
             break;
         default:
-            break;
-        }
-    }
-
-    // Epilogue
-    mc_add_imm_to_reg_x64(VM_REGISTER_ESP, 8);
-
-    mc_return();
-}
-
-void poAsm::ir_unary_minus(poRegLinear& linear, const poInstruction& ins)
-{
-    const int src = linear.getRegisterByVariable(ins.left());
-    const int dst = linear.getRegisterByVariable(ins.name());
-
-    switch (ins.type())
-    {
-    case TYPE_I64:
-        if (dst != src)
-        {
-            mc_mov_reg_to_reg_x64(dst, src);
-        }
-        mc_neg_reg_x64(dst);
-        break;
-    default:
-        break;
-    }
-}
-
-void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& ins, const std::vector<poInstruction>& args)
-{
-    static const int generalArgs[] = { VM_ARG1, VM_ARG2, VM_ARG3, VM_ARG4, VM_ARG5, VM_ARG6 };
-    static const int sseArgs[] = { VM_SSE_ARG1, VM_SSE_ARG2, VM_SSE_ARG3, VM_SSE_ARG4, VM_SSE_ARG5, VM_SSE_ARG6, VM_SSE_ARG7, VM_SSE_ARG8 };
-
-    const int numArgs = ins.left();
-    for (int i = 0; i < numArgs; i++)
-    {
-        switch (args[i].type()) {
-        case TYPE_I64:
-        case TYPE_I32:
-        case TYPE_I8:
-            mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].name()));
-            break;
-        }
-    }
-
-    const int symbol = ins.right();
-    std::string symbolName;
-    module.getSymbol(symbol, symbolName);
-
-    // Add patch this call
-
-    _calls.push_back(poAsmCall(int(_programData.size()), numArgs, symbolName));
-    mc_call(0);
-
-    switch (ins.type())
-    {
-    case TYPE_I64:
-        mc_mov_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()), VM_REGISTER_EAX);
-        break;
-    }
-}
-
-void poAsm::ir_param(poRegLinear& linear, const poInstruction& ins)
-{
-    const int dst = linear.getRegisterByVariable(ins.name());
-    static const int generalArgs[] = { VM_ARG1, VM_ARG2, VM_ARG3, VM_ARG4, VM_ARG5, VM_ARG6 };
-    static const int sseArgs[] = { VM_SSE_ARG1, VM_SSE_ARG2, VM_SSE_ARG3, VM_SSE_ARG4, VM_SSE_ARG5, VM_SSE_ARG6, VM_SSE_ARG7, VM_SSE_ARG8 };
-    const int param = ins.left();
-    switch (ins.type())
-    {
-    case TYPE_I64:
-    case TYPE_I32:
-    case TYPE_I8:
-        if (param < VM_MAX_ARGS)
-        {
-            const int src = generalArgs[param];
-            mc_mov_reg_to_reg_x64(dst, src);
+            return false;
         }
         break;
-    case TYPE_F64:
-        mc_movsd_reg_to_reg_x64(dst, sseArgs[param]);
-        break;
     }
-}
 
-//================
-
-poAsm::poAsm()
-    :
-    _entryPoint(-1)
-{
+    return true;
 }
 
 void poAsm::patchJump(const poAsmJump& jump)
@@ -1419,30 +1749,8 @@ void poAsm::patchJump(const poAsmJump& jump)
     const int size = jump.getSize();
     const int imm = pos - (jump.getProgramDataPos() + size);
 
-    switch (jump.getJumpType())
+    if (!ir_jump(jump.getJumpType(), imm, jump.getType()))
     {
-    case IR_JUMP_EQUALS:
-        mc_jump_equals(imm);
-        break;
-    case IR_JUMP_GREATER:
-        mc_jump_greater(imm);
-        break;
-    case IR_JUMP_LESS:
-        mc_jump_less(imm);
-        break;
-    case IR_JUMP_GREATER_EQUALS:
-        mc_jump_greater_equal(imm);
-        break;
-    case IR_JUMP_LESS_EQUALS:
-        mc_jump_less_equal(imm);
-        break;
-    case IR_JUMP_NOT_EQUALS:
-        mc_jump_not_equals(imm);
-        break;
-    case IR_JUMP_UNCONDITIONAL:
-        mc_jump_unconditional(imm);
-        break;
-    default:
         return;
     }
 
@@ -1542,6 +1850,60 @@ void poAsm::ssaDestruction(poFlowGraph& cfg)
     }
 }
 
+static const int align(const int size)
+{
+    const int remainder = size % 16;
+    if (remainder == 8)
+    {
+        return 0;
+    }
+
+    return 8;
+}
+
+void poAsm::generatePrologue(poRegLinear& linear)
+{
+    // Push all non-volatile general purpose registers which are used
+    int numPushed = 0;
+    for (int i = 0; i < VM_REGISTER_MAX; i++)
+    {
+        if (!linear.isVolatile(i) && linear.isRegisterUsed(i))
+        {
+            mc_push_reg(i);
+            numPushed++;
+        }
+    }
+
+    const int size = 8 * numPushed;
+    const int alignment = align(size);
+    _prologueSize = alignment + size;
+
+    if (alignment > 0)
+    {
+        mc_sub_imm_to_reg_x64(VM_REGISTER_ESP, alignment);
+    }
+}
+
+void poAsm::generateEpilogue(poRegLinear& linear)
+{
+    // Pop all non-volatile general purpose registers which are used (in backwards order)
+    int numPopped = 0;
+    for (int i = VM_REGISTER_MAX - 1; i >= 0; i--)
+    {
+        if (!linear.isVolatile(i) && linear.isRegisterUsed(i))
+        {
+            mc_pop_reg(i);
+            numPopped++;
+        }
+    }
+
+    const int size = _prologueSize - 8 * numPopped;
+    if (size > 0)
+    {
+        mc_add_imm_to_reg_x64(VM_REGISTER_ESP, size);
+    }
+}
+
 void poAsm::generate(poModule& module, poFlowGraph& cfg)
 {
     ssaDestruction(cfg);
@@ -1585,7 +1947,7 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
     linear.allocateRegisters(cfg);
 
     // Prologue
-    mc_sub_imm_to_reg_x64(VM_REGISTER_ESP, 8);
+    generatePrologue(linear);
 
     // Generate the machine code
     //
@@ -1673,10 +2035,29 @@ void poAsm::generate(poModule& module)
 
     patchCalls();
 
-    const int mainImm =_mapping["main"] - int(_programData.size());
-    _entryPoint = int(_programData.size());
-    mc_call(mainImm);
-    mc_return();
+    const auto& main = _mapping.find("main");
+    if (main != _mapping.end())
+    {
+        _entryPoint = int(_programData.size());
+        mc_sub_imm_to_reg_x64(VM_REGISTER_EBP, 8);
+        const int mainImm = main->second - int(_programData.size());
+        mc_call(mainImm);
+        mc_add_imm_to_reg_x64(VM_REGISTER_EBP, 8);
+        mc_return();
+    }
+    else
+    {
+        setError("No entry point defined.");
+    }
+}
+
+void poAsm::setError(const std::string& errorText)
+{
+    if (!_isError)
+    {
+        _isError = true;
+        _errorText = errorText;
+    }
 }
 
 void poAsm::patchCalls()
@@ -1694,6 +2075,12 @@ void poAsm::patchCalls()
             mc_call(it->second - pos);
             std::memcpy(_programData.data() + pos, _programData.data() + dataPos, size);
             _programData.resize(_programData.size() - size);
+        }
+        else
+        {
+            std::stringstream ss;
+            ss << "Unsolved symbol " << symbol;
+            setError(ss.str());
         }
     }
 }

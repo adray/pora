@@ -30,7 +30,7 @@ int poCompiler:: compile()
         if (lexer.isError())
         {
             std::stringstream ss;
-            ss << "Failed building " << file << ": " << lexer.errorText() << ":" << lexer.lineNum();
+            ss << "Failed building " << file << ": " << lexer.errorText() << " Line :" << lexer.lineNum();
             _errors.push_back(ss.str());
             return 0;
         }
@@ -82,6 +82,12 @@ int poCompiler:: compile()
     // Convert the basic blocks/cfg to machine code
     _assembler.generate(module);
     module.dump();
+
+    if (_assembler.isError())
+    {
+        _errors.push_back(_assembler.errorText());
+        return 0;
+    }
 
     return 1;
 }

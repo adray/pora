@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <cstdint>
 
 namespace po
 {
@@ -10,6 +11,7 @@ namespace po
     {
         IDENTIFIER,
         STRING,
+        CHAR,
         I8,
         I32,
         I64,
@@ -89,15 +91,19 @@ namespace po
         inline poTokenType token() const { return _tok; }
         inline long long i64() const { return std::atoll(_value.c_str()); }
         inline int i32() const { return std::atol(_value.c_str()); }
-        inline char i8() const { return _value[0]; }
-        inline size_t u64() const { return std::atoll(_value.c_str()); }
+        inline char i8() const { return static_cast<char>(std::atoi(_value.c_str()));; }
+        uint64_t u64() const;
         inline unsigned int u32() const { return std::atol(_value.c_str()); }
-        inline unsigned char u8() const { return _value[0]; }
+        inline unsigned char u8() const { return static_cast<unsigned char>(std::atoi(_value.c_str())); }
+        inline unsigned char character() const { return _value[0]; }
         inline const std::string& string() const { return _value; }
+        inline float f32() const { return float(std::atof(_value.c_str())); }
+        inline double f64() const { return std::atof(_value.c_str()); }
 
         inline int line() const { return _line; }
         inline int column() const { return _col; }
     private:
+
         poTokenType _tok;
         std::string _value;
         int _line;

@@ -8,52 +8,51 @@ using namespace po;
 // poConstant
 //================
 
+poConstant::poConstant(uint64_t u64)
+    :
+    _u64(u64),
+    _type(TYPE_U64)
+{
+}
+
 poConstant::poConstant(int64_t i64)
     :
     _i64(i64),
-    _i32(0),
-    _i8(0),
-    _f32(0.0f),
-    _f64(0.0),
     _type(TYPE_I64)
+{
+}
+poConstant::poConstant(uint32_t u32)
+    :
+    _u32(u32),
+    _type(TYPE_I32)
 {
 }
 poConstant::poConstant(int32_t i32)
     :
-    _i64(0),
     _i32(i32),
-    _i8(0),
-    _f32(0.0f),
-    _f64(0.0),
     _type(TYPE_I32)
 {
 }
 poConstant::poConstant(int8_t i8)
     :
-    _i64(0),
-    _i32(0),
     _i8(i8),
-    _f32(0.0f),
-    _f64(0.0),
     _type(TYPE_I8)
+{
+}
+poConstant::poConstant(uint8_t u8)
+    :
+    _u8(u8),
+    _type(TYPE_U8)
 {
 }
 poConstant::poConstant(const float f32)
     :
-    _i64(0),
-    _i32(0),
-    _i8(0),
     _f32(f32),
-    _f64(0.0),
     _type(TYPE_F32)
 {
 }
 poConstant::poConstant(const double f64)
     :
-    _i64(0),
-    _i32(0),
-    _i8(0),
-    _f32(0.0f),
     _f64(f64),
     _type(TYPE_F64)
 {
@@ -62,6 +61,19 @@ poConstant::poConstant(const double f64)
 //=================
 // ConstantPool
 //=================
+
+int poConstantPool::addConstant(const uint64_t u64)
+{
+    const auto& it = _u64.find(u64);
+    if (it == _u64.end())
+    {
+        const int id = int(_constants.size());
+        _constants.push_back(poConstant(u64));
+        _u64.insert(std::pair<int64_t, int>(u64, id));
+        return id;
+    }
+    return -1;
+}
 
 int poConstantPool::addConstant(const int64_t i64)
 {
@@ -89,6 +101,19 @@ int poConstantPool::addConstant(const int32_t i32)
     return -1;
 }
 
+int poConstantPool::addConstant(const uint32_t u32)
+{
+    const auto& it = _u32.find(u32);
+    if (it == _u32.end())
+    {
+        const int id = int(_constants.size());
+        _constants.push_back(poConstant(u32));
+        _u32.insert(std::pair<uint32_t, int>(u32, id));
+        return id;
+    }
+    return -1;
+}
+
 int poConstantPool::addConstant(const int8_t i8)
 {
     const auto& it = _i8.find(i8);
@@ -97,6 +122,19 @@ int poConstantPool::addConstant(const int8_t i8)
         const int id = int(_constants.size());
         _constants.push_back(poConstant(i8));
         _i8.insert(std::pair<int8_t, int>(i8, id));
+        return id;
+    }
+    return -1;
+}
+
+int poConstantPool::addConstant(const uint8_t u8)
+{
+    const auto& it = _u8.find(u8);
+    if (it == _u8.end())
+    {
+        const int id = int(_constants.size());
+        _constants.push_back(poConstant(u8));
+        _u8.insert(std::pair<uint8_t, int>(u8, id));
         return id;
     }
     return -1;
@@ -125,6 +163,39 @@ int poConstantPool::addConstant(const float f32)
         _f32.insert(std::pair<float, int>(f32, id));
         return id;
     }
+    return -1;
+}
+
+int poConstantPool::getConstant(const uint64_t u64)
+{
+    const auto& it = _u64.find(u64);
+    if (it != _u64.end())
+    {
+        return it->second;
+    }
+
+    return -1;
+}
+
+int poConstantPool::getConstant(const uint32_t u32)
+{
+    const auto& it = _u32.find(u32);
+    if (it != _u32.end())
+    {
+        return it->second;
+    }
+
+    return -1;
+}
+
+int poConstantPool::getConstant(const uint8_t u8)
+{
+    const auto& it = _u8.find(u8);
+    if (it != _u8.end())
+    {
+        return it->second;
+    }
+
     return -1;
 }
 
@@ -188,9 +259,29 @@ int64_t poConstantPool::getI64(const int id)
     return _constants[id].i64();
 }
 
+int8_t poConstantPool::getI8(const int id)
+{
+    return _constants[id].i8();
+}
+
 int32_t poConstantPool::getI32(const int id)
 {
     return _constants[id].i32();
+}
+
+uint64_t poConstantPool::getU64(const int id)
+{
+    return _constants[id].u64();
+}
+
+uint32_t poConstantPool::getU32(const int id)
+{
+    return _constants[id].u32();
+}
+
+uint8_t poConstantPool::getU8(const int id)
+{
+    return _constants[id].u8();
 }
 
 //=================

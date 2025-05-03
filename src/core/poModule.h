@@ -35,23 +35,37 @@ namespace po
     class poConstant
     {
     public:
+        poConstant(uint64_t u64);
         poConstant(int64_t i64);
         poConstant(int32_t i32);
+        poConstant(uint32_t u32);
         poConstant(int8_t i8);
+        poConstant(uint8_t u8);
         poConstant(const float f32);
         poConstant(const double f64);
         inline int type() const { return _type; }
+        inline int64_t u64() const { return _u64; }
         inline int64_t i64() const { return _i64; }
         inline int32_t i32() const { return _i32; }
+        inline uint32_t u32() const { return _u32; }
         inline int8_t i8() const { return _i8; }
+        inline uint8_t u8() const { return _u8; }
+        inline float f32() const { return _f32; }
+        inline double f64() const { return _f64; }
 
     private:
         int _type;
-        int64_t _i64;
-        int32_t _i32;
-        int8_t _i8;
-        double _f64;
-        float _f32;
+        union
+        {
+            uint64_t _u64;
+            int64_t _i64;
+            int32_t _i32;
+            uint32_t _u32;
+            int8_t _i8;
+            uint8_t _u8;
+            double _f64;
+            float _f32;
+        };
     };
 
     class poFunction
@@ -104,11 +118,17 @@ namespace po
     class poConstantPool
     {
     public:
+        int addConstant(const uint64_t u64);
         int addConstant(const int64_t i64);
         int addConstant(const int32_t i32);
+        int addConstant(const uint32_t u32);
         int addConstant(const int8_t i8);
+        int addConstant(const uint8_t u8);
         int addConstant(const double f64);
         int addConstant(const float f32);
+        int getConstant(const uint64_t u64);
+        int getConstant(const uint32_t u32);
+        int getConstant(const uint8_t u8);
         int getConstant(const int64_t i64);
         int getConstant(const int32_t i32);
         int getConstant(const int8_t i8);
@@ -116,11 +136,18 @@ namespace po
         int getConstant(const float f32);
         int64_t getI64(const int id);
         int32_t getI32(const int id);
+        int8_t getI8(const int id);
+        uint64_t getU64(const int id);
+        uint32_t getU32(const int id);
+        uint8_t getU8(const int id);
 
     private:
+        std::unordered_map<uint64_t, int> _u64;
         std::unordered_map<int64_t, int> _i64;
         std::unordered_map<int32_t, int> _i32;
+        std::unordered_map<uint32_t, int> _u32;
         std::unordered_map<int8_t, int> _i8;
+        std::unordered_map<uint8_t, int> _u8;
         std::unordered_map<double, int> _f64;
         std::unordered_map<float, int> _f32;
         std::vector<poConstant> _constants;

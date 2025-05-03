@@ -454,6 +454,9 @@ int poTypeChecker::checkExpr(poNode* node)
         case poTokenType::FALSE:
             type = TYPE_BOOLEAN;
             break;
+        case poTokenType::CHAR:
+            type = TYPE_U8;
+            break;
         }
         break;
     case poNodeType::CALL:

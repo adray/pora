@@ -140,21 +140,24 @@ void poSSA::ssaRename(const std::vector<int>& variables, poDom& dom)
         for (poSSAPhi& phi : ssa.phis())
         {
             auto& phis = phi.values();
-            int name = phis[0];
-            for (int i = 0; i < phis.size() - 2; i++)
+            if (phis.size() >= 2)
             {
-                const int newName = _variableNames++;
-                if (i == 0)
+                int name = phis[0];
+                for (int i = 0; i < phis.size() - 2; i++)
                 {
-                    bb->insertInstruction(poInstruction(newName, 0/*TODO*/, phis[i], phis[i + 1], IR_PHI), i);
+                    const int newName = _variableNames++;
+                    if (i == 0)
+                    {
+                        bb->insertInstruction(poInstruction(newName, 0/*TODO*/, phis[i], phis[i + 1], IR_PHI), i);
+                    }
+                    else
+                    {
+                        bb->insertInstruction(poInstruction(newName, 0/*TODO*/, name, phis[i + 1], IR_PHI), i);
+                    }
+                    name = newName;
                 }
-                else
-                {
-                    bb->insertInstruction(poInstruction(newName, 0/*TODO*/, name, phis[i + 1], IR_PHI), i);
-                }
-                name = newName;
+                bb->insertInstruction(poInstruction(phi.name(), 0/*TODO*/, name, phis[phis.size() - 1], IR_PHI), int(phis.size()) - 2);
             }
-            bb->insertInstruction(poInstruction(phi.name(), 0/*TODO*/, name, phis[phis.size()-1], IR_PHI), int(phis.size())-2);
         }
     }
 }
@@ -205,7 +208,11 @@ void poSSA::ssaRename(const std::vector<int>& variables, poDom& dom, int bb_id)
         poSSABasicBlock& succ_ssa = _ssa[succ[i]];
         for (poSSAPhi& phi : succ_ssa.phis())
         {
-            phi.addValue(getTopStack(phi.initalName()));
+            const int name = getTopStack(phi.initalName());
+            if (name != -1)
+            {
+                phi.addValue(name);
+            }
         }
     }
 
@@ -237,6 +244,11 @@ int poSSA::genName(const int variable)
 int poSSA::getTopStack(const int variable)
 {
     auto& stack = _renamingStack[variable];
+    if (stack.size() == 0)
+    {
+        return -1;
+    }
+
     return stack[stack.size() - 1];
 }
 

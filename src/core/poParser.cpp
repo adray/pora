@@ -97,7 +97,8 @@ poNode* poFunctionParser::parsePrimary()
         _parser.match(poTokenType::U32) ||
         _parser.match(poTokenType::U64) ||
         _parser.match(poTokenType::U8) ||
-        _parser.match(poTokenType::STRING))
+        _parser.match(poTokenType::STRING) ||
+        _parser.match(poTokenType::CHAR))
     {
         auto& token = _parser.peek();
         _parser.advance();
@@ -157,12 +158,12 @@ poNode* poFunctionParser::parseFactor()
     poNode* node = parseUnary();
     while (_parser.match(poTokenType::STAR) || _parser.match(poTokenType::SLASH))
     {
-        poToken token = _parser.peek();
+        const poToken token = _parser.peek();
         _parser.advance();
         node = new poBinaryNode(
             token.token() == poTokenType::STAR ? poNodeType::MUL : poNodeType::DIV,
             node,
-            parseFactor(),
+            parseUnary(),
             token);
     }
 
@@ -174,12 +175,12 @@ poNode* poFunctionParser::parseTerm()
     poNode* node = parseFactor();
     while (_parser.match(poTokenType::PLUS) || _parser.match(poTokenType::MINUS))
     {
-        poToken token = _parser.peek();
+        const poToken token = _parser.peek();
         _parser.advance();
         node = new poBinaryNode(
             token.token() == poTokenType::PLUS ? poNodeType::ADD : poNodeType::SUB,
             node,
-            parseTerm(),
+            parseFactor(),
             token);
     }
 

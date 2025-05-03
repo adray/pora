@@ -29,8 +29,12 @@ namespace po
         void setVolatile(const int reg, const bool isVolatile);
         void setType(const int reg, const poRegType type);
         void allocateRegisters(poFlowGraph& cfg);
-        inline int getRegister(const int index) { return _registers[index]; }
+        inline const int getRegister(const int index) { return _registers[index]; }
         int getRegisterByVariable(const int variable);
+        inline const int numRegisters() const { return _numRegisters; }
+        inline const int numInstructions() const { return int(_registers.size()); }
+        inline const bool isRegisterUsed(const int index) const { return _registerUsed[index]; }
+        inline const bool isVolatile(const int index) const { return _volatile[index]; }
 
     private:
         void allocateRegister(const int pos, const poRegType type, const int live, const int variable);

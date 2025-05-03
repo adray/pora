@@ -166,6 +166,46 @@ void po::syntaxTest()
         "   u8 x = 90b;"\
         "}"\
         "}", true);
+    checkSyntax("Numeric Test #1", "namespace Test {"\
+        "static void main() {"\
+        "   u64 x = 10000000000000000000u;"\
+        "}"\
+        "}", true);
+    checkSyntax("Numeric Test #2", "namespace Test {"\
+        "static void main() {"\
+        "   i64 x = 9223372036854775807;"\
+        "}"\
+        "}", true);
+    checkSyntax("Numeric Test #3", "namespace Test {"\
+        "static void main() {"\
+        "   i64 x = 9223372036854775808;"\
+        "}"\
+        "}", false);
+    checkSyntax("Numeric Test #4", "namespace Test {"\
+        "static void main() {"\
+        "   i64 x = 9223372036854775810;"\
+        "}"\
+        "}", false);
+    checkSyntax("Numeric Test #5", "namespace Test {"\
+        "static void main() {"\
+        "   i64 x = 9223372036854775810;"\
+        "}"\
+        "}", false);
+    checkSyntax("Numeric Test #6", "namespace Test {"\
+        "static void main() {"\
+        "   u8 x = 255b;"\
+        "}"\
+        "}", true);
+    checkSyntax("Numeric Test #7", "namespace Test {"\
+        "static void main() {"\
+        "   u8 x = 256b;"\
+        "}"\
+        "}", false);
+    checkSyntax("Numeric Test #8", "namespace Test {"\
+        "static void main() {"\
+        "   u8 x = 300b;"\
+        "}"\
+        "}", false);
     checkSyntax("Arithmetic Test #1", "namespace Test {"\
         "static void main() {"\
         "   i64 x = 5;"\

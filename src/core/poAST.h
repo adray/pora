@@ -58,10 +58,12 @@ namespace po
         poConstantNode(poNodeType type, const poToken& token);
         poConstantNode(poNodeType type, const poToken& token, int64_t value);
         poConstantNode(poNodeType type, const poToken& token, uint8_t value);
+        poConstantNode(poNodeType type, const poToken& token, uint64_t value);
         inline const int64_t i64() const { return _i64; }
         inline const uint8_t u8() const { return _u8; }
         inline const double f64() const { return _f64; }
         inline const float f32() const { return _f32; }
+        inline const uint64_t u64() const { return _u64; }
 
         inline const int type() const { return _type; }
     private:

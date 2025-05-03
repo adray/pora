@@ -17,6 +17,14 @@ poToken::poToken(poTokenType token, const std::string& value, int line, int col)
 {
 }
 
+uint64_t poToken::u64() const
+{
+    std::stringstream ss(_value);
+    uint64_t u64 = 0;
+    ss >> u64;
+    return u64;
+}
+
 //==============
 // Lexer
 //==============
@@ -194,7 +202,7 @@ void poLexer::scanCharacterLiteral()
     if (peek() == '\'')
     {
         advance();
-        addToken(poTokenType::U8, std::string(ch));
+        addToken(poTokenType::CHAR, std::string(ch));
     }
     else
     {
@@ -228,6 +236,26 @@ void poLexer::scanStringLiteral()
     }
 }
 
+template<typename T>
+static bool validateInteger(const std::string& str)
+{
+    constexpr T maxValue = std::numeric_limits<T>().max();
+    T integer = 0;
+    for (size_t i = 0; i < str.size(); i++)
+    {
+        const int val = str[i] - '0';
+        if (integer <= (maxValue - val) / 10) // N <= (K - V)/10
+        {
+            integer *= 10;
+            integer += val;
+            continue;
+        }
+        return false;
+    }
+
+    return true;
+}
+
 void poLexer::scanNumberLiteral()
 {
     std::string str;
@@ -259,21 +287,51 @@ void poLexer::scanNumberLiteral()
             if (hasDot && ch == 'f')
             {
                 advance();
-                addToken(poTokenType::F32);
+                addToken(poTokenType::F32, str);
             }
             else if (hasDot && ch == 'd')
             {
                 advance();
-                addToken(poTokenType::F64);
+                addToken(poTokenType::F64, str);
             }
             else if (!hasDot && ch == 'b')
             {
-                advance();
-                addToken(poTokenType::U8);
+                if (validateInteger<uint8_t>(str))
+                {
+                    advance();
+                    addToken(poTokenType::U8, str);
+                }
+                else
+                {
+                    setError("The specified u8 is not valid.");
+                }
+            }
+            else if (!hasDot && ch == 'u')
+            {
+                if (validateInteger<uint64_t>(str))
+                {
+                    advance();
+                    addToken(poTokenType::U64, str);
+                }
+                else
+                {
+                    setError("The specified u64 is not valid.");
+                }
+            }
+            else if (hasDot)
+            {
+                addToken(poTokenType::F64, str);
             }
             else
             {
-                addToken(hasDot ? poTokenType::F64 : poTokenType::I64, str);
+                if (validateInteger<int64_t>(str))
+                {
+                    addToken(poTokenType::I64, str);
+                }
+                else
+                {
+                    setError("The specified i64 is not valid.");
+                }
             }
             scanning = false;
         }

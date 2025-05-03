@@ -42,13 +42,29 @@ poConstantNode::poConstantNode(poNodeType type, const poToken& token)
         _i64 = token.i64();
         _type = TYPE_I64;
         break;
-    //case poTokenType::F32:
-    //    _f32 = token.f32();
-    //    _type = TYPE_U8;
-    //    break;
+    case poTokenType::F32:
+        _f32 = token.f32();
+        _type = TYPE_F32;
+        break;
+    case poTokenType::F64:
+        _f64 = token.f64();
+        _type = TYPE_F64;
+        break;
     case poTokenType::STRING:
         _str = token.string();
         //_type = TYPE_;
+        break;
+    case poTokenType::TRUE:
+        _u8 = 1;
+        _type = TYPE_BOOLEAN;
+        break;
+    case poTokenType::FALSE:
+        _u8 = 0;
+        _type = TYPE_BOOLEAN;
+        break;
+    case poTokenType::CHAR:
+        _u8 = token.character();
+        _type = TYPE_U8;
         break;
     }
 }
@@ -58,6 +74,14 @@ poConstantNode::poConstantNode(poNodeType type, const poToken& token, int64_t va
     poNode(type, token),
     _i64(value),
     _type(TYPE_I64)
+{
+}
+
+poConstantNode::poConstantNode(poNodeType type, const poToken& token, uint64_t value)
+    :
+    poNode(type, token),
+    _u64(value),
+    _type(TYPE_U64)
 {
 }
 
