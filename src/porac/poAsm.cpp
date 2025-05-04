@@ -212,6 +212,9 @@ enum vm_instructions
     VMI_JL32, /*signed*/ /*0F 8C*/
     VMI_JLE32, /*signed*/ /*0F 8E*/
 
+    VMI_NEG8_DST_MEM,
+    VMI_NEG8_DST_REG,
+
     VMI_NEG64_DST_MEM,
     VMI_NEG64_DST_REG,
     VMI_IDIV64_SRC_REG,
@@ -390,6 +393,9 @@ static constexpr vm_instruction gInstructions[VMI_MAX_INSTRUCTIONS] = {
     INS(0x0, 0x0F, 0x8C, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), //VMI_JL32, /*signed*/
     INS(0x0, 0x0F, 0x8E, VM_INSTRUCTION_CODE_OFFSET, CODE_UI, VMI_ENC_D), //VMI_JLE32, /*signed*/
 
+    INS(0x40, 0xF6, 0x3, VM_INSTRUCTION_UNARY, CODE_UMO, VMI_ENC_M), // VMI_NEG8_DST_MEM,
+    INS(0x40, 0xF6, 0x3, VM_INSTRUCTION_UNARY, CODE_UR, VMI_ENC_M), // VMI_NEG8_DST_REG,
+
     INS(0x48, 0xF7, 0x3, VM_INSTRUCTION_UNARY, CODE_UMO, VMI_ENC_M),     // VMI_NEG64_DST_MEM
     INS(0x48, 0xF7, 0x3, VM_INSTRUCTION_UNARY, CODE_UR, VMI_ENC_M),     // VMI_NEG64_DST_REG
 
@@ -491,6 +497,17 @@ poAsmCall::poAsmCall(const int pos, const int arity, const std::string& symbol)
     _pos(pos),
     _arity(arity),
     _symbol(symbol)
+{
+}
+
+//==================
+// poAsmConstant
+//==================
+
+poAsmConstant::poAsmConstant(const int initializedDataPos, const int programDataPos)
+    :
+    _initializedDataPos(initializedDataPos),
+    _programDataPos(programDataPos)
 {
 }
 
@@ -1193,6 +1210,10 @@ void poAsm::mc_neg_reg_x64(int reg)
 {
     emit_ur(gInstructions[VMI_NEG64_DST_REG], reg);
 }
+void poAsm::mc_neg_reg_8(int reg)
+{
+    emit_ur(gInstructions[VMI_NEG8_DST_REG], reg);
+}
 void poAsm::mc_movsd_reg_to_reg_x64(int dst, int src)
 {
     emit_sse_brr(gInstructions_SSE[VMI_SSE_MOVSD_SRC_REG_DST_REG], src, dst);
@@ -1371,6 +1392,10 @@ void poAsm::ir_sub(poRegLinear& linear, const poInstruction& ins)
     const int src1 = linear.getRegisterByVariable(ins.left());
     const int src2 = linear.getRegisterByVariable(ins.right());
 
+    const int sse_dst = dst - VM_REGISTER_MAX;
+    const int sse_src1 = src1 - VM_REGISTER_MAX;
+    const int sse_src2 = src2 - VM_REGISTER_MAX;
+
     switch (ins.type())
     {
     case TYPE_I64:
@@ -1379,6 +1404,14 @@ void poAsm::ir_sub(poRegLinear& linear, const poInstruction& ins)
             mc_mov_reg_to_reg_x64(dst, src1);
         }
         mc_sub_reg_to_reg_x64(dst, src2);
+        break;
+    case TYPE_F32:
+        if (sse_dst != sse_src1) { mc_movss_reg_to_reg_x64(sse_dst, sse_src1); }
+        mc_subss_reg_to_reg_x64(sse_dst, sse_src2);
+        break;
+    case TYPE_F64:
+        if (sse_dst != sse_src1) { mc_movsd_reg_to_reg_x64(sse_dst, sse_src1); }
+        mc_subsd_reg_to_reg_x64(sse_dst, sse_src2);
         break;
     case TYPE_I8:
     case TYPE_U8:
@@ -1397,6 +1430,10 @@ void poAsm::ir_mul(poRegLinear& linear, const poInstruction& ins)
     const int src1 = linear.getRegisterByVariable(ins.left());
     const int src2 = linear.getRegisterByVariable(ins.right());
 
+    const int sse_dst = dst - VM_REGISTER_MAX;
+    const int sse_src1 = src1 - VM_REGISTER_MAX;
+    const int sse_src2 = src2 - VM_REGISTER_MAX;
+
     switch (ins.type())
     {
     case TYPE_I64:
@@ -1404,6 +1441,14 @@ void poAsm::ir_mul(poRegLinear& linear, const poInstruction& ins)
             mc_mov_reg_to_reg_x64(dst, src1);
         }
         mc_mul_reg_to_reg_x64(dst, src2);
+        break;
+    case TYPE_F32:
+        if (sse_dst != sse_src1) { mc_movss_reg_to_reg_x64(sse_dst, sse_src1); }
+        mc_mulss_reg_to_reg_x64(sse_dst, sse_src2);
+        break;
+    case TYPE_F64:
+        if (sse_dst != sse_src1) { mc_movsd_reg_to_reg_x64(sse_dst, sse_src1); }
+        mc_mulsd_reg_to_reg_x64(sse_dst, sse_src2);
         break;
     case TYPE_I8:
         mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
@@ -1423,6 +1468,10 @@ void poAsm::ir_div(poRegLinear& linear, const poInstruction& ins)
     const int dst = linear.getRegisterByVariable(ins.name());
     const int src1 = linear.getRegisterByVariable(ins.left());
     const int src2 = linear.getRegisterByVariable(ins.right());
+
+    const int sse_dst = dst - VM_REGISTER_MAX;
+    const int sse_src1 = src1 - VM_REGISTER_MAX;
+    const int sse_src2 = src2 - VM_REGISTER_MAX;
 
     switch (ins.type())
     {
@@ -1444,6 +1493,14 @@ void poAsm::ir_div(poRegLinear& linear, const poInstruction& ins)
         mc_udiv_reg_8(src2);
         mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX);
         break;
+    case TYPE_F32:
+        if (sse_dst != sse_src1) { mc_movss_reg_to_reg_x64(sse_dst, sse_src1); }
+        mc_divss_reg_to_reg_x64(sse_dst, sse_src2);
+        break;
+    case TYPE_F64:
+        if (sse_dst != sse_src1) { mc_movsd_reg_to_reg_x64(sse_dst, sse_src1); }
+        mc_divsd_reg_to_reg_x64(sse_dst, sse_src2);
+        break;
     }
 }
 
@@ -1451,6 +1508,9 @@ void poAsm::ir_cmp(poRegLinear& linear, const poInstruction& ins)
 {
     const int src1 = linear.getRegisterByVariable(ins.left());
     const int src2 = linear.getRegisterByVariable(ins.right());
+
+    const int sse_src1 = src1 - VM_REGISTER_MAX;
+    const int sse_src2 = src2 - VM_REGISTER_MAX;
 
     switch (ins.type())
     {
@@ -1461,6 +1521,12 @@ void poAsm::ir_cmp(poRegLinear& linear, const poInstruction& ins)
     case TYPE_U8:
     case TYPE_I8:
         mc_cmp_reg_to_reg_8(src1, src2);
+        break;
+    case TYPE_F64:
+        mc_ucmpd_reg_to_reg_x64(sse_src1, sse_src2);
+        break;
+    case TYPE_F32:
+        mc_ucmps_reg_to_reg_x64(sse_src1, sse_src2);
         break;
     }
 }
@@ -1494,6 +1560,7 @@ void poAsm::ir_br(poRegLinear& linear, const poInstruction& ins, poBasicBlock* b
 void poAsm::ir_constant(poConstantPool& constants, poRegLinear& linear, const poInstruction& ins)
 {
     const int dst = linear.getRegisterByVariable(ins.name());
+    const int dstSSE = dst - VM_REGISTER_MAX;
 
     if (ins.constant() == -1)
     {
@@ -1522,6 +1589,14 @@ void poAsm::ir_constant(poConstantPool& constants, poRegLinear& linear, const po
         break;
     case TYPE_U8:
         mc_mov_imm_to_reg_8(dst, char(constants.getU8(ins.constant())));
+        break;
+    case TYPE_F32:
+        mc_movss_memory_to_reg_x64(dstSSE, 0);
+        addInitializedData(constants.getF32(ins.constant()), -int(sizeof(int32_t))); // insert patch
+        break;
+    case TYPE_F64:
+        mc_movsd_memory_to_reg_x64(dstSSE, 0);
+        addInitializedData(constants.getF64(ins.constant()), -int(sizeof(int32_t))); // insert patch
         break;
     default:
         break;
@@ -1580,7 +1655,24 @@ void poAsm::ir_unary_minus(poRegLinear& linear, const poInstruction& ins)
         {
             mc_movsd_reg_to_reg_x64(dst_sse, src_sse);
         }
-        //mc_
+        mc_xorpd_reg_to_reg_x64(dst_sse, dst_sse);
+        mc_subsd_reg_to_reg_x64(dst_sse, src_sse);
+        break;
+    case TYPE_F32:
+        if (dst_sse != src_sse)
+        {
+            mc_movss_reg_to_reg_x64(dst_sse, src_sse);
+        }
+        mc_xorps_reg_to_reg_x64(dst_sse, dst_sse);
+        mc_subss_reg_to_reg_x64(dst_sse, src_sse);
+        break;
+    case TYPE_I8:
+    case TYPE_U8:
+        if (dst != src)
+        {
+            mc_mov_reg_to_reg_x64(dst, src);
+        }
+        mc_neg_reg_8(dst);
         break;
     default:
         break;
@@ -1599,6 +1691,9 @@ void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& 
         case TYPE_I64:
         case TYPE_I32:
         case TYPE_I8:
+        case TYPE_U64:
+        case TYPE_U32:
+        case TYPE_U8:
             mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].name()));
             break;
         case TYPE_F64:
@@ -1621,6 +1716,10 @@ void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& 
 
     switch (ins.type())
     {
+    case TYPE_U8:
+    case TYPE_I8:
+    case TYPE_I32:
+    case TYPE_U32:
     case TYPE_I64:
     case TYPE_U64:
         mc_mov_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()), VM_REGISTER_EAX);
@@ -1676,8 +1775,6 @@ bool poAsm::ir_jump(int jump, int imm, int type)
 {
     switch (type)
     {
-    case TYPE_F64:
-    case TYPE_F32:
     case TYPE_I64:
     case TYPE_I32:
     case TYPE_I8:
@@ -1708,6 +1805,8 @@ bool poAsm::ir_jump(int jump, int imm, int type)
             return false;
         }
         break;
+    case TYPE_F64:
+    case TYPE_F32:
     case TYPE_U64:
     case TYPE_U32:
     case TYPE_U8:
@@ -1717,16 +1816,16 @@ bool poAsm::ir_jump(int jump, int imm, int type)
             mc_jump_equals(imm);
             break;
         case IR_JUMP_GREATER:
-            mc_jump_not_below_equal(imm); //mc_jump_greater(imm);
+            mc_jump_not_below_equal(imm);
             break;
         case IR_JUMP_LESS:
-            mc_jump_not_above_equal(imm);  //mc_jump_less(imm);
+            mc_jump_not_above_equal(imm);
             break;
         case IR_JUMP_GREATER_EQUALS:
-            mc_jump_not_below(imm); //mc_jump_greater_equal(imm);
+            mc_jump_not_below(imm);
             break;
         case IR_JUMP_LESS_EQUALS:
-            mc_jump_not_above(imm); //mc_jump_less_equal(imm);
+            mc_jump_not_above(imm);
             break;
         case IR_JUMP_NOT_EQUALS:
             mc_jump_not_equals(imm);
@@ -2060,6 +2159,32 @@ void poAsm::setError(const std::string& errorText)
     }
 }
 
+void poAsm::addInitializedData(const float f32, const int programDataOffset)
+{
+    _constants.push_back(poAsmConstant(int(_initializedData.size()), int(_programData.size()) + programDataOffset));
+
+    const int32_t data = *reinterpret_cast<const int32_t*>(&f32);
+    _initializedData.push_back(data & 0xFF);
+    _initializedData.push_back((data >> 8) & 0xFF);
+    _initializedData.push_back((data >> 16) & 0xFF);
+    _initializedData.push_back((data >> 24) & 0xFF);
+}
+
+void poAsm::addInitializedData(const double f64, const int programDataOffset)
+{
+    _constants.push_back(poAsmConstant(int(_initializedData.size()), int(_programData.size() + programDataOffset)));
+
+    const int64_t data = *reinterpret_cast<const int64_t*>(&f64);
+    _initializedData.push_back(data & 0xFF);
+    _initializedData.push_back((data >> 8) & 0xFF);
+    _initializedData.push_back((data >> 16) & 0xFF);
+    _initializedData.push_back((data >> 24) & 0xFF);
+    _initializedData.push_back((data >> 32) & 0xFF);
+    _initializedData.push_back((data >> 40) & 0xFF);
+    _initializedData.push_back((data >> 48) & 0xFF);
+    _initializedData.push_back((data >> 56) & 0xFF);
+}
+
 void poAsm::patchCalls()
 {
     for (poAsmCall& call : _calls)
@@ -2082,5 +2207,17 @@ void poAsm::patchCalls()
             ss << "Unsolved symbol " << symbol;
             setError(ss.str());
         }
+    }
+}
+
+void poAsm::link(const int programDataPos, const int initializedDataPos)
+{
+    for (auto& constant : _constants)
+    {
+        const int disp32 = (constant.getInitializedDataPos() + initializedDataPos) - (programDataPos + constant.getProgramDataPos() + int(sizeof(int32_t)));
+        _programData[constant.getProgramDataPos()] = disp32 & 0xFF;
+        _programData[constant.getProgramDataPos() + 1] = (disp32 >> 8) & 0xFF;
+        _programData[constant.getProgramDataPos() + 2] = (disp32 >> 16) & 0xFF;
+        _programData[constant.getProgramDataPos() + 3] = (disp32 >> 24) & 0xFF;
     }
 }

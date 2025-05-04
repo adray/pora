@@ -781,7 +781,8 @@ int poCodeGenerator::emitUnaryMinus(poNode* node, poFlowGraph& cfg)
     const int expr = emitExpr(unary->child(), cfg);
     const int instruction = _instructionCount++;
     /*TODO: get left/right instruction type*/
-    cfg.getLast()->addInstruction(poInstruction(instruction, TYPE_I64, expr, -1, IR_UNARY_MINUS));
+    auto& ins = cfg.getLast()->instructions()[cfg.getLast()->numInstructions() - 1];
+    cfg.getLast()->addInstruction(poInstruction(instruction, ins.type(), expr, -1, IR_UNARY_MINUS));
     return instruction;
 }
 

@@ -67,13 +67,27 @@ namespace po
         std::string _symbol;
     };
 
+    class poAsmConstant
+    {
+    public:
+        poAsmConstant(const int initializedDataPos, const int programDataPos);
+        inline int getInitializedDataPos() const { return _initializedDataPos; }
+        inline int getProgramDataPos() const { return _programDataPos; }
+
+    private:
+        int _initializedDataPos;
+        int _programDataPos;
+    };
+
     class poAsm
     {
     public:
         poAsm();
         void generate(poModule& module);
+        void link(const int programDataPos, const int initializedDataPos);
 
         inline const std::vector<unsigned char>& programData() const { return _programData; }
+        inline const std::vector<unsigned char>& initializedData() const { return _initializedData; }
         inline const int entryPoint() const { return _entryPoint; }
         inline bool isError() const { return _isError; }
         inline const std::string& errorText() const { return _errorText; }
@@ -88,6 +102,8 @@ namespace po
         void generatePrologue(poRegLinear& linear);
         void generateEpilogue(poRegLinear& linear);
         void setError(const std::string& errorText);
+        void addInitializedData(const float f32, const int programDataOffset);
+        void addInitializedData(const double f64, const int programDataOffset);
 
         //============================================
         // Low level machine code generation routines
@@ -191,6 +207,7 @@ namespace po
         void mc_dec_memory_x64(int reg, int offset);
         void mc_neg_memory_x64(int reg, int offset);
         void mc_neg_reg_x64(int reg);
+        void mc_neg_reg_8(int reg);
         void mc_movsd_reg_to_reg_x64(int dst, int src);
         void mc_movsd_reg_to_memory_x64(int dst, int src, int dst_offset);
         void mc_movsd_memory_to_reg_x64(int dst, int src, int src_offset);
@@ -245,6 +262,7 @@ namespace po
 
         std::unordered_map<std::string, int> _mapping;
         std::vector<poAsmCall> _calls;
+        std::vector<poAsmConstant> _constants;
         std::unordered_map<poBasicBlock*, int> _basicBlockMap;
         std::vector<poAsmBasicBlock> _basicBlocks;
         std::vector<unsigned char> _programData;

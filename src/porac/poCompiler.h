@@ -11,7 +11,7 @@ namespace po
         void addFile(const std::string& file);
         int compile();
         inline const std::vector<std::string>& errors() const { return _errors; }
-        inline const poAsm& assembler() const { return _assembler; }
+        inline poAsm& assembler() { return _assembler; }
 
     private:
         std::vector<std::string> _files;

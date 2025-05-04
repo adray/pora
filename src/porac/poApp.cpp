@@ -45,11 +45,11 @@ int main(const int numArgs, const char** const args)
         }
 
         const std::vector<unsigned char>& programData = compiler.assembler().programData();
+        const std::vector<unsigned char>& initializedData = compiler.assembler().initializedData();
 
         // Create the data sections
         poPortableExecutableSection text(poSectionType::TEXT);
         text.data().resize(1024);
-        std::memcpy(text.data().data(), programData.data(), programData.size());
 
         poPortableExecutableSection initialized(poSectionType::INITIALIZED);
         initialized.data().resize(1024);
@@ -59,7 +59,14 @@ int main(const int numArgs, const char** const args)
 
         poPortableExecutableSection iData(poSectionType::IDATA);
         iData.data().resize(1024);
-        
+
+        // Final linking..
+        compiler.assembler().link(0, 0x1000 /* image alignment? */);
+
+        // Write program data
+        std::memcpy(text.data().data(), programData.data(), programData.size());
+        std::memcpy(initialized.data().data(), initializedData.data(), initializedData.size());
+
         // Write the executable file
         poPortableExecutable exe;
         exe.setEntryPoint(compiler.assembler().entryPoint());

@@ -284,6 +284,16 @@ uint8_t poConstantPool::getU8(const int id)
     return _constants[id].u8();
 }
 
+float poConstantPool::getF32(const int id)
+{
+    return _constants[id].f32();
+}
+
+double poConstantPool::getF64(const int id)
+{
+    return _constants[id].f64();
+}
+
 //=================
 // Function
 //================

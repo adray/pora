@@ -140,6 +140,8 @@ namespace po
         uint64_t getU64(const int id);
         uint32_t getU32(const int id);
         uint8_t getU8(const int id);
+        float getF32(const int id);
+        double getF64(const int id);
 
     private:
         std::unordered_map<uint64_t, int> _u64;

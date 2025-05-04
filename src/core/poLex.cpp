@@ -256,6 +256,18 @@ static bool validateInteger(const std::string& str)
     return true;
 }
 
+static bool validateSingle(const std::string& str)
+{
+    const float f32 = float(std::atof(str.c_str()));
+    return !isnan(f32);
+}
+
+static bool validateDouble(const std::string& str)
+{
+    const double f64 = std::atof(str.c_str());
+    return !isnan(f64);
+}
+
 void poLexer::scanNumberLiteral()
 {
     std::string str;
@@ -286,13 +298,27 @@ void poLexer::scanNumberLiteral()
         {
             if (hasDot && ch == 'f')
             {
-                advance();
-                addToken(poTokenType::F32, str);
+                if (validateSingle(str))
+                {
+                    advance();
+                    addToken(poTokenType::F32, str);
+                }
+                else
+                {
+                    setError("The specified f32 is not valid.");
+                }
             }
             else if (hasDot && ch == 'd')
             {
-                advance();
-                addToken(poTokenType::F64, str);
+                if (validateDouble(str))
+                {
+                    advance();
+                    addToken(poTokenType::F64, str);
+                }
+                else
+                {
+                    setError("The specified f64 is not valid.");
+                }
             }
             else if (!hasDot && ch == 'b')
             {
@@ -320,7 +346,14 @@ void poLexer::scanNumberLiteral()
             }
             else if (hasDot)
             {
-                addToken(poTokenType::F64, str);
+                if (validateDouble(str))
+                {
+                    addToken(poTokenType::F64, str);
+                }
+                else
+                {
+                    setError("The specified f64 is not valid.");
+                }
             }
             else
             {
