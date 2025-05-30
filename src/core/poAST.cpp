@@ -1,5 +1,5 @@
 #include "poAST.h"
-#include "poTypeChecker.h"
+#include "poType.h"
 
 using namespace po;
 

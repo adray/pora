@@ -9,6 +9,7 @@
 namespace po
 {
     class poBasicBlock;
+    class poPhi;
 
     constexpr int IR_CONSTANT = 0x1;
     constexpr int IR_PARAM = 0x2;
@@ -25,6 +26,11 @@ namespace po
     constexpr int IR_CALL = 0x30;
     constexpr int IR_ARG = 0x31;
     constexpr int IR_RETURN = 0x32;
+    constexpr int IR_COPY = 0x33;
+    constexpr int IR_ALLOCA = 0x40;
+    constexpr int IR_MALLOC = 0x41;
+    constexpr int IR_LOAD = 0x42;
+    constexpr int IR_STORE = 0x43;
 
     constexpr int IR_JUMP_UNCONDITIONAL = 0x0;
     constexpr int IR_JUMP_EQUALS = 0x1;
@@ -37,9 +43,9 @@ namespace po
     class poInstruction
     {
     public:
-        poInstruction(const int32_t name, const int8_t type, const int16_t left, const int16_t right, const int16_t code);
-        poInstruction(const int32_t name, const int8_t type, const int16_t constant, const int16_t code);
-        inline int8_t type() const { return _type; }
+        poInstruction(const int32_t name, const int16_t type, const int16_t left, const int16_t right, const int16_t code);
+        poInstruction(const int32_t name, const int16_t type, const int16_t constant, const int16_t code);
+        inline int16_t type() const { return _type; }
         inline int16_t left() const { return _left; }
         inline int16_t right() const { return _right; }
         inline int16_t code() const { return _code; }
@@ -51,8 +57,7 @@ namespace po
 
     private:
         int32_t _name;
-        int8_t _padding;
-        int8_t _type;
+        int16_t _type;
         union
         {
             int16_t _left;
@@ -60,6 +65,27 @@ namespace po
         };
         int16_t _right;
         int16_t _code;
+    };
+
+    class poPhi
+    {
+    public:
+        poPhi(const int name, const int type);
+        void addValue(const int value, poBasicBlock* bb);
+        inline const std::vector<int>& values() const { return _rhs; }
+        inline void setName(const int name) { _name = name; }
+        inline const int name() const { return _name; }
+        inline const int initalName() const { return _initialName; }
+        inline void setType(const int type) { _type = type; }
+        inline const int getType() const { return _type; }
+        inline const std::vector<poBasicBlock*>& getBasicBlock() const { return _bb; }
+
+    private:
+        int _initialName;
+        int _name;
+        int _type;
+        std::vector<int> _rhs;
+        std::vector<poBasicBlock*> _bb;
     };
 
     class poBasicBlock
@@ -89,6 +115,9 @@ namespace po
             return _ins[index];
         }
 
+        inline void addPhi(const poPhi& phi) { _phis.push_back(phi); }
+        inline std::vector<poPhi>& phis() { return _phis; }
+
         inline void addIncoming(poBasicBlock* bb) { _incoming.push_back(bb); }
         //inline void removeIncoming(poBasicBlock* bb);
         inline const std::vector<poBasicBlock*>& getIncoming() const { return _incoming; }
@@ -100,6 +129,7 @@ namespace po
         bool _unconditionalBranch;
         std::vector<poBasicBlock*> _incoming;
         std::vector<poInstruction> _ins;
+        std::vector<poPhi> _phis;
     };
 
     class poFlowGraph

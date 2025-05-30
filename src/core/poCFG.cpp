@@ -7,23 +7,21 @@ using namespace po;
 // poInstruction
 //======================
 
-poInstruction::poInstruction(const int32_t name, const int8_t type, const int16_t left, const int16_t right, const int16_t code)
+poInstruction::poInstruction(const int32_t name, const int16_t type, const int16_t left, const int16_t right, const int16_t code)
     :
     _type(type),
     _left(left),
     _right(right),
     _code(code),
-    _padding(0),
     _name(name)
 {
 }
 
-poInstruction::poInstruction(const int32_t name, const int8_t type, const int16_t constant, const int16_t code)
+poInstruction::poInstruction(const int32_t name, const int16_t type, const int16_t constant, const int16_t code)
     :
     _type(type),
     _constant(constant),
     _code(code),
-    _padding(0),
     _right(0),
     _name(name)
 {
@@ -44,6 +42,23 @@ poBasicBlock::poBasicBlock()
 {
 }
 
+//==============
+// poSSAPhi
+//==============
+
+poPhi::poPhi(const int name, const int type)
+    :
+    _name(name),
+    _initialName(name),
+    _type(type)
+{
+}
+
+void poPhi::addValue(const int value, poBasicBlock* bb)
+{
+    _rhs.push_back(value);
+    _bb.push_back(bb);
+}
 
 
 //=============

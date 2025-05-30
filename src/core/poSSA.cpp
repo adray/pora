@@ -5,19 +5,19 @@
 
 using namespace po;
 
-//==============
-// poSSAPhi
-//==============
-
-poSSAPhi::poSSAPhi(const int name)
-    :
-    _name(name),
-    _initialName(name)
-{ }
-
-void poSSAPhi::addValue(const int value)
+static bool isSpecialInstruction(const int code)
 {
-    _rhs.push_back(value);
+    switch (code)
+    {
+    case (IR_CONSTANT):
+    case (IR_CALL):
+    case (IR_BR):
+    case (IR_PARAM):
+    case (IR_ALLOCA):
+    case (IR_MALLOC):
+        return true;
+    }
+    return false;
 }
 
 //=================
@@ -29,11 +29,6 @@ poSSABasicBlock::poSSABasicBlock()
     _maxDef(-1),
     _maxUse(-1)
 {
-}
-
-void poSSABasicBlock::addPhi(const int name)
-{
-    _phis.push_back(poSSAPhi(name));
 }
 
 //=============
@@ -71,6 +66,8 @@ void poSSA::insertPhiNodes(const std::vector<int>& variables, poDom& dom)
         std::unordered_set<int> defs; /* blocks containing a defintion of var */
         std::vector<int> worklist;
 
+        int type = 0;
+
         // 1) Add all nodes which contain assignments to the variable.
 
         for (int i = dom.start(); i < dom.num(); i++)
@@ -84,6 +81,7 @@ void poSSA::insertPhiNodes(const std::vector<int>& variables, poDom& dom)
                 {
                     worklist.push_back(i);
                     defs.insert(i);
+                    type = ins.type();
                     break;
                 }
             }
@@ -104,8 +102,8 @@ void poSSA::insertPhiNodes(const std::vector<int>& variables, poDom& dom)
                 {
                     // Insert phi node at the entry of BLK
                     poBasicBlock* bb = dom.get(blk).getBasicBlock();
-                    _ssa[blk].addPhi(var);
-                    
+                    bb->addPhi(poPhi(var, type));
+
                     blocksInsertedAt.insert(blk);
                     if (defs.find(blk) == defs.end())
                     {
@@ -136,8 +134,7 @@ void poSSA::ssaRename(const std::vector<int>& variables, poDom& dom)
     for (int i = dom.start(); i < dom.num(); i++)
     {
         poBasicBlock* bb = dom.get(i).getBasicBlock();
-        poSSABasicBlock& ssa = _ssa[i];
-        for (poSSAPhi& phi : ssa.phis())
+        for (poPhi& phi : bb->phis())
         {
             auto& phis = phi.values();
             if (phis.size() >= 2)
@@ -148,15 +145,15 @@ void poSSA::ssaRename(const std::vector<int>& variables, poDom& dom)
                     const int newName = _variableNames++;
                     if (i == 0)
                     {
-                        bb->insertInstruction(poInstruction(newName, 0/*TODO*/, phis[i], phis[i + 1], IR_PHI), i);
+                        bb->insertInstruction(poInstruction(newName, phi.getType(), phis[i], phis[i + 1], IR_PHI), i);
                     }
                     else
                     {
-                        bb->insertInstruction(poInstruction(newName, 0/*TODO*/, name, phis[i + 1], IR_PHI), i);
+                        bb->insertInstruction(poInstruction(newName, phi.getType(), name, phis[i + 1], IR_PHI), i);
                     }
                     name = newName;
                 }
-                bb->insertInstruction(poInstruction(phi.name(), 0/*TODO*/, name, phis[phis.size() - 1], IR_PHI), int(phis.size()) - 2);
+                bb->insertInstruction(poInstruction(phi.name(), phi.getType(), name, phis[phis.size() - 1], IR_PHI), int(phis.size()) - 2);
             }
         }
     }
@@ -174,7 +171,7 @@ void poSSA::ssaRename(const std::vector<int>& variables, poDom& dom, int bb_id)
 
     poSSABasicBlock& ssa = _ssa[bb_id];
 
-    for (poSSAPhi& phi : ssa.phis())
+    for (poPhi& phi : bb->phis())
     {
         phi.setName(genName(phi.name()));
     }
@@ -184,11 +181,11 @@ void poSSA::ssaRename(const std::vector<int>& variables, poDom& dom, int bb_id)
         auto& ins = bb->getInstruction(int(i));
         if (ins.code() != IR_PHI)
         {
-            if (ins.left() != -1 && ins.code() != IR_CONSTANT && ins.code() != IR_CALL && ins.code() != IR_BR && ins.code() != IR_PARAM)
+            if (ins.left() != -1 && !isSpecialInstruction(ins.code()))
             {
                 ins.setLeft(getTopStack(ins.left()));
             }
-            if (ins.right() != -1 && ins.code() != IR_CONSTANT && ins.code() != IR_CALL && ins.code() != IR_BR && ins.code() != IR_PARAM)
+            if (ins.right() != -1 && !isSpecialInstruction(ins.code()))
             {
                 ins.setRight(getTopStack(ins.right()));
             }
@@ -206,12 +203,12 @@ void poSSA::ssaRename(const std::vector<int>& variables, poDom& dom, int bb_id)
         poBasicBlock* succ_bb = succ_node.getBasicBlock();
 
         poSSABasicBlock& succ_ssa = _ssa[succ[i]];
-        for (poSSAPhi& phi : succ_ssa.phis())
+        for (poPhi& phi : succ_bb->phis())
         {
             const int name = getTopStack(phi.initalName());
             if (name != -1)
             {
-                phi.addValue(name);
+                phi.addValue(name, bb);
             }
         }
     }
@@ -227,7 +224,7 @@ void poSSA::ssaRename(const std::vector<int>& variables, poDom& dom, int bb_id)
         popStack(ins.name());
     }
 
-    for (poSSAPhi& phi : ssa.phis())
+    for (poPhi& phi : bb->phis())
     {
         popStack(phi.name());
     }
@@ -280,3 +277,69 @@ void poSSA::constructFunction(const std::vector<int>& variables, poFlowGraph& cf
     // SSA renaming
     ssaRename(variables, dom);
 }
+
+
+void poSSA_Destruction:: destruct(poFlowGraph& cfg)
+{
+    _web.findPhiWebs(cfg);
+
+    std::unordered_map<int, int> phiWebVariable;
+
+    poBasicBlock* bb = cfg.getFirst();
+    while (bb)
+    {
+        for (int i = 0; i < int(bb->numInstructions()); i++)
+        {
+            auto& ins = bb->getInstruction(i);
+            const int id = _web.find(ins.name());
+            if (id != -1)
+            {
+                // Involved in a phi web; rename the variable
+                const auto& it = phiWebVariable.find(id);
+                if (it != phiWebVariable.end())
+                {
+                    ins.setName(it->second);
+                }
+                else
+                {
+                    phiWebVariable.insert(std::pair<int, int>(id, ins.name()));
+                }
+            }
+        }
+
+        bb = bb->getNext();
+    }
+
+    bb = cfg.getFirst();
+    while (bb)
+    {
+        for (int i = 0; i < int(bb->numInstructions()); i++)
+        {
+            auto& ins = bb->getInstruction(i);
+            const int left = ins.left();
+            const int right = ins.right();
+
+            if (isSpecialInstruction(ins.code()))
+            {
+                continue;
+            }
+
+            const int leftId = _web.find(left);
+            const int rightId = _web.find(right);
+
+            if (leftId != -1)
+            {
+                // Update the name to the new name
+                ins.setLeft(phiWebVariable[leftId]);
+            }
+            if (rightId != -1)
+            {
+                // Update the name to the new name
+                ins.setRight(phiWebVariable[rightId]);
+            }
+        }
+
+        bb = bb->getNext();
+    }
+}
+

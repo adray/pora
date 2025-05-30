@@ -1,11 +1,27 @@
 #include "poLive.h"
 #include "poDom.h"
 #include "poCFG.h"
+#include "poNLF.h"
 #include <vector>
 #include <unordered_set>
 #include <iostream>
 
 using namespace po;
+
+static bool isSpecialInstruction(const int code)
+{
+    switch (code)
+    {
+    case (IR_CONSTANT):
+    case (IR_CALL):
+    case (IR_BR):
+    case (IR_PARAM):
+    case (IR_ALLOCA):
+    case (IR_MALLOC):
+        return true;
+    }
+    return false;
+}
 
 //=====================
 // poLiveNode
@@ -47,70 +63,61 @@ void poLiveNode::removeLiveOut(const int variable)
 // poLive
 //===================
 
-bool poLive::isReducible(poFlowGraph& cfg, poDom& dom)
+poLive::poLive()
+    :
+    _error(false)
 {
-    // The cfg is reducible if when removing the backedges (A->B is a backedge if B dominates A)
-    // the resulting cfg is a DAG (directed acyclic graph) where each node can be reached from the initial node.
+}
 
-    for (int i = 0; i < dom.num(); i++)
+void poLive::phiUses(poDom& dom, const int id)
+{
+    auto& live = _nodes[id];
+    const auto& succ = dom.get(id).successors();
+    const auto& dominators = dom.get(id).dominators();
+    poBasicBlock* entryBB = dom.get(id).getBasicBlock();
+
+    for (size_t i = 0; i < succ.size(); i++)
     {
-        auto& live = _nodes.emplace_back();
-        auto& node = dom.get(i);
-        auto& succ = node.successors();
-        auto& dominators = node.dominators();
-        bool isBackEdge = false;
-        for (int j = 0; j < succ.size(); j++)
+        poBasicBlock* bb = dom.get(succ[i]).getBasicBlock(); // successor basic block
+
+        for (auto& phi : bb->phis())
         {
-            for (int k = 0; k < dominators.size(); k++)
+            auto& values = phi.values();
+            auto& basicBlocks = phi.getBasicBlock();
+            for (size_t j = 0; j < values.size(); j++)
             {
-                if (succ[j] == dominators[k])
+                const int name = values[j];
+                const poBasicBlock* sourceBB = basicBlocks[j];
+
+                bool ok = sourceBB == entryBB;
+                if (!ok)
                 {
-                    isBackEdge = true;
-                    break;
+                    /*  loop over the nodes which dominate this node - hopefully it has to be case the variable
+                        will be live in our basic block, if was declared in one of our dominators.
+                    */
+                    for (const int dominator : dominators)
+                    {
+                        if (dom.get(dominator).getBasicBlock() == sourceBB)
+                        {
+                            ok = true;
+                            break;
+                        }
+                    }
                 }
-            }
 
-            live.addEdge(succ[j], isBackEdge);
-        }
-    }
-
-    if (_nodes.size() > 0)
-    {
-        // Check if all nodes can be visited by traversing the forward edges.
-
-        std::unordered_set<int> visited;
-        std::vector<int> worklist = { 0 };
-
-        while (worklist.size() > 0)
-        {
-            const int id = worklist[0];
-            worklist.erase(worklist.begin());
-            visited.insert(id);
-
-            auto& live = _nodes[id];
-            auto& edges = live.forwardEdges();
-            for (size_t i = 0; i < edges.size(); i++)
-            {
-                if (!visited.contains(edges[i]))
+                if (ok)
                 {
-                    worklist.push_back(edges[i]);
+                    live.addLiveOut(name);
                 }
             }
         }
-
-        if (_nodes.size() != visited.size())
-        {
-            return false;
-        }
     }
-
-    return true;
 }
 
 void poLive::dagDfs(poDom& dom, const int id)
 {
     auto& live = _nodes[id];
-    const auto& edges = live.forwardEdges(); /* I think we can assume all of these are also successors */
+    const auto& edges = live.forwardEdges();
     for (size_t i = 0; i < edges.size(); i++)
     {
         if (_visited.contains(edges[int(i)]))
@@ -120,44 +127,30 @@ void poLive::dagDfs(poDom& dom, const int id)
         dagDfs(dom, edges[int(i)]);
     }
 
+    phiUses(dom, id);
+
     poBasicBlock* bb = dom.get(id).getBasicBlock();
     auto& ins = bb->instructions();
-    //for (size_t i = 0; i < ins.size(); i++)
-    //{
-    //    if (ins[i].code() == IR_PHI)
-    //    {
-    //        live.addLiveOut(ins[i].left());
-    //        live.addLiveOut(ins[i].right());
-    //    }
-    //}
+
     for (size_t i = 0; i < edges.size(); i++)
     {
+        // Take a copy as we need to remove the PHI from the set of live
+        std::unordered_set<int> liveIn = _nodes[edges[i]].liveIn();
+
         poBasicBlock* bb = dom.get(edges[i]).getBasicBlock();
         auto& ins = bb->instructions();
+        for (size_t j = 0; j < ins.size(); j++)
+        {
+            const int name = ins[j].name();
+            if (ins[j].code() == IR_PHI)
+            {
+                liveIn.erase(name);
+            }
+        }
 
-    }
-
-    for (size_t i = 0; i < edges.size(); i++)
-    {
-        auto& liveIn = _nodes[edges[i]].liveIn();
         for (const int item : liveIn)
         {
             live.addLiveOut(item);
-        }
-
-        // We need to remove the PHI from the set of liveOut, only if
-        // the PHI def is not already present in the liveIn.
-
-        poBasicBlock* bb = dom.get(edges[i]).getBasicBlock();
-        auto& ins = bb->instructions();
-        for (size_t i = 0; i < ins.size(); i++)
-        {
-            const int name = ins[i].name();
-            if (ins[i].code() == IR_PHI &&
-                !liveIn.contains(name))
-            {
-                live.removeLiveOut(name);
-            }
         }
     }
 
@@ -172,10 +165,7 @@ void poLive::dagDfs(poDom& dom, const int id)
         if (instruction.code() != IR_PHI)
         {
             live.removeLiveIn(instruction.name());
-            if (instruction.code() != IR_BR &&
-                instruction.code() != IR_CONSTANT &&
-                instruction.code() != IR_CALL &&
-                instruction.code() != IR_PARAM)
+            if (!isSpecialInstruction(instruction.code()))
             {
                 if (instruction.left() != -1)
                 {
@@ -205,13 +195,80 @@ void poLive::compute(poFlowGraph& cfg, poDom& dom)
     // First check to see if is reducible.
     // If it isn't reducible will need to use a different algorithm
 
-    if (isReducible(cfg, dom))
+    poNLF nlf;
+    nlf.compute(dom);
+
+    if (nlf.isIrreducible())
     {
-        dagDfs(dom, 0);
+        // .. not reducible
+        _error = true;
+        _errorText = "Control flow graph is irreducible, liveness information cannot be computed (yet).";
     }
     else
     {
-        // .. not reducible
+        initializeLive(dom);
+        dagDfs(dom, 0);
+
+        for (int i = dom.start(); i < dom.num(); i++)
+        {
+            loopTreeDfs(dom, nlf, i);
+        }
+    }
+}
+
+void poLive::loopTreeDfs(poDom& dom, poNLF& nlf, const int id)
+{
+    if (nlf.getType(id) == poNLFType::Reducible)
+    {
+        poBasicBlock *bb = dom.get(id).getBasicBlock();
+        const auto& node = _nodes[id];
+        // Live loop = LiveIn - PhiDefs
+        std::unordered_set<int> liveLoop = node.liveIn();
+        for (const auto& phi : bb->phis())
+        {
+            liveLoop.erase(phi.name());
+        }
+
+        // Loop over the loop tree children and propagate the liveness
+        for (int i = dom.start(); i < dom.num(); i++)
+        {
+            if (i != id && nlf.getHeader(i) == id) // if it is a child of this loop
+            {
+                auto& child = _nodes[i];
+                for (const int live : liveLoop)
+                {
+                    child.addLiveIn(live);
+                    child.addLiveOut(live);
+                }
+
+                loopTreeDfs(dom, nlf, i);
+            }
+        }
+    }
+}
+
+void poLive::initializeLive(poDom& dom)
+{
+    for (int i = 0; i < dom.num(); i++)
+    {
+        auto& live = _nodes.emplace_back();
+        auto& node = dom.get(i);
+        auto& succ = node.successors();
+        auto& dominators = node.dominators();
+        bool isBackEdge = false;
+        for (int j = 0; j < int(succ.size()); j++)
+        {
+            for (int k = 0; k < int(dominators.size()); k++)
+            {
+                if (succ[j] == dominators[k])
+                {
+                    isBackEdge = true;
+                    break;
+                }
+            }
+
+            live.addEdge(succ[j], isBackEdge);
+        }
     }
 }
 
@@ -223,8 +280,8 @@ void poLiveRange::extendLiveRange(const int variable, const int pos)
 {
     if (_variableMapping.find(variable) != _variableMapping.end())
     {
-        const std::vector<int> index = _variableMapping[variable];
-        for (int i : index)
+        const std::vector<int>& index = _variableMapping[variable];
+        for (const int i : index)
         {
             _range[i] = pos - i;
         }
@@ -235,8 +292,8 @@ void poLiveRange::setLiveRange(const int variable, const int range)
 {
     if (_variableMapping.find(variable) != _variableMapping.end())
     {
-        const std::vector<int> index = _variableMapping[variable];
-        for (int i : index)
+        const std::vector<int>& index = _variableMapping[variable];
+        for (const int i : index)
         {
             _range[i] = range;
         }
@@ -258,19 +315,6 @@ void poLiveRange::addLiveRange(const int variable)
     }
 }
 
-//int poLiveRange::getLiveRange(const int variable)
-//{
-//    if (_variableMapping.find(variable) != _variableMapping.end())
-//    {
-//        const int index = _variableMapping[variable];
-//        return _range[index];
-//    }
-//    else
-//    {
-//        return 0;
-//    }
-//}
-
 int poLiveRange::getLiveRange(const int index)
 {
     return _range[index];
@@ -278,6 +322,13 @@ int poLiveRange::getLiveRange(const int index)
 
 void poLiveRange::compute(poFlowGraph& cfg)
 {
+    poDom dom;
+    dom.compute(cfg);
+
+    poLive live;
+    live.compute(cfg, dom);
+
+    int id = 0;
     int pos = 0;
     poBasicBlock* bb = cfg.getFirst();
     while (bb)
@@ -287,10 +338,7 @@ void poLiveRange::compute(poFlowGraph& cfg)
         {
             auto& instruction = ins[i];
 
-            if (instruction.code() != IR_CALL &&
-                instruction.code() != IR_CONSTANT &&
-                instruction.code() != IR_BR &&
-                instruction.code() != IR_PARAM)
+            if (isSpecialInstruction(instruction.code()))
             {
                 if (instruction.left() != -1)
                 {
@@ -306,7 +354,15 @@ void poLiveRange::compute(poFlowGraph& cfg)
             pos++;
         }
 
+        const std::vector<poLiveNode>& nodes = live.nodes();
+        const std::unordered_set<int> liveOut = nodes[id].liveOut();
+        for (const int live : liveOut)
+        {
+            extendLiveRange(live, int(pos));
+        }
+
         bb = bb->getNext();
+        id++;
     }
 }
 

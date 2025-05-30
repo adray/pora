@@ -4,6 +4,7 @@
 #include "poSSATests.h"
 #include "poLiveTests.h"
 #include "poRegLinearTests.h"
+#include "poNLFTests.h"
 
 #include <iostream>
 
@@ -17,6 +18,7 @@ int main(int numArgs, const char* const args)
     runSsaTests();
     runLiveTests();
     runRegLinearTests();
+    runNestedLoopForestsTests();
 
     return 0;
 }

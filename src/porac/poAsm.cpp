@@ -1,10 +1,14 @@
 #include "poAsm.h"
 #include "poModule.h"
 #include "poRegLinear.h"
-#include "poTypeChecker.h"
+#include "poType.h"
+
+#include "poLive.h"
+#include "poDom.h"
 
 #include <assert.h>
 #include <sstream>
+#include <iostream>
 
 using namespace po;
 
@@ -510,6 +514,7 @@ poAsmConstant::poAsmConstant(const int initializedDataPos, const int programData
     _programDataPos(programDataPos)
 {
 }
+
 
 //=====================
 // R/M 0-2
@@ -1353,6 +1358,27 @@ void poAsm::mc_xorps_reg_to_reg_x64(int dst, int src)
 
 //================
 
+void poAsm::ir_load(poRegLinear& linear, const poInstruction& ins, const int instructionIndex)
+{
+    // We need to mov data from the stack pos to the destination register
+
+    const int dst = linear.getRegisterByVariable(ins.name());
+    const int dst_sse = linear.getRegisterByVariable(ins.name() - VM_REGISTER_MAX);
+
+    const int offset = ins.left();
+    const int stackPos = linear.getStackSlot(instructionIndex) + offset;
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+        mc_mov_memory_to_reg_x64(dst, VM_REGISTER_ESP, stackPos);
+        break;
+    case TYPE_F64:
+        mc_movsd_memory_to_reg_x64(dst, VM_REGISTER_ESP, stackPos);
+        break;
+    }
+}
+
 void poAsm::ir_add(poRegLinear& linear, const poInstruction& ins)
 {
     const int dst = linear.getRegisterByVariable(ins.name());
@@ -1554,6 +1580,44 @@ void poAsm::ir_br(poRegLinear& linear, const poInstruction& ins, poBasicBlock* b
 
         poAsmBasicBlock* asmBB = &_basicBlocks[_basicBlockMap[bb]];
         asmBB->jumps().push_back(poAsmJump(pos, ins.left(), size, targetBB, ins.type()));
+    }
+}
+
+void poAsm::ir_copy(poRegLinear& linear, const poInstruction& ins)
+{
+    const int dst = linear.getRegisterByVariable(ins.name());
+    const int src = linear.getRegisterByVariable(ins.left());
+
+    const int sse_dst = dst - VM_REGISTER_MAX;
+    const int sse_src = src - VM_REGISTER_MAX;
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+    case TYPE_U64:
+    case TYPE_I32:
+    case TYPE_U32:
+    case TYPE_I8:
+    case TYPE_U8:
+        if (dst != src)
+        {
+            mc_mov_reg_to_reg_x64(dst, src);
+        }
+        break;
+    case TYPE_F32:
+        if (sse_dst != sse_src)
+        {
+            mc_movss_reg_to_reg_x64(sse_dst, sse_src);
+        }
+        break;
+    case TYPE_F64:
+        if (sse_dst != sse_src)
+        {
+            mc_movsd_reg_to_reg_x64(sse_dst, sse_src);
+        }
+        break;
+    default:
+        break;
     }
 }
 
@@ -1773,6 +1837,12 @@ poAsm::poAsm()
 
 bool poAsm::ir_jump(int jump, int imm, int type)
 {
+    if (jump == IR_JUMP_UNCONDITIONAL)
+    {
+        mc_jump_unconditional(imm);
+        return true;
+    }
+
     switch (type)
     {
     case TYPE_I64:
@@ -1797,9 +1867,6 @@ bool poAsm::ir_jump(int jump, int imm, int type)
             break;
         case IR_JUMP_NOT_EQUALS:
             mc_jump_not_equals(imm);
-            break;
-        case IR_JUMP_UNCONDITIONAL:
-            mc_jump_unconditional(imm);
             break;
         default:
             return false;
@@ -1829,9 +1896,6 @@ bool poAsm::ir_jump(int jump, int imm, int type)
             break;
         case IR_JUMP_NOT_EQUALS:
             mc_jump_not_equals(imm);
-            break;
-        case IR_JUMP_UNCONDITIONAL:
-            mc_jump_unconditional(imm);
             break;
         default:
             return false;
@@ -1890,65 +1954,6 @@ void poAsm::scanBasicBlocks(poFlowGraph& cfg)
     }
 }
 
-void poAsm::ssaDestruction(poFlowGraph& cfg)
-{
-    _web.findPhiWebs(cfg);
-
-    std::unordered_map<int, int> phiWebVariable;
-
-    poBasicBlock* bb = cfg.getFirst();
-    while (bb)
-    {
-        for (int i = 0; i < int(bb->numInstructions()); i++)
-        {
-            auto& ins = bb->getInstruction(i);
-            const int id = _web.find(ins.name());
-            if (id != -1)
-            {
-                // Involved in a phi web; rename the variable
-                const auto& it = phiWebVariable.find(id);
-                if (it != phiWebVariable.end())
-                {
-                    ins.setName(it->second);
-                }
-                else
-                {
-                    phiWebVariable.insert(std::pair<int, int>(id, ins.name()));
-                }
-            }
-        }
-
-        bb = bb->getNext();
-    }
-
-    bb = cfg.getFirst();
-    while (bb)
-    {
-        for (int i = 0; i < int(bb->numInstructions()); i++)
-        {
-            auto& ins = bb->getInstruction(i);
-            const int left = ins.left();
-            const int right = ins.right();
-
-            const int leftId = _web.find(left);
-            const int rightId = _web.find(right);
-
-            if (leftId != -1)
-            {
-                // Update the name to the new name
-                ins.setLeft(phiWebVariable[leftId]);
-            }
-            if (rightId != -1)
-            {
-                // Update the name to the new name
-                ins.setRight(phiWebVariable[rightId]);
-            }
-        }
-
-        bb = bb->getNext();
-    }
-}
-
 static const int align(const int size)
 {
     const int remainder = size % 16;
@@ -1973,13 +1978,14 @@ void poAsm::generatePrologue(poRegLinear& linear)
         }
     }
 
-    const int size = 8 * numPushed;
+    const int size = 8 * numPushed + 8 * linear.stackSize();
     const int alignment = align(size);
     _prologueSize = alignment + size;
+    const int resize = _prologueSize - 8 * numPushed;
 
-    if (alignment > 0)
+    if (resize > 0)
     {
-        mc_sub_imm_to_reg_x64(VM_REGISTER_ESP, alignment);
+        mc_sub_imm_to_reg_x64(VM_REGISTER_ESP, resize);
     }
 }
 
@@ -2003,11 +2009,80 @@ void poAsm::generateEpilogue(poRegLinear& linear)
     }
 }
 
+void poAsm::dump(const poRegLinear& linear, poFlowGraph& cfg)
+{
+    std::cout << "###############" << std::endl;
+    std::cout << "Stack Size: " << linear.stackSize() << std::endl;
+
+    poBasicBlock* bb = cfg.getFirst();
+    int index = 0;
+    int pos = 0;
+    while (bb)
+    {
+       std::cout << "Basic Block " << index << ":" << std::endl;
+       poAsmBasicBlock& abb = _basicBlocks[_basicBlockMap[bb]];
+
+       for (int i = 0; i < bb->numInstructions(); i++)
+       {
+           poRegSpill spill;
+           if (linear.spillAt(pos, &spill))
+           {
+               std::cout << "SPILL " << spill.spillRegister() << std::endl;
+           }
+
+           const poInstruction& ins = bb->getInstruction(i);
+           std::cout << ins.name() << " " << linear.getRegisterByVariable(ins.name()) << std::endl;
+           pos++;
+       }
+
+        bb = bb->getNext();
+        index++;
+    }
+
+    std::cout << "###############" << std::endl;
+}
+
+void poAsm::spill(poRegLinear& linear, const int pos)
+{
+    poRegSpill spill;
+    if (linear.spillAt(pos, &spill))
+    {
+        const int spillVariable = spill.spillVariable();
+        const int slot = spill.spillStackSlot();
+        mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, -8 * (slot + 1), spill.spillRegister());
+    }
+}
+
+void poAsm::restore(const poInstruction& ins, poRegLinear& linear, const int pos)
+{
+    switch (ins.type())
+    {
+    case IR_CALL: /* CALL, BR, PARAM, CONSTANT have special handling */
+    case IR_BR:
+    case IR_PARAM:
+    case IR_CONSTANT:
+    case IR_PHI: /* PHIs are not used at this point */
+        return;
+    }
+
+    /* if a variable we want to use has been spilled, we need to restore it */
+
+    if (ins.left() != -1)
+    {
+        //const int spillSlot = _stackAlloc.findSlot(ins.left());
+        //mc_mov_memory_to_reg_x64(linear.)
+    }
+
+    if (ins.right() != -1)
+    {
+        //const int spillSlot = _stackAlloc.findSlot(ins.right());
+
+    }
+}
+
 void poAsm::generate(poModule& module, poFlowGraph& cfg)
 {
-    ssaDestruction(cfg);
-
-    poRegLinear linear;
+    poRegLinear linear(module);
     linear.setNumRegisters(VM_REGISTER_MAX + VM_SSE_REGISTER_MAX);
     
     linear.setVolatile(VM_REGISTER_ESP, true);
@@ -2044,14 +2119,18 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
     }
 
     linear.allocateRegisters(cfg);
+    
+    scanBasicBlocks(cfg);
+    
+    dump(linear, cfg);
 
     // Prologue
     generatePrologue(linear);
 
     // Generate the machine code
     //
-    scanBasicBlocks(cfg);
     poBasicBlock* bb = cfg.getFirst();
+    int pos = 0;
     while (bb)
     {
         _basicBlocks[_basicBlockMap[bb]].setPos(int(_programData.size()));
@@ -2061,8 +2140,15 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
         for (int i = 0; i < int(instructions.size()); i++)
         {
             auto& ins = instructions[i];
+
+            spill(linear, pos);
+            restore(ins, linear, pos);
+
             switch (ins.code())
             {
+            case IR_LOAD:
+                ir_load(linear, ins, pos);
+                break;
             case IR_ADD:
                 ir_add(linear, ins);
                 break;
@@ -2090,6 +2176,9 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
             case IR_CONSTANT:
                 ir_constant(module.constants(), linear, ins);
                 break;
+            case IR_COPY:
+                ir_copy(linear, ins);
+                break;
             case IR_DIV:
                 ir_div(linear, ins);
                 break;
@@ -2112,6 +2201,8 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
                 ir_unary_minus(linear, ins);
                 break;
             }
+
+            pos++;
         }
 
         bb = bb->getNext();

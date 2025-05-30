@@ -11,8 +11,15 @@ set (PORAC_SOURCES
     "poCompiler.cpp"
     "poEmit.h"
     "poEmit.cpp"
+)
 
+set (PORAC_EXAMPLES
     "../Examples/Example.po"
+    "../Examples/Example2.po"
+    "../Examples/Example3.po"
+    "../Examples/Example4.po"
+    "../Examples/Example5.po"
+    "../Examples/Example6.po"
 )
 
 project ("porac")
@@ -20,7 +27,7 @@ project ("porac")
 include_directories("../core")
 
 # Add source to this project's executable.
-add_executable(porac ${PORAC_SOURCES})
+add_executable(porac ${PORAC_SOURCES} ${PORAC_EXAMPLES})
 target_link_libraries(porac poracore)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)

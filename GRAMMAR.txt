@@ -1,0 +1,38 @@
+# EBNF for pora
+
+topLevel := import | namespace ;
+import := 'import' IDENTIFIER ';' ;
+namespace := 'namespace' IDENTIFIER '{' (('static' function) | struct)* '}' ;
+function := (primitive | IDENTIFIER | 'void') IDENTIFIER '(' args ')' '{' statement* '}' ;
+args := primitive IDENTIFIER (',' primitive IDENTIFIER)* ;
+struct := 'struct' IDENTIFIER '{' field* '}' ;
+field := (primitive | IDENTIFIER) IDENTIFIER ';' ;
+
+statement := exprStatement ';' |
+		decl ';' |
+		for |
+		while |
+		if |
+		return
+		;
+exprStatement := IDENTIFIER '=' rhs |
+		IDENTIFIER ( ( '.' IDENTIFIER )? ( '(' call ')' )? )*
+		;
+decl := (primitive | IDENTIFIER) IDENTIFIER ('=' rhs)? ;
+
+rhs := term ;
+term := factor (('+' | '-') factor)* ;
+factor := unary (('*' | '\') unary)* ;
+unary := '-' primary | primary ;
+
+primary := TRUE | FALSE | f32 | f64 | I32 | I64 | I8 | U32 | U64 | U8 | STRING | CHAR |
+	IDENTIFIER ( ( '.' IDENTIFIER )? ( '(' call ')' )? )* |
+	'(' expression ')'
+	 ;
+primitive := 'boolean' | 'f32' | 'f64' | 'i32' | 'i64' | 'i8' | 'u32' | 'u64' | 'u8' ;
+
+expression := or ;
+or := and ('||' and)* ;
+and := equality ('&&' equality)* ;
+equality := term (('==' | '!=' | '<' | '>' | '<=' | '>=') term)* ;
+

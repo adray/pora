@@ -1,5 +1,6 @@
 #pragma once
 #include "poCFG.h"
+#include "poType.h"
 
 #include <vector>
 #include <string>
@@ -86,32 +87,16 @@ namespace po
         std::vector<int> _variables;
     };
 
-    class poType
-    {
-    public:
-        poType(const std::string& name, poAttributes attribute);
-        void addFunction(const poFunction& function);
-        inline const std::string& name() const { return _name; }
-        inline const poAttributes attribute() const { return _attribute; }
-
-    private:
-        std::string _name;
-        std::vector<poFunction> _functions;
-        poAttributes _attribute;
-    };
-
     class poNamespace
     {
     public:
         poNamespace(const std::string& name);
-        void addType(const poType& type);
         void addFunction(const poFunction& function);
         inline const std::string& name() const { return _name; }
         inline std::vector<poFunction>& functions() { return _functions; }
 
     private:
         std::string _name;
-        std::vector<poType> _types;
         std::vector<poFunction> _functions;
     };
 
@@ -162,11 +147,14 @@ namespace po
         poResult<poNamespace> getNamespace(const std::string& name);
         inline std::vector<poNamespace>& namespaces() { return _namespaces; }
         inline poConstantPool& constants() { return _constants; }
+        inline std::vector<poType>& types() { return _types; }
         int addSymbol(const std::string& symbol);
         bool getSymbol(const int id, std::string& symbol);
+        void addType(const poType& type);
         void dump();
 
     private:
+        std::vector<poType> _types;
         std::unordered_map<int, std::string> _symbols;
         std::vector<poNamespace> _namespaces;
         poConstantPool _constants;

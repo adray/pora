@@ -14,6 +14,7 @@ namespace po
         void advance();
         const poToken& peek();
         bool match(poTokenType type);
+        bool lookahead(poTokenType type);
         bool eof();
         inline const std::string& error() const { return _errorText; }
         inline int errorLine() const { return _line; }
@@ -66,6 +67,15 @@ namespace po
         poParser& _parser;
     };
 
+    class poStructParser
+    {
+    public:
+        poStructParser(poParser& parser);
+        poNode* parse();
+    private:
+        poParser& _parser;
+    };
+
     class poNamespaceParser
     {
     public:
@@ -73,6 +83,7 @@ namespace po
         poNode* parse();
     private:
         poNode* parseFunction(const poToken& ret);
+        poNode* parseStruct();
 
         poParser& _parser;
     };

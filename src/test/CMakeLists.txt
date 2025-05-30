@@ -15,6 +15,8 @@ set (PORA_TEST_SOURCES
     "poLiveTests.cpp"
     "poRegLinearTests.h"
     "poRegLinearTests.cpp"
+    "poNLFTests.h"
+    "poNLFTests.cpp"
 )
 
 project ("poratest")

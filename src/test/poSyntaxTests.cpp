@@ -108,6 +108,14 @@ void po::syntaxTest()
         "static void main()"\
         "}", false);
     checkSyntax("Function Test #7", "namespace Test { static void main() { ", false);
+    checkSyntax("Function Test #8", "namespace Test {"\
+        "static i64 test() {"\
+        "   return 5;"\
+        "}"\
+        "static void main() {"\
+        "   i64 x = 6 + test();"\
+        "}"\
+        "}", true);
     checkSyntax("Type Test #1", "namespace Test {"\
         "static void main() {"\
         "   i32 x = 5;"\
@@ -457,4 +465,74 @@ void po::syntaxTest()
     //    "   for (;;){} "\
     //    "}"\
     //    "}", true);
+    checkSyntax("Struct Test #1", "namespace Test {"\
+        "struct myStruct {"\
+        "}"\
+        "}", true);
+    checkSyntax("Struct Test #2", "namespace Test {"\
+        "struct myStruct {"\
+        "}", false);
+    checkSyntax("Struct Test #3", "namespace Test {"\
+        "struct myStruct"\
+        "}", false);
+    checkSyntax("Struct Test #4", "namespace Test {"\
+        "struct myStruct {"\
+        "   i64 x;"\
+        "   i64 y;"\
+        "   boolean z;"\
+        "}"\
+        "}", true);
+    checkSyntax("Struct Test #5", "namespace Test {"\
+        "struct myStruct {"\
+        "   i64 x"\
+        "}"
+        "}", false);
+    checkSyntax("Struct Test #6", "namespace Test {"\
+        "struct myStruct {"\
+        "   i64"\
+        "}"\
+        "}", false);
+    checkSyntax("Struct Test #7", "namespace Test {"\
+        "struct myStruct {"\
+        "   i64 x;"\
+        "}"\
+        "static void main() {"\
+        "   myStruct v;"\
+        "}"\
+        "}", true);
+    checkSyntax("Struct Test #8", "namespace Test {"\
+        "struct myStruct {"\
+        "   i64 x;"\
+        "}"\
+        "static void main() {"\
+        "   myStruct v1;"\
+        "   myStruct v2 = v1;"\
+        "}"\
+        "}", true);
+    checkSyntax("Struct Test #9", "namespace Test {"\
+        "struct myStruct {"\
+        "   i64 x;"\
+        "}"\
+        "static void main() {"\
+        "   myStruct v1;"\
+        "   i64 p = v1.x;"\
+        "}"\
+        "}", true);
+    checkSyntax("Struct Test #10", "namespace Test {"\
+        "struct myStruct {"\
+        "   myOtherStruct y;"\
+        "}"\
+        "struct myOtherStruct {"\
+        "   i64 x;"\
+        "}"\
+        "static void main() {"\
+        "   myStruct v1;"\
+        "   i64 p = v1.y.x;"\
+        "}"\
+        "}", true);
+    checkSyntax("Array Test #1", "namespace Test {"\
+        "static void main"\
+        "   i64[10] myArray;"\
+        "}"\
+        "}", true);
 }

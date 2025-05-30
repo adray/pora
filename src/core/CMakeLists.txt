@@ -31,6 +31,14 @@ set (PORACORE_SOURCES
     "poSSA.cpp"
     "poRegLinear.h"
     "poRegLinear.cpp"
+    "poUses.h"
+    "poUses.cpp"
+    "poNLF.h"
+    "poNLF.cpp"
+    "poType.h"
+    "poType.cpp"
+    "poTypeResolver.h"
+    "poTypeResolver.cpp"
 )
 
 project ("poracore")

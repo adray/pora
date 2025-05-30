@@ -2,7 +2,7 @@
 #include "poSSA.h"
 #include "poModule.h"
 #include "poCFG.h"
-#include "poTypeChecker.h"
+#include "poType.h"
 
 #include <iostream>
 #include <unordered_set>

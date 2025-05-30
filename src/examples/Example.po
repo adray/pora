@@ -1,0 +1,56 @@
+import std;
+
+namespace Example
+{
+    static i64 foo(i64 x)
+    {
+        return x + 5;
+    }
+
+    static void test()
+    {
+        i64 i = 100;
+    }
+
+    static void main()
+    {
+        i64 x = 500;
+        x = x * 10 + 5;
+        i64 y = foo(-x);
+        test();
+
+        if (y != 0 && (x == 5005 || x == 0))
+        {
+            foo(5);
+        }
+        else if (x == 500)
+        {
+            foo(51);
+            return;
+        }
+
+        if (x == 0 || (x == 1 && x == 2))
+        {
+            foo(4);
+        }
+
+        while (x > 0)
+        {
+            x = x - 100;
+            if (x == 1)
+            {
+                return;
+            }
+        }
+
+        for (i64 i = 0; i < 10; i = i + 1) {}
+
+        i64* p;
+        u8 c = '#';
+        f64 d = 100.1;
+
+        i64 z = 10 * 5;
+        z = z + 1;
+    }
+}
+

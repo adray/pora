@@ -22,7 +22,7 @@ namespace po
         inline void addImmediateDominatedBy(const int id) { _immediateDominatedBy.push_back(id); }
 
         inline void clearPredecessors() { _predecessors.clear(); }
-        inline void clearDominators() { return _dominators.clear(); }
+        inline void clearDominators() { _dominators.clear(); }
 
         inline poBasicBlock* getBasicBlock() const { return _bb; }
         inline const std::vector<int>& dominators() const { return _dominators; }
@@ -34,8 +34,8 @@ namespace po
 
     private:
         poBasicBlock* _bb;
-        std::vector<int> _predecessors;
-        std::vector<int> _successors;
+        std::vector<int> _predecessors; /* the immediate predecessors of this node */
+        std::vector<int> _successors; /* the immediate successors of this node */
         std::vector<int> _dominators; /* nodes which dominate this node */
         std::vector<int> _dominatedBy; /* nodes which this node dominates */
         std::vector<int> _immediateDominatedBy; /* nodes which this node immediately dominates */
@@ -48,6 +48,7 @@ namespace po
         void compute(poFlowGraph& cfg);
         inline int start() const { return 0; }
         inline poDomNode& get(const int index) { return _nodes[index]; }
+        inline const poDomNode& get(const int index) const { return _nodes[index]; }
         inline int num() const { return int(_nodes.size()); }
 
     private:

@@ -11,17 +11,6 @@ namespace po
     class poNode;
     class poListNode;
 
-    constexpr int TYPE_VOID = 0;
-    constexpr int TYPE_I64 = 1;
-    constexpr int TYPE_I32 = 2;
-    constexpr int TYPE_I8 = 3;
-    constexpr int TYPE_F64 = 4;
-    constexpr int TYPE_F32 = 5;
-    constexpr int TYPE_U64 = 6;
-    constexpr int TYPE_U32 = 7;
-    constexpr int TYPE_U8 = 8;
-    constexpr int TYPE_BOOLEAN = 9;
-
     class poTypeChecker
     {
     public:
@@ -36,7 +25,7 @@ namespace po
         void setError(const std::string& text, const poToken& token);
 
         void getModules(poNode* node);
-        void getFunctions(poNode* node);
+        void getNamespace(poNode* node);
 
         void checkModules(poNode* node);
         void checkNamespaces(poNode* node);
@@ -57,7 +46,7 @@ namespace po
         void pushScope();
         void popScope();
 
-        std::unordered_set<std::string> _types;
+        std::unordered_map<std::string, poListNode*> _types;
         std::vector<std::unordered_map<std::string, int>> _variables;
         std::unordered_map<std::string, poListNode*> _functions;
         std::string _errorText;

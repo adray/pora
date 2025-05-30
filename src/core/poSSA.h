@@ -1,4 +1,5 @@
 #pragma once
+#include "poPhiWeb.h"
 
 #include <unordered_set>
 #include <unordered_map>
@@ -12,37 +13,16 @@ namespace po
     class poInstruction;
     class poDom;
 
-    class poSSAPhi
-    {
-    public:
-        poSSAPhi(const int name);
-        void addValue(const int value);
-        inline const std::vector<int>& values() const { return _rhs; }
-        inline void setName(const int name) { _name = name; }
-        inline const int name() const { return _name; }
-        inline const int initalName() const { return _initialName; }
-
-    private:
-        int _initialName;
-        int _name;
-        std::vector<int> _rhs;
-    };
-
     class poSSABasicBlock
     {
     public:
         poSSABasicBlock();
-        void addPhi(const int name);
-        inline std::vector<poSSAPhi>& phis() {
-            return _phis;
-        }
         inline const int maxUse()const { return _maxUse; }
         inline const int maxDef()const { return _maxDef; }
         inline void setMaxUse(const int use) { _maxUse = use; }
         inline void setMaxDef(const int def) { _maxDef = def; }
 
     private:
-        std::vector<poSSAPhi> _phis;
         int _maxUse;
         int _maxDef;
     };
@@ -66,5 +46,13 @@ namespace po
         std::unordered_map<int, int> _renameMap;
         std::unordered_set<poBasicBlock*> _visited;
         int _variableNames;
+    };
+
+    class poSSA_Destruction
+    {
+    public:
+        void destruct(poFlowGraph& cfg);
+    private:
+        poPhiWeb _web;
     };
 }

@@ -85,11 +85,13 @@ namespace po
 
     private:
         int getType(const poToken& token);
+        int getTypeSize(const int type);
         int getOrAddVariable(const std::string& name, const int type);
         int addVariable(const std::string& name, const int type);
         void getModules(poNode* node);
         void getNamespaces(poNode* node);
-        void getFunctions(poNode* node, poNamespace& ns);
+        void getFunction(poNode* node);
+        void getStruct(poNode* node);
         void emitFunction(poNode* node, poFunction& function);
         void emitBody(poNode* node, poFlowGraph& cfg);
         void emitArgs(poNode* node, poFlowGraph& cfg);
@@ -109,7 +111,10 @@ namespace po
         poModule& _module;
         poConditionGraph _graph;
         std::unordered_map<std::string, poNode*> _functions;
+        //std::unordered_map<std::string, poNode*> _userTypes;
+        std::unordered_map<std::string, int> _userTypes;
         std::unordered_map<std::string, poVariable> _variables;
+        std::vector<int> _types;
         int _instructionCount;
     };
 }

@@ -1,5 +1,6 @@
 #include "poTypeChecker.h"
 #include "poAST.h"
+#include "poType.h"
 
 #include <assert.h>
 
@@ -67,13 +68,13 @@ void poTypeChecker::getModules(poNode* node)
         {
             if (child->type() == poNodeType::NAMESPACE)
             {
-                getFunctions(child);
+                getNamespace(child);
             }
         }
     }
 }
 
-void poTypeChecker::getFunctions(poNode* node)
+void poTypeChecker::getNamespace(poNode* node)
 {
     poListNode* ns = static_cast<poListNode*>(node);
     for (poNode* child : ns->list())
@@ -83,6 +84,11 @@ void poTypeChecker::getFunctions(poNode* node)
             poListNode* func = static_cast<poListNode*>(child);
             const std::string& name = func->token().string();
             _functions.insert(std::pair<std::string, poListNode*>(name, func));
+        }
+        else if (child->type() == poNodeType::STRUCT)
+        {
+            poListNode* structure = static_cast<poListNode*>(child);
+            _types.insert(std::pair<std::string, poListNode*>(structure->token().string(), structure));
         }
     }
 }

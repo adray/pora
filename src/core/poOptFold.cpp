@@ -1,6 +1,6 @@
 #include "poOptFold.h"
 #include "poAST.h"
-#include "poTypeChecker.h"
+#include "poType.h"
 
 #include <assert.h>
 

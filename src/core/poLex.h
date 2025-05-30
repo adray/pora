@@ -59,6 +59,7 @@ namespace po
         WHILE,
         FOR,
         CLASS,
+        STRUCT,
         NEW,
         PUBLIC,
         PRIVATE,

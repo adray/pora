@@ -8,6 +8,7 @@
 #include "poEmit.h"
 #include "poOptFold.h"
 #include "poSSA.h"
+#include "poTypeResolver.h"
 
 #include <sstream>
 
@@ -53,6 +54,10 @@ int poCompiler:: compile()
         lexer.reset();
     }
 
+    // Resolve types
+    poModule module;
+    poTypeResolver typeResolver(module);
+    typeResolver.resolve(nodes);
 
     // Type check AST
     poTypeChecker typeChecker;
@@ -69,10 +74,9 @@ int poCompiler:: compile()
     fold.fold(nodes);
 
     // Convert the AST to a IR (three address code - intermediate representation) formed of BB (basic blocks) and CFG (control flow graph)
-    poModule module;
     poCodeGenerator generator(module);
     generator.generate(nodes);
-    //module.dump();
+    module.dump();
 
     // Convert to SSA form and insert PHI nodes
     poSSA ssa;

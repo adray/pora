@@ -30,11 +30,13 @@ namespace po
         CMP_LESS_EQUALS, /* poBinaryNode */
         CMP_GREATER_EQUALS, /* poBinaryNode */
         CONSTANT, /* poConstantNode */
+        MEMBER, /* poUnaryNode */
         STATEMENT, /* poUnaryNode */
         RETURN, /* poUnaryNode */
         FUNCTION, /* poListNode */
         BODY, /* poListNode */
         CLASS, /* poListNode */
+        STRUCT, /* poListNode */
         NAMESPACE, /* poListNode */
         MODULE, /* poListNode */
         IMPORT /* poNode */

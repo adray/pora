@@ -1,0 +1,31 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        for (i64 i = 0; i < 10; i = i + 1) {}
+
+        i64 z;
+        z = z + 5;
+        
+        i64 p = 20;
+        p = p / 4;
+
+        u64 x = 10000000000000000000u;
+        i64 y = 9223372036854775807;
+        boolean a = true;
+
+        u8 w = 3b;
+        w = w + 5b - 8b;
+        w = w * 10b;
+        w = 21b / 3b;
+
+        u8 c = 'C';
+        if (c > w)
+        {
+            u8 d = 'D';
+        }
+    }
+}
+

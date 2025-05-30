@@ -1,7 +1,8 @@
 #include "poRegLinearTests.h"
 #include "poCFG.h"
 #include "poRegLinear.h"
-#include "poTypeChecker.h"
+#include "poType.h"
+#include "poModule.h"
 
 #include <iostream>
 
@@ -34,7 +35,8 @@ static void regLinearTest1()
     cfg.addBasicBlock(bb3);
     cfg.addBasicBlock(bb4);
 
-    poRegLinear linear;
+    poModule mod;
+    poRegLinear linear(mod);
     linear.setNumRegisters(16);
     linear.allocateRegisters(cfg);
 
@@ -95,7 +97,7 @@ static void regLinearTest2()
     bb3->addInstruction(poInstruction(1004, TYPE_I64, 0, IR_CONSTANT));
     bb3->addInstruction(poInstruction(1000, TYPE_I64, 1000, 1004, IR_ADD));
     bb3->addInstruction(poInstruction(1005, 0, -1, -1, IR_BR));
-    bb2->setBranch(bb2, true);
+    bb3->setBranch(bb2, true);
 
     bb4->addInstruction(poInstruction(1006, 0, 0, IR_RETURN));
 
@@ -104,7 +106,8 @@ static void regLinearTest2()
     cfg.addBasicBlock(bb3);
     cfg.addBasicBlock(bb4);
 
-    poRegLinear linear;
+    poModule mod;
+    poRegLinear linear(mod);
     linear.setNumRegisters(16);
     linear.allocateRegisters(cfg);
 
@@ -114,9 +117,9 @@ static void regLinearTest2()
     bool ok = true;
     for (int i = 0; i < 8; i++)
     {
-        // Check the register for an instruction doesn't interfer with
+        // Check the register for an instruction doesn't interfere with
         // the register used for '1004'. Ignore those which are '1004'
-        // or those which don't need a reigster e.g. BR, CMP, RETURN.
+        // or those which don't need a register e.g. BR, CMP, RETURN.
         if (i != 0 &&
             i != 2 &&
             i != 5 &&
@@ -143,9 +146,36 @@ static void regLinearTest2()
     }
 }
 
+static void regLinearTest3()
+{
+    std::cout << "Reg Linear Test #3 ";
+
+    poFlowGraph cfg;
+    poBasicBlock* bb1 = new poBasicBlock();
+
+    bb1->addInstruction(poInstruction(1000, TYPE_I64, 100, IR_CONSTANT));
+    bb1->addInstruction(poInstruction(1001, TYPE_I64, 200, IR_CONSTANT));
+    bb1->addInstruction(poInstruction(1002, TYPE_I64, 300, IR_CONSTANT));
+    bb1->addInstruction(poInstruction(1003, TYPE_I64, 1002, 1001, IR_ADD));
+    bb1->addInstruction(poInstruction(1004, TYPE_I64, 1003, 1000, IR_ADD));
+
+    cfg.addBasicBlock(bb1);
+
+    poModule mod;
+    poRegLinear linear(mod);
+    linear.setNumRegisters(2);
+    linear.allocateRegisters(cfg);
+
+    // TODO: check that the register has been spilled
+
+    std::cout << "OK" << std::endl;
+    //std::cout << "FAILED" << std::endl;
+}
+
 void po::runRegLinearTests()
 {
     regLinearTest1();
     regLinearTest2();
+    regLinearTest3();
 }
 

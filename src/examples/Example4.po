@@ -1,0 +1,18 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        i64 x = 0;
+        for (i64 i = 0; i < 3; i=i+ 1)
+        {
+            for (i64 j = 0; j < 3; j=j+1)
+            {
+                x = x + 1;
+            }
+        }
+
+        x = x + 1;
+    }
+}

@@ -1,0 +1,55 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        i64 x = 0;
+        i64 k = 7;
+        for (i64 i = 0; i < 10; i=i+ 1)
+        {
+            x = x + k;
+            if (i == 0)
+            {
+                x = x * 2;
+            }
+        }
+    }
+
+    static void loop()
+    {
+        i64 x = 0;
+        for (i64 i = 0; i < 10; i=i+ 1)
+        {
+            if (i / 2 == 0) {
+                x = x + i;
+            } else {
+                x = x + i * 2;
+            }
+        }
+
+        i64 p = x;
+    }
+
+    static void test()
+    {
+        i64 x;
+        i64 y = 20;
+        x = y;
+    }
+
+    static void spill()
+    {
+        i64 a = 1;
+        i64 b = 2;
+        i64 c = 3;
+        i64 d = 4;
+        i64 e = 5;
+        i64 f = 6;
+        i64 g = 7;
+        i64 h = 8; // spill here
+        i64 i = 9; // spill here
+
+        i64 k = a + b + c + d + e + f + g + h + i;
+    }
+}

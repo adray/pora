@@ -1,0 +1,22 @@
+import std;
+
+namespace Example
+{
+    struct vec3
+    {
+        f64 x;
+        f64 y;
+        f64 z;
+    }
+
+    struct transform
+    {
+        vec3 pos;
+        vec3 scale;
+    }
+
+    static void main()
+    {
+        transform t;
+    }
+}

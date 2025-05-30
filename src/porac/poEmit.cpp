@@ -1,7 +1,7 @@
 #include "poEmit.h"
 #include "poAST.h"
 #include "poModule.h"
-#include "poTypeChecker.h"
+#include "poType.h"
 #include <assert.h>
 #include <algorithm>
 
@@ -72,12 +72,6 @@ int poConditionGraph::createNode(poNode* ast, int success, int fail)
 
 int poConditionGraph::buildAnd(poNode* ast, int success, int fail)
 {
-    //poBinaryNode* expr = static_cast<poBinaryNode*>(ast);
-    //const int left = build(expr->left(), success, fail);
-    //const int right = build(expr->right(), left, fail);
-
-    //return right;
-
     poBinaryNode* expr = static_cast<poBinaryNode*>(ast);
     const int right = build(expr->right(), success, fail);
     const int left = build(expr->left(), right, fail);
@@ -87,12 +81,6 @@ int poConditionGraph::buildAnd(poNode* ast, int success, int fail)
 
 int poConditionGraph::buildOr(poNode* ast, int success, int fail)
 {
-    //poBinaryNode* expr = static_cast<poBinaryNode*>(ast);
-    //const int left = build(expr->left(), success, fail);
-    //const int right = build(expr->right(), success, left);
-
-    //return right;
-
     poBinaryNode* expr = static_cast<poBinaryNode*>(ast);
     const int right = build(expr->right(), success, fail);
     const int left = build(expr->left(), success, right);
@@ -221,6 +209,11 @@ void poCodeGenerator::generate(const std::vector<poNode*>& ast)
         getModules(node);
     }
 
+    for (auto& type : _module.types())
+    {
+        _userTypes.insert(std::pair<std::string, int>(type.name(), type.id()));
+    }
+
     for (auto& ns : _module.namespaces())
     {
         for (auto& staticFunction : ns.functions())
@@ -232,6 +225,32 @@ void poCodeGenerator::generate(const std::vector<poNode*>& ast)
             }
         }
     }
+}
+
+int poCodeGenerator::getTypeSize(const int type)
+{
+    int size = 0;
+    switch (type)
+    {
+    case TYPE_BOOLEAN:
+    case TYPE_U8:
+    case TYPE_I8:
+        size = 1;
+        break;
+    case TYPE_U32:
+    case TYPE_I32:
+    case TYPE_F32:
+        size = 4;
+        break;
+    case TYPE_U64:
+    case TYPE_I64:
+    case TYPE_F64:
+        size = 8;
+        break;
+    default:
+        break;
+    }
+    return size;
 }
 
 int poCodeGenerator::getType(const poToken& token)
@@ -267,7 +286,17 @@ int poCodeGenerator::getType(const poToken& token)
         type = TYPE_VOID;
         break;
     default:
-        type = -1;
+    {
+        const auto& it = _userTypes.find(token.string());
+        if (it != _userTypes.end())
+        {
+            type = it->second;
+        }
+        else
+        {
+            type = -1;
+        }
+    }
         break;
     }
     return type;
@@ -283,6 +312,7 @@ int poCodeGenerator::getOrAddVariable(const std::string& name, const int type)
     }
     else
     {
+        _types.push_back(type);
         var = _instructionCount++;
         _variables.insert(std::pair<std::string, poVariable>(name, poVariable(var, type)));
     }
@@ -297,6 +327,7 @@ int poCodeGenerator::addVariable(const std::string& name, const int type)
     const auto& it = _variables.find(name);
     if (it == _variables.end())
     {
+        _types.push_back(type);
         var = _instructionCount++;
         _variables.insert(std::pair<std::string, poVariable>(name, poVariable(var, type)));
     }
@@ -307,6 +338,7 @@ void poCodeGenerator::emitFunction(poNode* node, poFunction& function)
 {
     // Reset the variable emitter.
     _variables.clear();
+    _types.clear();
     _instructionCount = 0;
 
     poFlowGraph& cfg = function.cfg();
@@ -350,6 +382,7 @@ void poCodeGenerator::emitFunction(poNode* node, poFunction& function)
         if (retType == TYPE_VOID)
         {
             last->addInstruction(poInstruction(_instructionCount++, TYPE_VOID, -1, -1, IR_RETURN));
+            _types.push_back(TYPE_VOID);
         }
         else
         {
@@ -405,6 +438,7 @@ void poCodeGenerator::emitArgs(poNode* node, poFlowGraph& cfg)
             poNode* type = param->child();
             const int code = getType(type->token());
             bb->addInstruction(poInstruction(getOrAddVariable(name, code), code, paramCount++, -1, IR_PARAM));
+            _types.push_back(code);
         }
     }
 }
@@ -463,6 +497,7 @@ void poCodeGenerator::emitWhileStatement(poNode* node, poFlowGraph& cfg, poBasic
     cfg.addBasicBlock(bodyBB);
     emitBody(body, cfg);
     cfg.getLast()->addInstruction(poInstruction(_instructionCount++, 0, IR_JUMP_UNCONDITIONAL, -1, IR_BR));
+    _types.push_back(0);
     cfg.getLast()->setBranch(loopHeaderBB, true);
     loopHeaderBB->addIncoming(cfg.getLast());
 }
@@ -503,6 +538,7 @@ void poCodeGenerator::emitIfStatement(poNode* node, poFlowGraph& cfg, poBasicBlo
         cfg.addBasicBlock(bodyBB);
         emitBody(body, cfg);
         cfg.getLast()->addInstruction(poInstruction(_instructionCount++, 0, IR_JUMP_UNCONDITIONAL, -1, IR_BR)); /*unconditional branch*/
+        _types.push_back(0);
         cfg.getLast()->setBranch(endBB, true);
         endBB->addIncoming(cfg.getLast());
         cfg.addBasicBlock(elseBB);
@@ -561,6 +597,7 @@ void poCodeGenerator::emitIfExpression(poConditionGraphNode& cgn, poFlowGraph& c
         {
             id = fail.id();
             cfg.getLast()->addInstruction(poInstruction(_instructionCount++, type, getCompare(node.node()), -1, IR_BR));
+            _types.push_back(type);
             cfg.getLast()->setBranch(success.getBasicBlock(), false);
             success.getBasicBlock()->addIncoming(cfg.getLast());
             cfg.addBasicBlock(fail.getBasicBlock());
@@ -569,6 +606,7 @@ void poCodeGenerator::emitIfExpression(poConditionGraphNode& cgn, poFlowGraph& c
         {
             id = success.id();
             cfg.getLast()->addInstruction(poInstruction(_instructionCount++, type, flipJump(getCompare(node.node())), -1, IR_BR));
+            _types.push_back(type);
             cfg.getLast()->setBranch(fail.getBasicBlock(), false);
             fail.getBasicBlock()->addIncoming(cfg.getLast());
             cfg.addBasicBlock(success.getBasicBlock());
@@ -577,6 +615,7 @@ void poCodeGenerator::emitIfExpression(poConditionGraphNode& cgn, poFlowGraph& c
         {
             /*we are the last node? branch to the fail state */
             cfg.getLast()->addInstruction(poInstruction(_instructionCount++, type, flipJump(getCompare(node.node())), -1, IR_BR));
+            _types.push_back(type);
             cfg.getLast()->setBranch(fail.getBasicBlock(), false);
             fail.getBasicBlock()->addIncoming(cfg.getLast());
         }
@@ -607,15 +646,17 @@ int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg)
             returnType = getType(child->token());
         }
     }
-    
+
     const int symbol = _module.addSymbol(name);
     const int retVariable = _instructionCount;
     cfg.getLast()->addInstruction(poInstruction(_instructionCount++, returnType, int(call->list().size()), symbol, IR_CALL));
+    _types.push_back(returnType);
     for (int i = 0; i < int(args.size()); i++)
     {
         poUnaryNode* param = static_cast<poUnaryNode*>(argsNode->list()[i]);
         const int type = getType(param->child()->token());
         cfg.getLast()->addInstruction(poInstruction(_instructionCount++, type, args[i], -1, IR_ARG));
+        _types.push_back(type);
     }
     return retVariable;
 }
@@ -624,9 +665,9 @@ void poCodeGenerator::emitAssignment(poNode* node, poFlowGraph& cfg)
 {
     poBinaryNode* assignment = static_cast<poBinaryNode*>(node);
     const int right = emitExpr(assignment->right(), cfg);
-    auto& ins = cfg.getLast()->getInstruction(int(cfg.getLast()->numInstructions()) - 1);
-    const int variable = getOrAddVariable(assignment->left()->token().string(), ins.type());
-    ins.setName(variable); /* update the final instruction to assign the variable */
+    const int type = _types[right];
+    const int variable = getOrAddVariable(assignment->left()->token().string(), type);
+    cfg.getLast()->addInstruction(poInstruction(variable, type, right, -1, IR_COPY));
 }
 
 void poCodeGenerator::emitReturn(poNode* node, poFlowGraph& cfg)
@@ -636,13 +677,14 @@ void poCodeGenerator::emitReturn(poNode* node, poFlowGraph& cfg)
     {
         const int expr = emitExpr(returnNode->child(), cfg);
         poBasicBlock* bb = cfg.getLast();
-        const poInstruction& ins = bb->getInstruction(int(bb->numInstructions()) - 1);
-        assert(ins.name() == expr);
-        bb->addInstruction(poInstruction(_instructionCount++, ins.type(), expr, -1, IR_RETURN));
+        const int type = _types[expr];
+        bb->addInstruction(poInstruction(_instructionCount++, type, expr, -1, IR_RETURN));
+        _types.push_back(type);
     }
     else
     {
         cfg.getLast()->addInstruction(poInstruction(_instructionCount++, 0, -1, -1, IR_RETURN));
+        _types.push_back(0);
     }
     cfg.addBasicBlock(new poBasicBlock());
 }
@@ -695,7 +737,16 @@ void poCodeGenerator::emitDecl(poNode* node, poFlowGraph& cfg)
             break;
         }
 
-        cfg.getLast()->addInstruction(poInstruction(var, type, constant, IR_CONSTANT));
+        if (constant != -1)
+        {
+            cfg.getLast()->addInstruction(poInstruction(var, type, constant, IR_CONSTANT));
+            _types.push_back(type);
+        }
+        else
+        {
+            cfg.getLast()->addInstruction(poInstruction(var, type, 1 /* num elements */, -1, IR_ALLOCA));
+            _types.push_back(type);
+        }
     }
 }
 
@@ -745,6 +796,7 @@ int poCodeGenerator::emitConstantExpr(poNode* node, poFlowGraph& cfg)
         if (id == -1) { id = constants.addConstant(constant->i64()); }
         instructionId = _instructionCount;
         cfg.getLast()->addInstruction(poInstruction(_instructionCount++, TYPE_I64, id, IR_CONSTANT));
+        _types.push_back(TYPE_I64);
         break;
     case TYPE_BOOLEAN:
     case TYPE_U8:
@@ -752,24 +804,28 @@ int poCodeGenerator::emitConstantExpr(poNode* node, poFlowGraph& cfg)
         if (id == -1) { id = constants.addConstant(constant->u8()); }
         instructionId = _instructionCount;
         cfg.getLast()->addInstruction(poInstruction(_instructionCount++, TYPE_U8, id, IR_CONSTANT));
+        _types.push_back(TYPE_U8);
         break;
     case TYPE_F64:
         id = constants.getConstant(constant->f64());
         if (id == -1) { id = constants.addConstant(constant->f64()); }
         instructionId = _instructionCount;
         cfg.getLast()->addInstruction(poInstruction(_instructionCount++, TYPE_F64, id, IR_CONSTANT));
+        _types.push_back(TYPE_F64);
         break;
     case TYPE_F32:
         id = constants.getConstant(constant->f32());
         if (id == -1) { id = constants.addConstant(constant->f32()); }
         instructionId = _instructionCount;
         cfg.getLast()->addInstruction(poInstruction(_instructionCount++, TYPE_F32, id, IR_CONSTANT));
+        _types.push_back(TYPE_F32);
         break;
     case TYPE_U64:
         id = constants.getConstant(constant->u64());
         if (id == -1) { id = constants.addConstant(constant->u64()); }
         instructionId = _instructionCount;
         cfg.getLast()->addInstruction(poInstruction(_instructionCount++, TYPE_U64, id, IR_CONSTANT));
+        _types.push_back(TYPE_U64);
         break;
     }
     return instructionId;
@@ -780,9 +836,9 @@ int poCodeGenerator::emitUnaryMinus(poNode* node, poFlowGraph& cfg)
     poUnaryNode* unary = static_cast<poUnaryNode*>(node);
     const int expr = emitExpr(unary->child(), cfg);
     const int instruction = _instructionCount++;
-    /*TODO: get left/right instruction type*/
-    auto& ins = cfg.getLast()->instructions()[cfg.getLast()->numInstructions() - 1];
-    cfg.getLast()->addInstruction(poInstruction(instruction, ins.type(), expr, -1, IR_UNARY_MINUS));
+    const int type = _types[expr];
+    cfg.getLast()->addInstruction(poInstruction(instruction, type, expr, -1, IR_UNARY_MINUS));
+    _types.push_back(type);
     return instruction;
 }
 
@@ -792,26 +848,29 @@ int poCodeGenerator::emitBinaryExpr(poNode* node, poFlowGraph& cfg)
     poBinaryNode* binary = static_cast<poBinaryNode*>(node);
     const int left = emitExpr(binary->left(), cfg);
     const int right = emitExpr(binary->right(), cfg);
-    /*TODO: get left/right instruction type*/
-    auto& ins = cfg.getLast()->instructions()[cfg.getLast()->numInstructions() - 1];
+    const int type = _types[left];
 
     switch (node->type())
     {
     case poNodeType::ADD:
         instructionId = _instructionCount;
-        cfg.getLast()->addInstruction(poInstruction(_instructionCount++, ins.type(), left, right, IR_ADD));
+        cfg.getLast()->addInstruction(poInstruction(_instructionCount++, type, left, right, IR_ADD));
+        _types.push_back(type);
         break;
     case poNodeType::SUB:
         instructionId = _instructionCount;
-        cfg.getLast()->addInstruction(poInstruction(_instructionCount++, ins.type(), left, right, IR_SUB));
+        cfg.getLast()->addInstruction(poInstruction(_instructionCount++, type, left, right, IR_SUB));
+        _types.push_back(type);
         break;
     case poNodeType::MUL:
         instructionId = _instructionCount;
-        cfg.getLast()->addInstruction(poInstruction(_instructionCount++, ins.type(), left, right, IR_MUL));
+        cfg.getLast()->addInstruction(poInstruction(_instructionCount++, type, left, right, IR_MUL));
+        _types.push_back(type);
         break;
     case poNodeType::DIV:
         instructionId = _instructionCount;
-        cfg.getLast()->addInstruction(poInstruction(_instructionCount++, ins.type(), left, right, IR_DIV));
+        cfg.getLast()->addInstruction(poInstruction(_instructionCount++, type, left, right, IR_DIV));
+        _types.push_back(type);
         break;
     case poNodeType::CMP_EQUALS:
     case poNodeType::CMP_NOT_EQUALS:
@@ -820,7 +879,8 @@ int poCodeGenerator::emitBinaryExpr(poNode* node, poFlowGraph& cfg)
     case poNodeType::CMP_LESS_EQUALS:
     case poNodeType::CMP_GREATER_EQUALS:
         instructionId = _instructionCount;
-        cfg.getLast()->addInstruction(poInstruction(_instructionCount++, ins.type(), left, right, IR_CMP));
+        cfg.getLast()->addInstruction(poInstruction(_instructionCount++, type, left, right, IR_CMP));
+        _types.push_back(type);
         break;
     }
     return instructionId;
@@ -843,31 +903,27 @@ void poCodeGenerator::getNamespaces(poNode* node)
 {
     poListNode* namespaceNode = static_cast<poListNode*>(node);
     assert(namespaceNode->type() == poNodeType::NAMESPACE);
-    poNamespace ns(namespaceNode->token().string());
     for (poNode* child : namespaceNode->list())
     {
         if (child->type() == poNodeType::FUNCTION)
         {
-            getFunctions(child, ns);
+            getFunction(child);
+        }
+        else if (child->type() == poNodeType::STRUCT)
+        {
+            getStruct(child);
         }
     }
-    _module.addNamespace(ns);
 }
 
-void poCodeGenerator::getFunctions(poNode* node, poNamespace& ns)
+void poCodeGenerator::getStruct(poNode* node)
+{
+    assert(node->type() == poNodeType::STRUCT);
+    //_userTypes.insert(std::pair<std::string, poNode*>(node->token().string(), node));
+}
+
+void poCodeGenerator::getFunction(poNode* node)
 {
     assert(node->type() == poNodeType::FUNCTION);
     _functions.insert(std::pair<std::string, poNode*>(node->token().string(), node));
-    poListNode* functionNode = static_cast<poListNode*>(node);
-    for (poNode* child : functionNode->list())
-    {
-        if (child->type() == poNodeType::ARGS)
-        {
-            poListNode* args = static_cast<poListNode*>(child);
-            ns.addFunction(poFunction(
-                node->token().string(),
-                int(args->list().size()),
-                poAttributes::PUBLIC));
-        }
-    }
 }

@@ -39,6 +39,24 @@ namespace po
         poBasicBlock* _bb;
     };
 
+    class poAsmCopy
+    {
+    public:
+        poAsmCopy(const int src, const int dst)
+            :
+            _src(src),
+            _dst(dst)
+        {
+        }
+
+        inline const int dst() const { return _dst; }
+        inline const int src() const { return _src; }
+
+    private:
+        int _src;
+        int _dst;
+    };
+
     class poAsmBasicBlock
     {
     public:
@@ -93,11 +111,15 @@ namespace po
         inline const std::string& errorText() const { return _errorText; }
 
     private:
+        void dump(const poRegLinear& linear, poFlowGraph& cfg);
+
+        void spill(poRegLinear& linear, const int pos);
+        void restore(const poInstruction& ins, poRegLinear& linear, const int pos);
+
         void generate(poModule& module, poFlowGraph& cfg);
-        void patchForwardJumps(po::poBasicBlock* bb);
+        void patchForwardJumps(poBasicBlock* bb);
         void scanBasicBlocks(poFlowGraph& cfg);
         void patchJump(const poAsmJump& jump);
-        void ssaDestruction(poFlowGraph& cfg);
         void patchCalls();
         void generatePrologue(poRegLinear& linear);
         void generateEpilogue(poRegLinear& linear);
@@ -247,6 +269,7 @@ namespace po
         // IR to machine code routines
         //=====================================
 
+        void ir_load(poRegLinear& linear, const poInstruction& ins, const int instructionIndex);
         void ir_add(poRegLinear& linear, const poInstruction& ins);
         void ir_sub(poRegLinear& linear, const poInstruction& ins);
         void ir_mul(poRegLinear& linear, const poInstruction& ins);
@@ -254,6 +277,7 @@ namespace po
         void ir_cmp(poRegLinear& linear, const poInstruction& ins);
         void ir_br(poRegLinear& linear, const poInstruction& ins, poBasicBlock* bb);
         void ir_constant(poConstantPool& constants, poRegLinear& linear, const poInstruction& ins);
+        void ir_copy(poRegLinear& linear, const poInstruction& ins);
         void ir_ret(poRegLinear& linear, const poInstruction& ins);
         void ir_unary_minus(poRegLinear& linear, const poInstruction& ins);
         void ir_call(poModule& module, poRegLinear& linear, const poInstruction& ins, const std::vector<poInstruction>& args);

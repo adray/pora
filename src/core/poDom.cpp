@@ -102,16 +102,20 @@ void poDom::computeDominators()
                 // New dominators = {node} union (intersection of Dom(p) where p in Predecessor(node))
                 std::vector<int> newDominators = { int(i) };
                 std::vector<int> dominators = _nodes[i].dominators();
-                std::vector<int> working(_nodes.size());
-                size_t numNodes = dominators.size();
+                std::vector<int> working = dominators;
+                const size_t numNodes = dominators.size();
                 for (int pred : _nodes[i].predecessors())
                 {
                     auto& domPred = _nodes[pred].dominators();
                     intersect(domPred, dominators, working);
                     dominators = working;
                 }
-                working.resize(newDominators.size() + dominators.size());
-                std::set_union(newDominators.begin(), newDominators.end(), dominators.begin(), dominators.end(), working.begin());
+                
+                if (std::find(dominators.begin(), dominators.end(), int(i)) == dominators.end())
+                {
+                    working.resize(newDominators.size() + dominators.size());
+                    std::set_union(newDominators.begin(), newDominators.end(), dominators.begin(), dominators.end(), working.begin());
+                }
 
                 if (numNodes != working.size())
                 {

@@ -1,5 +1,4 @@
 #include "poModule.h"
-#include "poTypeChecker.h"
 #include <iostream>
 
 using namespace po;
@@ -306,22 +305,6 @@ poFunction::poFunction(const std::string& name, int arity, poAttributes attribut
 {
 }
 
-//===============
-// Type
-//===============
-
-poType::poType(const std::string& name, poAttributes attribute)
-    :
-    _name(name),
-    _attribute(attribute)
-{
-}
-
-void poType::addFunction(const poFunction& function)
-{
-    _functions.push_back(function);
-}
-
 //=================
 // Namespace
 //=================
@@ -330,10 +313,6 @@ poNamespace::poNamespace(const std::string& name)
     :
     _name(name)
 {
-}
-void poNamespace::addType(const poType& type)
-{
-    _types.push_back(type);
 }
 void poNamespace::addFunction(const poFunction& function)
 {
@@ -347,6 +326,11 @@ void poNamespace::addFunction(const poFunction& function)
 void poModule::addNamespace(const poNamespace& ns)
 {
     _namespaces.push_back(ns);
+}
+
+void poModule::addType(const poType& type)
+{
+    _types.push_back(type);
 }
 
 poResult<poNamespace> poModule::getNamespace(const std::string& name)
@@ -434,6 +418,9 @@ void poModule::dump()
                     case IR_RETURN:
                         std::cout << " IR_RETURN " << int(ins.type()) << " " << ins.left();
                         break;
+                    case IR_COPY:
+                        std::cout << " IR_COPY " << int(ins.type()) << " " << ins.left();
+                        break;
                     case IR_CALL:
                         std::cout << " IR_CALL " << int(ins.type()) << " " << int(ins.left());
                         break;
@@ -450,6 +437,18 @@ void poModule::dump()
                             const int target = blocks[bb->getBranch()];
                             std::cout << " --> Basic Block " << target;
                         }
+                        break;
+                    case IR_ALLOCA:
+                        std::cout << " IR_ALLOCA " << int(ins.type()) << " " << int(ins.left());
+                        break;
+                    case IR_MALLOC:
+                        std::cout << " IR_MALLOC " << int(ins.type()) << " " << int(ins.left());
+                        break;
+                    case IR_LOAD:
+                        std::cout << " IR_LOAD " << int(ins.type());
+                        break;
+                    case IR_STORE:
+                        std::cout << " IR_STORE " << int(ins.type());
                         break;
                     }
                     std::cout << std::endl;
