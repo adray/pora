@@ -17,11 +17,13 @@ namespace po
         ELSE, /* poUnaryNode */
         WHILE, /* poListNode */
         CALL, /* poListNode */
+        MEMBER_CALL, /* poBinaryNode */
         ASSIGNMENT, /* poBinaryNode */
         VARIABLE, /* poNode */
         PARAMETER, /* poUnaryNode */
         ARGS, /* poListNode */
         TYPE, /* poNode */
+        ARRAY, /* poUnaryNode */
         DECL, /* poUnaryNode */
         CMP_EQUALS, /* poBinaryNode */
         CMP_NOT_EQUALS, /* poBinaryNode */

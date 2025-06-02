@@ -10,7 +10,7 @@
 
 using namespace po;
 
-int main(int numArgs, const char* const args)
+int main(int numArgs, const char** const args)
 {
     std::cout << "Running tests..." << std::endl;
     syntaxTest();

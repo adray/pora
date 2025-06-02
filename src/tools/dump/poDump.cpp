@@ -3,6 +3,7 @@
 #include "poPE.h"
 
 #include <iostream>
+#include <cstring>
 
 using namespace po;
 

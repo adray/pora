@@ -36,6 +36,7 @@ namespace po
         poFunctionParser(poParser& parser);
         poNode* parse(const poToken& ret);
     private:
+        poNode* parseMember(const poToken& token);
         poNode* parseRH(poNode* lhs);
         poNode* parsePrimary();
         poNode* parseUnary();

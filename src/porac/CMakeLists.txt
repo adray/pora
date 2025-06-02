@@ -14,12 +14,12 @@ set (PORAC_SOURCES
 )
 
 set (PORAC_EXAMPLES
-    "../Examples/Example.po"
-    "../Examples/Example2.po"
-    "../Examples/Example3.po"
-    "../Examples/Example4.po"
-    "../Examples/Example5.po"
-    "../Examples/Example6.po"
+    "../examples/Example.po"
+    "../examples/Example2.po"
+    "../examples/Example3.po"
+    "../examples/Example4.po"
+    "../examples/Example5.po"
+    "../examples/Example6.po"
 )
 
 project ("porac")

@@ -4,6 +4,7 @@
 #include "poType.h"
 #include <assert.h>
 #include <algorithm>
+#include <iostream>
 
 using namespace po;
 
@@ -209,11 +210,6 @@ void poCodeGenerator::generate(const std::vector<poNode*>& ast)
         getModules(node);
     }
 
-    for (auto& type : _module.types())
-    {
-        _userTypes.insert(std::pair<std::string, int>(type.name(), type.id()));
-    }
-
     for (auto& ns : _module.namespaces())
     {
         for (auto& staticFunction : ns.functions())
@@ -286,17 +282,7 @@ int poCodeGenerator::getType(const poToken& token)
         type = TYPE_VOID;
         break;
     default:
-    {
-        const auto& it = _userTypes.find(token.string());
-        if (it != _userTypes.end())
-        {
-            type = it->second;
-        }
-        else
-        {
-            type = -1;
-        }
-    }
+        type = _module.getTypeFromName(token.string());
         break;
     }
     return type;
@@ -666,8 +652,16 @@ void poCodeGenerator::emitAssignment(poNode* node, poFlowGraph& cfg)
     poBinaryNode* assignment = static_cast<poBinaryNode*>(node);
     const int right = emitExpr(assignment->right(), cfg);
     const int type = _types[right];
-    const int variable = getOrAddVariable(assignment->left()->token().string(), type);
-    cfg.getLast()->addInstruction(poInstruction(variable, type, right, -1, IR_COPY));
+
+    if (assignment->left()->type() == poNodeType::VARIABLE)
+    {
+        const int variable = getOrAddVariable(assignment->left()->token().string(), type);
+        cfg.getLast()->addInstruction(poInstruction(variable, type, right, -1, IR_COPY));
+    }
+    else
+    {
+        emitStoreMember(assignment, cfg, right);
+    }
 }
 
 void poCodeGenerator::emitReturn(poNode* node, poFlowGraph& cfg)
@@ -740,12 +734,10 @@ void poCodeGenerator::emitDecl(poNode* node, poFlowGraph& cfg)
         if (constant != -1)
         {
             cfg.getLast()->addInstruction(poInstruction(var, type, constant, IR_CONSTANT));
-            _types.push_back(type);
         }
         else
         {
             cfg.getLast()->addInstruction(poInstruction(var, type, 1 /* num elements */, -1, IR_ALLOCA));
-            _types.push_back(type);
         }
     }
 }
@@ -779,7 +771,108 @@ int poCodeGenerator::emitExpr(poNode* node, poFlowGraph& cfg)
     case poNodeType::CALL:
         instructionId = emitCall(node, cfg);
         break;
+    case poNodeType::MEMBER:
+        instructionId = emitLoadMember(node, cfg);
+        break;
     }
+    return instructionId;
+}
+
+void poCodeGenerator::emitStoreMember(poNode* node, poFlowGraph& cfg, const int id)
+{
+    poUnaryNode* member = static_cast<poUnaryNode*>(node);
+
+    int expr = -1;
+    std::vector<poUnaryNode*> stack = { member };
+    while (member)
+    {
+        poNode* child = member->child();
+        if (child->type() == poNodeType::MEMBER)
+        {
+            member = static_cast<poUnaryNode*>(child);
+            stack.push_back(member);
+        }
+        else
+        {
+            expr = emitExpr(child, cfg);
+            member = nullptr;
+        }
+    }
+   
+    int offset = 0;
+    int fieldType = _types[expr];
+
+    for (int i = int(stack.size() - 1); i >= 0; i--)
+    {
+        poNode* member = stack[i];
+        const int typeId = fieldType;
+        const poType& type = _module.types()[typeId - TYPE_OBJECT - 1];
+      
+        int fieldOffset = 0;
+        for (const poField field : type.fields())
+        {
+            if (field.name() == member->token().string())
+            {
+                fieldType = field.type();
+                fieldOffset = field.offset();
+                break;
+            }
+        }
+
+        offset += fieldOffset;
+    }
+
+    cfg.getLast()->addInstruction(poInstruction(_instructionCount++, fieldType, expr, id, offset, IR_STORE));
+    _types.push_back(fieldType);
+}
+
+int poCodeGenerator::emitLoadMember(poNode* node, poFlowGraph& cfg)
+{
+    poUnaryNode* member = static_cast<poUnaryNode*>(node);
+
+    int expr = -1;
+    std::vector<poUnaryNode*> stack = { member };
+    while (member)
+    {
+        poNode* child = member->child();
+        if (child->type() == poNodeType::MEMBER)
+        {
+            member = static_cast<poUnaryNode*>(child);
+            stack.push_back(member);
+        }
+        else
+        {
+            expr = emitExpr(child, cfg);
+            member = nullptr;
+        }
+    }
+   
+    int offset = 0;
+    int fieldType = _types[expr];
+
+    for (int i = int(stack.size() - 1); i >= 0; i--)
+    {
+        poNode* member = stack[i];
+        const int typeId = fieldType;
+        const poType& type = _module.types()[typeId - TYPE_OBJECT - 1];
+      
+        int fieldOffset = 0;
+        for (const poField field : type.fields())
+        {
+            if (field.name() == member->token().string())
+            {
+                fieldType = field.type();
+                fieldOffset = field.offset();
+                break;
+            }
+        }
+
+        offset += fieldOffset;
+    }
+
+    const int instructionId = _instructionCount;
+    cfg.getLast()->addInstruction(poInstruction(_instructionCount++, fieldType, expr, -1, offset, IR_LOAD));
+    _types.push_back(fieldType);
     return instructionId;
 }
 
@@ -919,7 +1012,6 @@ void poCodeGenerator::getNamespaces(poNode* node)
 void poCodeGenerator::getStruct(poNode* node)
 {
     assert(node->type() == poNodeType::STRUCT);
-    //_userTypes.insert(std::pair<std::string, poNode*>(node->token().string(), node));
 }
 
 void poCodeGenerator::getFunction(poNode* node)

@@ -25,7 +25,7 @@ namespace po
             _index(index)
         { }
 
-        inline bool HasValue() const { _index != 0; }
+        inline bool HasValue() const { return _index != 0; }
         inline T& Value() { return _list[_index]; }
 
     private:
@@ -151,10 +151,12 @@ namespace po
         int addSymbol(const std::string& symbol);
         bool getSymbol(const int id, std::string& symbol);
         void addType(const poType& type);
+        int getTypeFromName(const std::string& name) const;
         void dump();
 
     private:
         std::vector<poType> _types;
+        std::unordered_map<std::string, int> _typeMapping;
         std::unordered_map<int, std::string> _symbols;
         std::vector<poNamespace> _namespaces;
         poConstantPool _constants;

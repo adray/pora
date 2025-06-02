@@ -2,6 +2,7 @@
 #include <fstream>
 #include <cstdint>
 #include <iostream>
+#include <string.h>
 
 using namespace po;
 
@@ -212,13 +213,13 @@ void poPortableExecutable::genImports(const int imagePos, poPortableExecutableSe
     /* Import Directory - Name RVA table */
     char* name = reinterpret_cast<char*>(int(imports[0].mName) - imagePos + section.data().data());
     const char* kernelDll = "KERNEL32.DLL";
-    std::memcpy(name, kernelDll, strlen(kernelDll) + 1);
+    memcpy(name, kernelDll, strlen(kernelDll) + 1);
 
     /* Hint/Name RVA table */
     short* api_hint = reinterpret_cast<short*>(apis[0] - imagePos + section.data().data());
     char* api_name = reinterpret_cast<char*>(apis[0] - imagePos + section.data().data() + sizeof(short));
     const char* virtualAlloc = "VirtualAlloc";
-    std::memcpy(api_name, virtualAlloc, strlen(virtualAlloc) + 1);
+    memcpy(api_name, virtualAlloc, strlen(virtualAlloc) + 1);
 
     /* Import address table
     * These are the same of the import lookup table, until it is loaded.
@@ -383,19 +384,19 @@ void poPortableExecutable::write(const std::string& filename)
             switch (section.type())
             {
             case poSectionType::TEXT:
-                std::memcpy(table.mName, textName.data(), textName.size());
+                memcpy(table.mName, textName.data(), textName.size());
                 table.mCharacteristics = IMAGE_SCN_CNT_CODE | IMAGE_SCN_MEM_EXECUTE | IMAGE_SCN_MEM_READ;
                 break;
             case poSectionType::INITIALIZED:
-                std::memcpy(table.mName, initName.data(), initName.size());
+                memcpy(table.mName, initName.data(), initName.size());
                 table.mCharacteristics = IMAGE_SCN_CNT_INITIALIZED_DATA /* | IMAGE_SCN_MEM_WRITE*/ | IMAGE_SCN_MEM_READ;
                 break;
             case poSectionType::UNINITIALIZED:
-                std::memcpy(table.mName, uninitializedName.data(), uninitializedName.size());
+                memcpy(table.mName, uninitializedName.data(), uninitializedName.size());
                 table.mCharacteristics = IMAGE_SCN_CNT_UNINITIALIZED_DATA | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_READ;
                 break;
             case poSectionType::IDATA:
-                std::memcpy(table.mName, iDataName.data(), iDataName.size());
+                memcpy(table.mName, iDataName.data(), iDataName.size());
                 table.mCharacteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_READ;
                 break;
             }

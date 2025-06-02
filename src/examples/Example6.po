@@ -18,5 +18,8 @@ namespace Example
     static void main()
     {
         transform t;
+        //vec3 pos = t.pos;
+        t.scale.z = 10.5;
+        f64 x = t.scale.z;
     }
 }

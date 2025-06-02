@@ -12,6 +12,7 @@ poInstruction::poInstruction(const int32_t name, const int16_t type, const int16
     _type(type),
     _left(left),
     _right(right),
+    _memOffset(0),
     _code(code),
     _name(name)
 {
@@ -22,7 +23,19 @@ poInstruction::poInstruction(const int32_t name, const int16_t type, const int16
     _type(type),
     _constant(constant),
     _code(code),
-    _right(0),
+    _left(-1),
+    _right(-1),
+    _name(name)
+{
+}
+
+poInstruction::poInstruction(const int32_t name, const int16_t type, const int16_t left, const int16_t right, const int16_t memOffset, const int16_t code)
+    :
+    _type(type),
+    _left(left),
+    _right(right),
+    _memOffset(memOffset),
+    _code(code),
     _name(name)
 {
 }

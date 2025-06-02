@@ -377,7 +377,10 @@ void poRegLinear::allocateRegisters(poFlowGraph& cfg)
                 //type = poRegType::General;
                 _registers.push_back(0);
                 pos++;
-                _stackSlots.insert(std::pair<int, int>(pos, _stackAlloc.allocateSlot(ins.name(), _module.types()[ins.type() - TYPE_OBJECT - 1].size())));
+                if (ins.type() >= TYPE_OBJECT)
+                {
+                    _stackSlots.insert(std::pair<int, int>(pos, _stackAlloc.allocateSlot(ins.name(), _module.types()[ins.type() - TYPE_OBJECT - 1].size())));
+                }
                 continue;
             }
 
@@ -410,6 +413,11 @@ const bool poRegLinear::spillAt(const int index, poRegSpill* spill) const
         return true;
     }
     return false;
+}
+
+const int poRegLinear::getStackSlotByVariable(const int variable) const
+{
+    return _stackAlloc.findSlot(variable);
 }
 
 const int poRegLinear::getStackSlot(const int pos) const

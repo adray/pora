@@ -331,8 +331,19 @@ void poModule::addNamespace(const poNamespace& ns)
 void poModule::addType(const poType& type)
 {
     _types.push_back(type);
+    _typeMapping.insert(std::pair<std::string, int>(type.name(), type.id()));
 }
 
+int poModule::getTypeFromName(const std::string& name) const
+{
+    const auto& it = _typeMapping.find(name);
+    if (it != _typeMapping.end())
+    {
+        return it->second;
+    }
+    return -1;
+}
+ 
 poResult<poNamespace> poModule::getNamespace(const std::string& name)
 {
     int index = -1;
@@ -445,10 +456,10 @@ void poModule::dump()
                         std::cout << " IR_MALLOC " << int(ins.type()) << " " << int(ins.left());
                         break;
                     case IR_LOAD:
-                        std::cout << " IR_LOAD " << int(ins.type());
+                        std::cout << " IR_LOAD " << int(ins.type()) << " " << int(ins.left()) << " #" << int(ins.memOffset());
                         break;
                     case IR_STORE:
-                        std::cout << " IR_STORE " << int(ins.type());
+                        std::cout << " IR_STORE " << int(ins.type()) << " " << int(ins.left()) << " " << int(ins.right()) << " #" << int(ins.memOffset());
                         break;
                     }
                     std::cout << std::endl;

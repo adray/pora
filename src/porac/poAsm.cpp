@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <sstream>
 #include <iostream>
+#include <cstring>
 
 using namespace po;
 
@@ -1365,7 +1366,7 @@ void poAsm::ir_load(poRegLinear& linear, const poInstruction& ins, const int ins
     const int dst = linear.getRegisterByVariable(ins.name());
     const int dst_sse = linear.getRegisterByVariable(ins.name() - VM_REGISTER_MAX);
 
-    const int offset = ins.left();
+    const int offset = ins.memOffset();
     const int stackPos = linear.getStackSlot(instructionIndex) + offset;
 
     switch (ins.type())
@@ -1377,6 +1378,28 @@ void poAsm::ir_load(poRegLinear& linear, const poInstruction& ins, const int ins
         mc_movsd_memory_to_reg_x64(dst, VM_REGISTER_ESP, stackPos);
         break;
     }
+}
+
+void poAsm::ir_store(poRegLinear& linear, const poInstruction& ins)
+{
+    // We need to mov data from the source register to the destination stack slot
+
+    const int src = linear.getRegisterByVariable(ins.right());
+    const int src_sse = linear.getRegisterByVariable(ins.right() - VM_REGISTER_MAX);
+
+    const int offset = ins.memOffset();
+    const int stackPos = linear.getStackSlotByVariable(ins.left()) + offset;
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+        mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, stackPos, src);
+        break;
+    case TYPE_F64:
+        mc_movsd_reg_to_memory_x64(VM_REGISTER_ESP, stackPos, src_sse);
+        break;
+    }
+
 }
 
 void poAsm::ir_add(poRegLinear& linear, const poInstruction& ins)
@@ -1917,7 +1940,7 @@ void poAsm::patchJump(const poAsmJump& jump)
         return;
     }
 
-    std::memcpy(_programData.data() + jump.getProgramDataPos(), _programData.data() + pos, size);
+    memcpy(_programData.data() + jump.getProgramDataPos(), _programData.data() + pos, size);
     _programData.resize(_programData.size() - size);
 }
 
@@ -2149,6 +2172,9 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
             case IR_LOAD:
                 ir_load(linear, ins, pos);
                 break;
+            case IR_STORE:
+                ir_store(linear, ins);
+                break;
             case IR_ADD:
                 ir_add(linear, ins);
                 break;
@@ -2289,7 +2315,7 @@ void poAsm::patchCalls()
             const int size = 5;
             const int dataPos = int(_programData.size());
             mc_call(it->second - pos);
-            std::memcpy(_programData.data() + pos, _programData.data() + dataPos, size);
+            memcpy(_programData.data() + pos, _programData.data() + dataPos, size);
             _programData.resize(_programData.size() - size);
         }
         else

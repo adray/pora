@@ -2,5 +2,5 @@
 
 namespace po
 {
-    int main(int numArgs, const char* const args);
+    int main(int numArgs, const char** const args);
 }

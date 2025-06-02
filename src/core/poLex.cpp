@@ -1,6 +1,8 @@
 #include "poLex.h"
 #include <fstream>
 #include <sstream>
+#include <limits>
+#include <math.h>
 
 using namespace po;
 

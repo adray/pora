@@ -3,6 +3,7 @@
 #include "poCompiler.h"
 #include <iostream>
 #include <string>
+#include <cstring>
 
 using namespace po;
 
@@ -64,8 +65,8 @@ int main(const int numArgs, const char** const args)
         compiler.assembler().link(0, 0x1000 /* image alignment? */);
 
         // Write program data
-        std::memcpy(text.data().data(), programData.data(), programData.size());
-        std::memcpy(initialized.data().data(), initializedData.data(), initializedData.size());
+        memcpy(text.data().data(), programData.data(), programData.size());
+        memcpy(initialized.data().data(), initializedData.data(), initializedData.size());
 
         // Write the executable file
         poPortableExecutable exe;

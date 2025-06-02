@@ -60,7 +60,7 @@ int poCompiler:: compile()
     typeResolver.resolve(nodes);
 
     // Type check AST
-    poTypeChecker typeChecker;
+    poTypeChecker typeChecker(module);
     if (!typeChecker.check(nodes))
     {
         std::stringstream ss;

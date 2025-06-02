@@ -1,17 +1,20 @@
 #include "poTypeChecker.h"
 #include "poAST.h"
 #include "poType.h"
+#include "poModule.h"
 
 #include <assert.h>
+#include <iostream>
 
 using namespace po;
 
 
-poTypeChecker::poTypeChecker()
+poTypeChecker::poTypeChecker(poModule& module)
     :
     _isError(false),
     _errorCol(0),
-    _errorLine(0)
+    _errorLine(0),
+    _module(module)
 {
 }
 
@@ -180,8 +183,13 @@ void poTypeChecker::checkNamespaces(poNode* node)
                 break;
             }
         }
+        else if (child->type() == poNodeType::STRUCT)
+        {
+            continue;
+        }
         else
         {
+            setError("Unexpected node type in namespace.", node->token());
             break;
         }
     }
@@ -246,6 +254,10 @@ void poTypeChecker::checkFunctions(poNode* node)
         }
 
         const int returnType = getType(type->token());
+        if (returnType == -1)
+        {
+            setError("Undefined type.", type->token());
+        }
         checkBody(body, returnType);
         popScope();
     }
@@ -358,6 +370,9 @@ int poTypeChecker::getType(const poToken& token)
     case poTokenType::BOOLEAN:
         type = TYPE_BOOLEAN;
         break;
+    case poTokenType::IDENTIFIER:
+        type = _module.getTypeFromName(token.string());
+        break;
     default:
         type = -1;
         break;
@@ -371,6 +386,10 @@ void poTypeChecker::checkDecl(poNode* node)
     if (decl->child()->type() == poNodeType::ASSIGNMENT)
     {
         const int type = getType(decl->token());
+        if (type == -1)
+        {
+            setError("Undefined type.", decl->token());
+        }
 
         poBinaryNode* assignment = static_cast<poBinaryNode*>(decl->child());
         const int rhs = checkExpr(assignment->right());
@@ -392,13 +411,21 @@ void poTypeChecker::checkDecl(poNode* node)
     else if (decl->child()->type() == poNodeType::VARIABLE)
     {
         const int type = getType(decl->token());
+        if (type == -1)
+        {
+            setError("Undefined type.", decl->token());
+        }
 
         const auto& token = decl->child()->token();
         const std::string& name = token.string();
-        if (!addVariable(name, type))
+        if (!isError() && !addVariable(name, type))
         {
             setError("Redefinition of variable.", decl->token());
         }
+    }
+    else
+    {
+        setError("Malformed declaration.", decl->token());
     }
 }
 
@@ -413,13 +440,28 @@ void poTypeChecker::checkAssignment(poNode* node)
         setError("Error checking types in assignment.", assignment->token());
     }
 
-    if (!isError() && assignment->left()->type() == poNodeType::VARIABLE)
+    if (!isError())
     {
-        const auto& token = assignment->left()->token();
-        const std::string& name = token.string();
-        if (rhs != getVariable(name))
+        if (assignment->left()->type() == poNodeType::VARIABLE)
         {
-            setError("Error checking types in assignment.", token);
+            const auto& token = assignment->left()->token();
+            const std::string& name = token.string();
+            if (rhs != getVariable(name))
+            {
+                setError("Error checking types in assignment.", token);
+            }
+        }
+        else if (assignment->left()->type() == poNodeType::MEMBER)
+        {
+            const int lhs = checkMember(assignment->left());
+            if (lhs != rhs)
+            {
+                setError("Error checking types in assignment.", assignment->token());
+            } 
+        }
+        else
+        {
+            setError("Error checking types in assignment.", assignment->token());
         }
     }
 }
@@ -467,6 +509,9 @@ int poTypeChecker::checkExpr(poNode* node)
         break;
     case poNodeType::CALL:
         type = checkCall(node);
+        break;
+    case poNodeType::MEMBER:
+        type = checkMember(node);
         break;
     case poNodeType::VARIABLE:
     {
@@ -519,7 +564,29 @@ int poTypeChecker::checkExpr(poNode* node)
     return type;
 }
 
-int po::poTypeChecker::checkCall(po::poNode* node)
+int poTypeChecker::checkMember(poNode* node)
+{
+    poUnaryNode* member = static_cast<poUnaryNode*>(node);
+    assert(member->type() == poNodeType::MEMBER);
+
+    const int expr = checkExpr(member->child());
+    if (expr > TYPE_OBJECT)
+    {
+        const std::string& memberName = member->token().string();
+        const poType& type = _module.types()[expr - TYPE_OBJECT - 1];
+        for (const poField& field : type.fields())
+        {
+            if (field.name() == memberName)
+            {
+                return field.type();
+            }
+        }
+    }
+
+    return -1;
+}
+
+int poTypeChecker::checkCall(poNode* node)
 {
     poListNode* function = nullptr;
 
@@ -538,6 +605,10 @@ int po::poTypeChecker::checkCall(po::poNode* node)
             if (child->type() == poNodeType::TYPE)
             {
                 type = getType(child->token());
+                if (type == -1)
+                {
+                    setError("Undefined type.", child->token());
+                }
             }
             else if (child->type() == poNodeType::ARGS)
             {

@@ -2,6 +2,8 @@
 #include "poCFG.h"
 #include "poDom.h"
 
+#include <algorithm>
+
 using namespace po;
 
 //===============

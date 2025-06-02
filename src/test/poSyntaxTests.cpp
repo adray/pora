@@ -2,10 +2,86 @@
 #include "poLex.h"
 #include "poParser.h"
 #include "poTypeChecker.h"
+#include "poTypeResolver.h"
+#include "poModule.h"
+#include "poAST.h"
 #include <string>
 #include <iostream>
 
 using namespace po;
+
+static void dumpAST(poNode* ast);
+
+static void dumpASTList(poNode* ast)
+{
+    poListNode* list = static_cast<poListNode*>(ast);
+    for (poNode* node : list->list())
+    {
+        dumpAST(node);
+    }
+}
+
+static void dumpASTUnary(poNode* ast)
+{
+    poUnaryNode* node = static_cast<poUnaryNode*>(ast);
+    dumpAST(node->child());
+}
+
+static void dumpAST(poNode* ast)
+{
+    switch (ast->type())
+    {
+        case poNodeType::ADD:
+            break;
+        case poNodeType::FUNCTION:
+            std::cout << "FUNCTION" << std::endl;
+            dumpASTList(ast);
+            break;
+        case poNodeType::BODY:
+            std::cout << "BODY" << std::endl;
+            dumpASTList(ast);
+            break;
+        case poNodeType::STATEMENT:
+            std::cout << "STATEMENT" << std::endl;
+            dumpASTUnary(ast);
+            break;
+        case poNodeType::DECL:
+            std::cout << "DECL: " << ast->token().string() << std::endl;
+            dumpASTUnary(ast);
+            break;
+        case poNodeType::TYPE:
+            std::cout << "Type: ";
+            switch (ast->token().token())
+            {
+                case poTokenType::IDENTIFIER:
+                    std::cout << ast->token().string();
+                    break;
+                case poTokenType::VOID:
+                    std::cout << "VOID";
+                    break;
+                case poTokenType::I64_TYPE:
+                    std::cout << "I64";
+                    break;
+            }
+            std::cout << std::endl;
+            break;
+        case poNodeType::VARIABLE:
+            std::cout << "Variable: " << ast->token().string() << std::endl;
+            break;
+        case poNodeType::NAMESPACE:
+            std::cout << "Namespace: " << ast->token().string() << std::endl;
+            dumpASTList(ast);
+            break;
+        case poNodeType::MODULE:
+            std::cout << "Module" << std::endl;
+            dumpASTList(ast);
+            break;
+        case poNodeType::STRUCT:
+            std::cout << "Struct: " << ast->token().string() << std::endl;
+            dumpASTList(ast);
+            break;
+    }
+}
 
 static void checkSyntax(const std::string& testName, const std::string& program, bool success)
 {
@@ -42,10 +118,16 @@ static void checkSyntax(const std::string& testName, const std::string& program,
         return;
     }
 
+    //dumpAST(ast);
+
     std::vector<poNode*> nodes;
     nodes.push_back(ast);
 
-    poTypeChecker checker;
+    poModule module;
+    poTypeResolver resolver(module);
+    resolver.resolve(nodes);
+
+    poTypeChecker checker(module);
     if (!checker.check(nodes))
     {
         if (success)
@@ -530,9 +612,100 @@ void po::syntaxTest()
         "   i64 p = v1.y.x;"\
         "}"\
         "}", true);
+    checkSyntax("Struct Test #11", "namespace Test {"\
+        "static void myTest(myStruct x)"\
+        "{"\
+        "}"\
+        "struct myStruct {"\
+        "   i64 x;"\
+        "}"\
+        "static void main() {"\
+        "   myStruct v1;"\
+        "   myTest(v1);"\
+        "}"\
+        "}", true); 
+    checkSyntax("Struct Test #12", "namespace Test {"\
+        "static void myTest(myStructx x)"\
+        "{"\
+        "}"\
+        "struct myStruct {"\
+        "   i64 x;"\
+        "}"\
+        "static void main() {"\
+        "   myStruct v1;"\
+        "   myTest(v1);"\
+        "}"\
+        "}", false);
+    checkSyntax("Struct Test #13", "namespace Test {"\
+        "struct myStruct {"\
+        "   i64 x;"\
+        "}"\
+        "static void main() {"\
+        "   myStructx v1;"\
+        "}"\
+        "}", false);
+    checkSyntax("Struct Test #14", "namespace Test {"\
+        "struct myStruct {"\
+        "   i64 x;"\
+        "}"\
+        "static void main() {"\
+        "   myStruct v1;"\
+        "   v1.x = 4;"\
+        "}"\
+        "}", true);
+    checkSyntax("Struct Test #15", "namespace Test {"\
+        "struct myStruct {"\
+        "   i64 x;"\
+        "}"\
+        "static void main() {"\
+        "   myStruct v1;"\
+        "   i64 y = 10;"\
+        "   v1.x = y;"\
+        "}"\
+        "}", true);
+    checkSyntax("Struct Test #16", "namespace Test {"\
+        "struct myStruct {"\
+        "   i64 x;"\
+        "}"\
+        "static void main() {"\
+        "   myStruct v1;"\
+        "   f64 y = 10.0;"\
+        "   v1.x = y;"\
+        "}"\
+        "}", false);
     checkSyntax("Array Test #1", "namespace Test {"\
-        "static void main"\
+        "static void main() {"\
         "   i64[10] myArray;"\
         "}"\
         "}", true);
+    checkSyntax("Array Test #2", "namespace Test {"\
+        "static void main() {"\
+        "   i64[10 myArray;"\
+        "}"\
+        "}", false);
+    checkSyntax("Array Test #3", "namespace Test {"\
+        "static void main() {"\
+        "   i64] myArray;"\
+        "}"\
+        "}", false);
+    checkSyntax("Array Test #4", "namespace Test {"\
+        "static void main() {"\
+        "   i64[16] myArray;"\
+        "   myArray[0] = 0;"\
+        "}"\
+        "}", true);
+    checkSyntax("Array Test #5", "namespace Test {"\
+        "static void main() {"\
+        "   i64[8] myArray;"\
+        "   i64 x = myArray[1];"\
+        "}"\
+        "}", true);
+    checkSyntax("Array Test #6", "namespace Test {"\
+        "static void main() {"\
+        "   i64[4] myArray;"\
+        "   myArray[2 = 4;"\
+        "}"\
+        "}", false);
+
+
 }

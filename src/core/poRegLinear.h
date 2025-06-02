@@ -79,6 +79,7 @@ namespace po
         int getRegisterByVariable(const int variable) const;
         const bool spillAt(const int index, poRegSpill* spill) const;
         const int getStackSlot(const int pos) const;
+        const int getStackSlotByVariable(const int pos) const;
 
         inline const int getRegister(const int index) const { return _registers[index]; }
         inline const int numRegisters() const { return _numRegisters; }

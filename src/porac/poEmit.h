@@ -107,12 +107,12 @@ namespace po
         int emitConstantExpr(poNode* node, poFlowGraph& cfg);
         int emitBinaryExpr(poNode* node, poFlowGraph& cfg);
         int emitUnaryMinus(poNode* node, poFlowGraph& cfg);
+        int emitLoadMember(poNode* node, poFlowGraph& cfg);
+        void emitStoreMember(poNode* node, poFlowGraph& cfg, const int id);
 
         poModule& _module;
         poConditionGraph _graph;
         std::unordered_map<std::string, poNode*> _functions;
-        //std::unordered_map<std::string, poNode*> _userTypes;
-        std::unordered_map<std::string, int> _userTypes;
         std::unordered_map<std::string, poVariable> _variables;
         std::vector<int> _types;
         int _instructionCount;

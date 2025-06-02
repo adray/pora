@@ -2,6 +2,8 @@
 #include <fstream>
 #include <vector>
 #include <iostream>
+#include <cstdint>
+#include <string.h>
 
 using namespace po;
 

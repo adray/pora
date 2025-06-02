@@ -10,11 +10,12 @@ namespace po
 {
     class poNode;
     class poListNode;
+    class poModule;
 
     class poTypeChecker
     {
     public:
-        poTypeChecker();
+        poTypeChecker(poModule& module);
         bool check(const std::vector<poNode*>& nodes);
         inline const std::string& errorText() const { return _errorText; }
         inline int errorLine() const { return _errorLine; }
@@ -36,7 +37,8 @@ namespace po
         void checkAssignment(poNode* node);
         void checkReturn(poNode* node, const int returnType);
         int checkExpr(poNode* node);
-        int checkCall(po::poNode* node);
+        int checkMember(poNode* node);
+        int checkCall(poNode* node);
         int getType(const poToken& token);
         void checkIfStatement(po::poNode* node, const int returnType);
         void checkWhileStatement(po::poNode* node, const int returnType);
@@ -46,6 +48,7 @@ namespace po
         void pushScope();
         void popScope();
 
+        poModule& _module;
         std::unordered_map<std::string, poListNode*> _types;
         std::vector<std::unordered_map<std::string, int>> _variables;
         std::unordered_map<std::string, poListNode*> _functions;

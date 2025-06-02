@@ -269,6 +269,7 @@ namespace po
         // IR to machine code routines
         //=====================================
 
+        void ir_store(poRegLinear& linear, const poInstruction& ins);
         void ir_load(poRegLinear& linear, const poInstruction& ins, const int instructionIndex);
         void ir_add(poRegLinear& linear, const poInstruction& ins);
         void ir_sub(poRegLinear& linear, const poInstruction& ins);

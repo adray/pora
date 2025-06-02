@@ -45,11 +45,13 @@ namespace po
     public:
         poInstruction(const int32_t name, const int16_t type, const int16_t left, const int16_t right, const int16_t code);
         poInstruction(const int32_t name, const int16_t type, const int16_t constant, const int16_t code);
+        poInstruction(const int32_t name, const int16_t type, const int16_t left, const int16_t right, const int16_t memOffset, const int16_t code);
         inline int16_t type() const { return _type; }
         inline int16_t left() const { return _left; }
         inline int16_t right() const { return _right; }
         inline int16_t code() const { return _code; }
         inline int16_t constant() const { return _constant; }
+        inline int16_t memOffset() const { return _memOffset; }
         inline int32_t name() const { return _name; }
         inline void setName(const int32_t name) { _name = name; }
         inline void setLeft(const int32_t left) { _left = left; }
@@ -58,12 +60,13 @@ namespace po
     private:
         int32_t _name;
         int16_t _type;
+        int16_t _left;
+        int16_t _right;
         union
         {
-            int16_t _left;
             int16_t _constant;
+            int16_t _memOffset;
         };
-        int16_t _right;
         int16_t _code;
     };
 
