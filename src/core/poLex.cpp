@@ -47,6 +47,8 @@ poLexer::poLexer()
     addKeyword("return", poTokenType::RETURN);
     addKeyword("while", poTokenType::WHILE);
     addKeyword("for", poTokenType::FOR);
+    addKeyword("continue", poTokenType::CONTINUE);
+    addKeyword("break", poTokenType::BREAK);
     addKeyword("class", poTokenType::CLASS);
     addKeyword("new", poTokenType::NEW);
     addKeyword("public", poTokenType::PUBLIC);

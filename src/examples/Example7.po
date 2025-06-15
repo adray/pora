@@ -1,0 +1,23 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        for (i64 i = 0; i < 100; i = i + 1)
+        {
+            if (i == 20)
+            {
+                break;
+            }
+        }
+
+        for (i64 i = 0; i < 100; i = i + 1)
+        {
+            if (i == 20)
+            {
+                continue;
+            }
+        }
+    }
+}

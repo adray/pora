@@ -48,9 +48,9 @@ namespace po
         poNode* parseAnd();
         poNode* parseOr();
         poNode* parseExpression();
-        poNode* parseBody();
+        poNode* parseBody(const bool isLoop);
         poNode* parseArg();
-        poNode* parseIfStatement();
+        poNode* parseIfStatement(const bool isLoop);
         poNode* parseWhile();
         poNode* parseFor();
         poNode* parseDecl(const poToken& type);

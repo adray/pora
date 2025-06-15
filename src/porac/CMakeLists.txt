@@ -20,6 +20,7 @@ set (PORAC_EXAMPLES
     "../examples/Example4.po"
     "../examples/Example5.po"
     "../examples/Example6.po"
+    "../examples/Example7.po"
 )
 
 project ("porac")

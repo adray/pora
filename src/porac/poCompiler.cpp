@@ -76,6 +76,13 @@ int poCompiler:: compile()
     // Convert the AST to a IR (three address code - intermediate representation) formed of BB (basic blocks) and CFG (control flow graph)
     poCodeGenerator generator(module);
     generator.generate(nodes);
+    if (generator.isError())
+    {
+        std::stringstream ss;
+        ss << generator.errorText() << std::endl;
+        _errors.push_back(ss.str());
+        return 0;
+    }
     module.dump();
 
     // Convert to SSA form and insert PHI nodes

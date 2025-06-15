@@ -287,6 +287,11 @@ void poTypeChecker::checkBody(poNode* node, const int returnType)
         {
             checkWhileStatement(statement, returnType);
         }
+        else if (statement->type() == poNodeType::BREAK ||
+            statement->type() == poNodeType::CONTINUE)
+        {
+            continue;
+        }
         else
         {
             setError("Type checking failed, statement expected.", statement->token());
@@ -762,6 +767,20 @@ void po::poTypeChecker::checkWhileStatement(po::poNode* node, const int returnTy
             pushScope();
             checkBody(body, returnType);
             popScope();
+        }
+        else if (child->type() == poNodeType::STRIDE)
+        {
+            poUnaryNode* stride = static_cast<poUnaryNode*>(child);
+
+            if (stride->child()->type() == poNodeType::STATEMENT)
+            {
+                poUnaryNode* statement = static_cast<poUnaryNode*>(stride->child());
+                checkStatement(statement, returnType);
+            }
+            else
+            {
+                setError("Malformed stride syntax tree node.", stride->token());
+            }
         }
         else
         {

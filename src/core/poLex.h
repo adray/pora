@@ -58,6 +58,8 @@ namespace po
         RETURN,
         WHILE,
         FOR,
+        CONTINUE,
+        BREAK,
         CLASS,
         STRUCT,
         NEW,

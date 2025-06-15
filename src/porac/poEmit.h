@@ -83,7 +83,12 @@ namespace po
         poCodeGenerator(poModule& module);
         void generate(const std::vector<poNode*>& ast);
 
+        inline const bool isError() const { return _isError; }
+        inline const std::string& errorText() const { return _errorText; }
+
     private:
+        void setError(const std::string& errorText);
+
         int getType(const poToken& token);
         int getTypeSize(const int type);
         int getOrAddVariable(const std::string& name, const int type);
@@ -98,7 +103,7 @@ namespace po
         int emitAlloca(const int type, const int varName, poBasicBlock* bb);
         void emitCopy(const int src, const int dst, poBasicBlock* bb);
         void emitFunction(poNode* node, poFunction& function);
-        void emitBody(poNode* node, poFlowGraph& cfg);
+        void emitBody(poNode* node, poFlowGraph& cfg, poBasicBlock* loopHeader, poBasicBlock* loopEnd);
         void emitArgs(poNode* node, poFlowGraph& cfg);
         void emitParameter(const int type, poBasicBlock* bb, const int paramIndex, const int varName);
         void emitStatement(poNode* node, poFlowGraph& cfg);
@@ -106,7 +111,7 @@ namespace po
         void emitReturn(poNode* node, poFlowGraph& cfg);
         void emitDecl(poNode* node, poFlowGraph& cfg);
         void emitAssignment(poNode* node, poFlowGraph& cfg);
-        void emitIfStatement(poNode* node, poFlowGraph& cfg, poBasicBlock* endBB);
+        void emitIfStatement(poNode* node, poFlowGraph& cfg, poBasicBlock* endBB, poBasicBlock* loopHeader, poBasicBlock* loopEnd);
         void emitWhileStatement(poNode* node, poFlowGraph& cfg, poBasicBlock* endBB);
         void emitIfExpression(poConditionGraphNode& cgn, poFlowGraph& cfg, poBasicBlock* successBB, poBasicBlock* failBB);
         int emitExpr(poNode* node, poFlowGraph& cfg);
@@ -125,5 +130,7 @@ namespace po
         std::vector<int> _types;
         int _instructionCount;
         int _returnInstruction;
+        bool _isError;
+        std::string _errorText;
     };
 }

@@ -1670,7 +1670,17 @@ void poAsm::ir_br(poRegLinear& linear, const poInstruction& ins, poBasicBlock* b
         // Insert patch
 
         const int pos = int(_programData.size());
-        mc_jump_equals(0);
+
+        /* Insert after we have got the position */
+        if (ins.left() == IR_JUMP_UNCONDITIONAL)
+        {
+            mc_jump_unconditional(0);
+        }
+        else
+        {
+            mc_jump_equals(0);
+        }
+
         const int size = int(_programData.size()) - pos;
 
         poAsmBasicBlock* asmBB = &_basicBlocks[_basicBlockMap[bb]];

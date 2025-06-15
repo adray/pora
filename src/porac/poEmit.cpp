@@ -200,8 +200,15 @@ poCodeGenerator::poCodeGenerator(poModule& module)
     :
     _module(module),
     _instructionCount(0),
-    _returnInstruction(-1)
+    _returnInstruction(-1),
+    _isError(false)
 {
+}
+
+void poCodeGenerator::setError(const std::string& errorText)
+{
+    _errorText = errorText;
+    _isError = true;
 }
 
 void poCodeGenerator::generate(const std::vector<poNode*>& ast)
@@ -226,10 +233,6 @@ void poCodeGenerator::generate(const std::vector<poNode*>& ast)
 
 int poCodeGenerator::getArrayType(const int baseType, const int arrayRank)
 {
-    //const poType& type = _module.types()[baseType];
-    //const std::string name = type.name() + "[]";
-    //return _module.getTypeFromName(name);
-
     return _module.getArrayType(baseType);
 }
 
@@ -429,7 +432,7 @@ void poCodeGenerator::emitFunction(poNode* node, poFunction& function)
 
     if (body)
     {
-        emitBody(body, cfg);
+        emitBody(body, cfg, nullptr, nullptr);
     }
 
     // Insert a terminator instruction if required.
@@ -452,6 +455,7 @@ void poCodeGenerator::emitFunction(poNode* node, poFunction& function)
         {
             // error: there isn't a return defined and the function doesn't return void
             // so we can't insert one
+            setError("Function expects a return value, but function doesn't return one.");
         }
     }
 
@@ -463,7 +467,7 @@ void poCodeGenerator::emitFunction(poNode* node, poFunction& function)
     }
 }
 
-void poCodeGenerator::emitBody(poNode* node, poFlowGraph& cfg)
+void poCodeGenerator::emitBody(poNode* node, poFlowGraph& cfg, poBasicBlock* loopHeader, poBasicBlock* loopEnd)
 {
     poBasicBlock* bb = cfg.getLast();
     poListNode* list = static_cast<poListNode*>(node);
@@ -482,8 +486,30 @@ void poCodeGenerator::emitBody(poNode* node, poFlowGraph& cfg)
         else if (child->type() == poNodeType::IF)
         {
             poBasicBlock* endBB = new poBasicBlock(); // Create a basic block for *after* the if statement
-            emitIfStatement(child, cfg, endBB);
+            emitIfStatement(child, cfg, endBB, loopHeader, loopEnd);
             cfg.addBasicBlock(endBB);
+        }
+        else if (child->type() == poNodeType::BREAK)
+        {
+            assert(loopEnd);
+            cfg.getLast()->addInstruction(poInstruction(_instructionCount++, 0, IR_JUMP_UNCONDITIONAL, -1, IR_BR));
+            _types.push_back(0);
+            cfg.getLast()->setBranch(loopEnd, true);
+            loopEnd->addIncoming(cfg.getLast());
+            cfg.addBasicBlock(new poBasicBlock());
+        }
+        else if (child->type() == poNodeType::CONTINUE)
+        {
+            assert(loopHeader);
+            cfg.getLast()->addInstruction(poInstruction(_instructionCount++, 0, IR_JUMP_UNCONDITIONAL, -1, IR_BR));
+            _types.push_back(0);
+            cfg.getLast()->setBranch(loopHeader, true);
+            loopHeader->addIncoming(cfg.getLast());
+            cfg.addBasicBlock(new poBasicBlock());
+        }
+        else
+        {
+            setError("Unexpected statement in body.");
         }
     }
 }
@@ -588,7 +614,7 @@ void poCodeGenerator::emitStatement(poNode* node, poFlowGraph& cfg)
     }
     else if (child->type() == poNodeType::BODY)
     {
-        emitBody(child, cfg);
+        emitBody(child, cfg, nullptr, nullptr);
     }
 }
 
@@ -597,11 +623,16 @@ void poCodeGenerator::emitWhileStatement(poNode* node, poFlowGraph& cfg, poBasic
     poListNode* whileLoop = static_cast<poListNode*>(node);
     poNode* body = nullptr;
     poNode* expr = nullptr;
+    poNode* stride = nullptr;
     for (poNode* child : whileLoop->list())
     {
         if (child->type() == poNodeType::BODY)
         {
             body = child;
+        }
+        else if (child->type() == poNodeType::STRIDE)
+        {
+            stride = child;
         }
         else
         {
@@ -613,19 +644,37 @@ void poCodeGenerator::emitWhileStatement(poNode* node, poFlowGraph& cfg, poBasic
     poBasicBlock* loopHeaderBB = new poBasicBlock();
     poBasicBlock* bodyBB = new poBasicBlock();
     cfg.addBasicBlock(loopHeaderBB);
+    
+    poBasicBlock* strideBB = nullptr;
+    if (stride)
+    {
+        strideBB = new poBasicBlock();
+    }
 
     _graph.buildGraph(expr);
     auto& root = _graph.root();
     emitIfExpression(root, cfg, bodyBB, endBB);
     cfg.addBasicBlock(bodyBB);
-    emitBody(body, cfg);
+    if (strideBB)
+    {
+        emitBody(body, cfg, strideBB, endBB);
+        cfg.addBasicBlock(strideBB);
+
+        poUnaryNode* strideNode = static_cast<poUnaryNode*>(stride);
+        assert(strideNode->child()->type() == poNodeType::STATEMENT);
+        emitStatement(strideNode->child(), cfg);
+    }
+    else
+    {
+        emitBody(body, cfg, loopHeaderBB, endBB);
+    }
     cfg.getLast()->addInstruction(poInstruction(_instructionCount++, 0, IR_JUMP_UNCONDITIONAL, -1, IR_BR));
     _types.push_back(0);
     cfg.getLast()->setBranch(loopHeaderBB, true);
     loopHeaderBB->addIncoming(cfg.getLast());
 }
 
-void poCodeGenerator::emitIfStatement(poNode* node, poFlowGraph& cfg, poBasicBlock* endBB)
+void poCodeGenerator::emitIfStatement(poNode* node, poFlowGraph& cfg, poBasicBlock* endBB, poBasicBlock* loopHeader, poBasicBlock* loopEnd)
 {
     poListNode* ifStatement = static_cast<poListNode*>(node);
     poListNode* body = nullptr;
@@ -659,7 +708,7 @@ void poCodeGenerator::emitIfStatement(poNode* node, poFlowGraph& cfg, poBasicBlo
         poBasicBlock* elseBB = new poBasicBlock();
         emitIfExpression(root, cfg, bodyBB, elseBB);
         cfg.addBasicBlock(bodyBB);
-        emitBody(body, cfg);
+        emitBody(body, cfg, loopHeader, loopEnd);
         cfg.getLast()->addInstruction(poInstruction(_instructionCount++, 0, IR_JUMP_UNCONDITIONAL, -1, IR_BR)); /*unconditional branch*/
         _types.push_back(0);
         cfg.getLast()->setBranch(endBB, true);
@@ -669,19 +718,19 @@ void poCodeGenerator::emitIfStatement(poNode* node, poFlowGraph& cfg, poBasicBlo
         poNode* child = elseNode->child();
         if (child->type() == poNodeType::IF)
         {
-            emitIfStatement(child, cfg, endBB);
+            emitIfStatement(child, cfg, endBB, loopHeader, loopEnd);
         }
         else if (child->type() == poNodeType::BODY)
         {
             // Emit the body and fall through to the end bb.
-            emitBody(child, cfg);
+            emitBody(child, cfg, loopHeader, loopEnd);
         }
     }
     else
     {
         emitIfExpression(root, cfg, bodyBB, endBB);
         cfg.addBasicBlock(bodyBB);
-        emitBody(body, cfg);
+        emitBody(body, cfg, loopHeader, loopEnd);
     }
 }
 

@@ -381,7 +381,7 @@ poNode* poFunctionParser::parseWhile()
             return nullptr;
         }
 
-        poNode* body = parseBody();
+        poNode* body = parseBody(true);
         children.push_back(body);
 
         if (!_parser.match(poTokenType::CLOSE_BRACE))
@@ -424,10 +424,10 @@ poNode* poFunctionParser::parseFor()
             }
             _parser.advance();
 
-            poNode* stride = parseExpressionStatement();
+            poNode* stride = new poUnaryNode(poNodeType::STRIDE, parseExpressionStatement(), forStatement);
             if (!_parser.match(poTokenType::CLOSE_PARAN))
             {
-                _parser.setError("Expected close parenethesis.");
+                _parser.setError("Expected close parenthesis.");
                 return nullptr;
             }
             _parser.advance();
@@ -437,7 +437,7 @@ poNode* poFunctionParser::parseFor()
                 _parser.setError("Expected open brace.");
                 return nullptr;
             }
-            poNode* body = parseBody();
+            poNode* body = parseBody(true);
 
             if (!_parser.match(poTokenType::CLOSE_BRACE))
             {
@@ -446,12 +446,10 @@ poNode* poFunctionParser::parseFor()
             }
             _parser.advance();
 
-            poListNode* bodyList = static_cast<poListNode*>(body);
-            bodyList->list().push_back(stride);
-
             std::vector<poNode*> loopChildren = {
-                bodyList,
-                equality
+                body,
+                equality,
+                stride
             };
 
             poListNode* loopNode = new poListNode(poNodeType::WHILE, loopChildren, forStatement);
@@ -462,7 +460,7 @@ poNode* poFunctionParser::parseFor()
     return new poUnaryNode(poNodeType::STATEMENT, new poListNode(poNodeType::BODY, children, forStatement), forStatement);
 }
 
-poNode* poFunctionParser::parseIfStatement()
+poNode* poFunctionParser::parseIfStatement(const bool isLoop)
 {
     std::vector<poNode*> children;
 
@@ -489,7 +487,7 @@ poNode* poFunctionParser::parseIfStatement()
 
         if (_parser.match(poTokenType::OPEN_BRACE))
         {
-            children.push_back(parseBody());
+            children.push_back(parseBody(isLoop));
         }
         else
         {
@@ -505,13 +503,13 @@ poNode* poFunctionParser::parseIfStatement()
                 if (_parser.match(poTokenType::IF))
                 {
                     children.push_back(new poUnaryNode(poNodeType::ELSE,
-                        parseIfStatement(),
+                        parseIfStatement(isLoop),
                         expr));
                 }
                 else if (_parser.match(poTokenType::OPEN_BRACE))
                 {
                     children.push_back(new poUnaryNode(poNodeType::ELSE,
-                        parseBody(),
+                        parseBody(isLoop),
                         expr));
                     if (_parser.match(poTokenType::CLOSE_BRACE))
                     {
@@ -838,7 +836,7 @@ poNode* poFunctionParser::parseStatement()
     return statement;
 }
 
-poNode* poFunctionParser::parseBody()
+poNode* poFunctionParser::parseBody(const bool isLoop)
 {
     auto& function = _parser.peek();
     _parser.advance();
@@ -890,7 +888,7 @@ poNode* poFunctionParser::parseBody()
         }
         else if (_parser.match(poTokenType::IF))
         {
-            children.push_back(parseIfStatement());
+            children.push_back(parseIfStatement(isLoop));
         }
         else if (_parser.match(poTokenType::FOR))
         {
@@ -899,6 +897,50 @@ poNode* poFunctionParser::parseBody()
         else if (_parser.match(poTokenType::WHILE))
         {
             children.push_back(parseWhile());
+        }
+        else if (_parser.match(poTokenType::CONTINUE))
+        {
+            if (isLoop)
+            {
+                const poToken& token = _parser.peek();
+                children.push_back(new poNode(poNodeType::CONTINUE, token));
+                _parser.advance();
+
+                if (_parser.match(poTokenType::SEMICOLON))
+                {
+                    _parser.advance();
+                }
+                else
+                {
+                    _parser.setError("Expected semicolon.");
+                }
+            }
+            else
+            {
+                _parser.setError("Unexpected continue.");
+            }
+        }
+        else if (_parser.match(poTokenType::BREAK))
+        {
+            if (isLoop)
+            {
+                const poToken& token = _parser.peek();
+                children.push_back(new poNode(poNodeType::BREAK, token));
+                _parser.advance();
+
+                if (_parser.match(poTokenType::SEMICOLON))
+                {
+                    _parser.advance();
+                }
+                else
+                {
+                    _parser.setError("Expected semicolon.");
+                }
+            }
+            else
+            {
+                _parser.setError("Unexpected break.");
+            }
         }
         else
         {
@@ -978,7 +1020,7 @@ poNode* poFunctionParser::parse(const poToken& ret)
                 _parser.advance();
                 if (_parser.match(poTokenType::OPEN_BRACE))
                 {
-                    nodes.push_back(parseBody());
+                    nodes.push_back(parseBody(false));
                     node = new poListNode(poNodeType::FUNCTION, nodes, id);
                 }
                 else

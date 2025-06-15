@@ -16,6 +16,9 @@ namespace po
         IF, /* poListNode */
         ELSE, /* poUnaryNode */
         WHILE, /* poListNode */
+        STRIDE, /* poUnaryNode */
+        CONTINUE, /* poNode */
+        BREAK, /* poNode */
         CALL, /* poListNode */
         MEMBER_CALL, /* poBinaryNode */
         CALL_CONVENTION, /* poNode */

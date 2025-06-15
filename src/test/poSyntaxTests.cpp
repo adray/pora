@@ -542,6 +542,27 @@ void po::syntaxTest()
         "   {"\
         "}"\
         "}", false);
+    checkSyntax("For Test #13", "namespace Test {"\
+        "static void main() {"\
+        "   for (i64 i = 0; i < 10; i = i + 1)"\
+        "   {"\
+        "       if (i == 5)"\
+        "       {"\
+        "           break;"\
+        "       }"\
+        "   }"\
+        "}"\
+        "}", true);
+    checkSyntax("For Test #14", "namespace Test {"\
+        "static void main() {"\
+        "   continue;"\
+        "}"\
+        "}", false);
+    checkSyntax("For Test #15", "namespace Test {"\
+        "static void main() {"\
+        "   break;"\
+        "}"\
+        "}", false);
     //checkSyntax("For Test #13", "namespace Test {"\
     //    "static void main() {"\
     //    "   for (;;){} "\
