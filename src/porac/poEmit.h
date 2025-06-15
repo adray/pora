@@ -12,6 +12,7 @@ namespace po
     class poFlowGraph;
     class poToken;
     class poBasicBlock;
+    class poInstruction;
 
     class poVariable
     {
@@ -99,6 +100,7 @@ namespace po
         void getNamespaces(poNode* node);
         void getFunction(poNode* node);
         void getStruct(poNode* node);
+        void emitInstruction(const poInstruction& instruction, poBasicBlock* bb);
         int emitAlloca(const int type, poBasicBlock* bb);
         int emitAlloca(const int type, const int varName, poBasicBlock* bb);
         void emitCopy(const int src, const int dst, poBasicBlock* bb);
