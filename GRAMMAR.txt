@@ -15,10 +15,10 @@ statement := exprStatement ';' |
 		if |
 		return
 		;
-exprStatement := IDENTIFIER '=' rhs |
+exprStatement := IDENTIFIER ( ( '.' IDENTIFIER ) | ('[' expression ']' )* '=' rhs |
 		IDENTIFIER ( ( '.' IDENTIFIER )? ( '(' call ')' )? )*
 		;
-decl := (primitive | IDENTIFIER) IDENTIFIER ('=' rhs)? ;
+decl := (primitive | IDENTIFIER) ('[' I64 ']')?  IDENTIFIER ('=' rhs)? ;
 
 rhs := term ;
 term := factor (('+' | '-') factor)* ;

@@ -88,13 +88,19 @@ namespace po
         int getTypeSize(const int type);
         int getOrAddVariable(const std::string& name, const int type);
         int addVariable(const std::string& name, const int type);
+        int getArrayType(const int baseType, const int arrayRank);
+        int getPointerType(const int baseType);
         void getModules(poNode* node);
         void getNamespaces(poNode* node);
         void getFunction(poNode* node);
         void getStruct(poNode* node);
+        int emitAlloca(const int type, poBasicBlock* bb);
+        int emitAlloca(const int type, const int varName, poBasicBlock* bb);
+        void emitCopy(const int src, const int dst, poBasicBlock* bb);
         void emitFunction(poNode* node, poFunction& function);
         void emitBody(poNode* node, poFlowGraph& cfg);
         void emitArgs(poNode* node, poFlowGraph& cfg);
+        void emitParameter(const int type, poBasicBlock* bb, const int paramIndex, const int varName);
         void emitStatement(poNode* node, poFlowGraph& cfg);
         int emitCall(poNode* node, poFlowGraph& cfg);
         void emitReturn(poNode* node, poFlowGraph& cfg);
@@ -107,6 +113,8 @@ namespace po
         int emitConstantExpr(poNode* node, poFlowGraph& cfg);
         int emitBinaryExpr(poNode* node, poFlowGraph& cfg);
         int emitUnaryMinus(poNode* node, poFlowGraph& cfg);
+        int emitLoadArray(poNode* node, poFlowGraph& cfg);
+        void emitStoreArray(poNode* node, poFlowGraph& cfg, const int id);
         int emitLoadMember(poNode* node, poFlowGraph& cfg);
         void emitStoreMember(poNode* node, poFlowGraph& cfg, const int id);
 
@@ -116,5 +124,6 @@ namespace po
         std::unordered_map<std::string, poVariable> _variables;
         std::vector<int> _types;
         int _instructionCount;
+        int _returnInstruction;
     };
 }

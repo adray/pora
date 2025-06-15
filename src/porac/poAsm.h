@@ -269,8 +269,10 @@ namespace po
         // IR to machine code routines
         //=====================================
 
+        void ir_element_ptr(poModule& module, poRegLinear& linear, const poInstruction& ins);
+        void ir_ptr(poModule& module, poRegLinear& linear, const poInstruction& ins);
         void ir_store(poRegLinear& linear, const poInstruction& ins);
-        void ir_load(poRegLinear& linear, const poInstruction& ins, const int instructionIndex);
+        void ir_load(poRegLinear& linear, const poInstruction& ins);
         void ir_add(poRegLinear& linear, const poInstruction& ins);
         void ir_sub(poRegLinear& linear, const poInstruction& ins);
         void ir_mul(poRegLinear& linear, const poInstruction& ins);
@@ -282,7 +284,7 @@ namespace po
         void ir_ret(poRegLinear& linear, const poInstruction& ins);
         void ir_unary_minus(poRegLinear& linear, const poInstruction& ins);
         void ir_call(poModule& module, poRegLinear& linear, const poInstruction& ins, const std::vector<poInstruction>& args);
-        void ir_param(poRegLinear& linear, const poInstruction& ins);
+        void ir_param(poModule& module, poRegLinear& linear, const poInstruction& ins);
         bool ir_jump(const int jump, const int imm, const int type);
 
         std::unordered_map<std::string, int> _mapping;

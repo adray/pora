@@ -14,7 +14,7 @@ namespace po
     constexpr int TYPE_U32 = 7;
     constexpr int TYPE_U8 = 8;
     constexpr int TYPE_BOOLEAN = 9;
-    constexpr int TYPE_OBJECT = 255; /* values above this are user defined (non primitive) */
+    constexpr int TYPE_OBJECT = 10; /* values above this are user defined (non primitive) */
 
     class poField
     {
@@ -34,16 +34,20 @@ namespace po
     class poType
     {
     public:
-        poType(const int id, const int baseType, const bool isArray, const std::string& name);
+        poType(const int id, const int baseType, const std::string& name);
 
         inline void addField(const poField& field) { _fields.push_back(field); }
         inline void setSize(const int size) { _size = size; }
+
+        inline void setArray(const bool isArray) { _isArray = isArray; }
+        inline void setPointer(const bool isPointer) { _isPointer = isPointer; }
 
         inline const std::vector<poField>& fields() const { return _fields; }
         inline const int id() const { return _id; }
         inline const int baseType() const { return _baseType; }
         inline const int size() const { return _size; }
         inline const bool isArray() const { return _isArray; }
+        inline const bool isPointer() const { return _isPointer; }
         inline const std::string& name() const { return _name; }
 
     private:
@@ -51,6 +55,7 @@ namespace po
         int _baseType;
         int _size;
         bool _isArray;
+        bool _isPointer;
         std::string _name;
         std::vector<poField> _fields;
     };

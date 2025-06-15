@@ -18,12 +18,14 @@ namespace po
         WHILE, /* poListNode */
         CALL, /* poListNode */
         MEMBER_CALL, /* poBinaryNode */
+        CALL_CONVENTION, /* poNode */
         ASSIGNMENT, /* poBinaryNode */
         VARIABLE, /* poNode */
         PARAMETER, /* poUnaryNode */
         ARGS, /* poListNode */
         TYPE, /* poNode */
-        ARRAY, /* poUnaryNode */
+        ARRAY, /* poArrayNode */
+        ARRAY_ACCESSOR, /* poArrayAccessorNode */
         DECL, /* poUnaryNode */
         CMP_EQUALS, /* poBinaryNode */
         CMP_NOT_EQUALS, /* poBinaryNode */
@@ -36,6 +38,7 @@ namespace po
         STATEMENT, /* poUnaryNode */
         RETURN, /* poUnaryNode */
         FUNCTION, /* poListNode */
+        EXTERN, /* poListNode */
         BODY, /* poListNode */
         CLASS, /* poListNode */
         STRUCT, /* poListNode */
@@ -116,5 +119,27 @@ namespace po
         inline std::vector<poNode*>& list() { return _list; }
     private:
         std::vector<poNode*> _list;
+    };
+
+    class poArrayNode : public poUnaryNode
+    {
+    public:
+        poArrayNode(const int64_t arraySize, poNode* node, const poNodeType type, const poToken& token);
+        inline const int64_t arraySize() const { return _arraySize; }
+
+    private:
+        int64_t _arraySize;
+    };
+
+    class poArrayAccessor : public poNode
+    {
+    public:
+        poArrayAccessor(poNode* accessor, poNode* child, const poNodeType type, const poToken& token);
+        inline poNode* accessor() const { return _accessor; }
+        inline poNode* child() const { return _child; }
+
+    private:
+        poNode* _accessor;
+        poNode* _child;
     };
 }

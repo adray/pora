@@ -82,7 +82,8 @@ void poTypeChecker::getNamespace(poNode* node)
     poListNode* ns = static_cast<poListNode*>(node);
     for (poNode* child : ns->list())
     {
-        if (child->type() == poNodeType::FUNCTION)
+        if (child->type() == poNodeType::FUNCTION ||
+            child->type() == poNodeType::EXTERN)
         {
             poListNode* func = static_cast<poListNode*>(child);
             const std::string& name = func->token().string();
@@ -183,7 +184,8 @@ void poTypeChecker::checkNamespaces(poNode* node)
                 break;
             }
         }
-        else if (child->type() == poNodeType::STRUCT)
+        else if (child->type() == poNodeType::STRUCT ||
+            child->type() == poNodeType::EXTERN)
         {
             continue;
         }
@@ -335,6 +337,22 @@ void poTypeChecker::checkReturn(poNode* node, const int returnType)
     }
 }
 
+int poTypeChecker::getArrayType(const int baseType, const int arrayRank)
+{
+    const poType& type = _module.types()[baseType];
+    const std::string name = type.name() + "[]";
+    int arrayType = _module.getTypeFromName(name);
+    if (arrayType == -1)
+    {
+        const int numTypes = int(_module.types().size());
+        arrayType = numTypes;
+        poType type(arrayType, baseType, name);
+        type.setArray(true);
+        _module.addType(type);
+    }
+    return arrayType;
+}
+
 int poTypeChecker::getType(const poToken& token)
 {
     int type = TYPE_VOID;
@@ -423,6 +441,29 @@ void poTypeChecker::checkDecl(poNode* node)
             setError("Redefinition of variable.", decl->token());
         }
     }
+    else if (decl->child()->type() == poNodeType::ARRAY)
+    {
+        poArrayNode* arrayNode = static_cast<poArrayNode*>(decl->child());
+
+        const int type = getType(decl->token());
+        if (type == -1)
+        {
+            setError("Undefined type.", decl->token());
+        }
+
+        const int arrayType = getArrayType(type, 1);
+        if (arrayType == -1)
+        {
+            setError("Undefined type.", decl->token());
+        }
+
+        const auto& token = decl->child()->token();
+        const std::string& name = token.string();
+        if (!isError() && !addVariable(name, arrayType))
+        {
+            setError("Redefinition of variable.", decl->token());
+        }
+    }
     else
     {
         setError("Malformed declaration.", decl->token());
@@ -458,6 +499,14 @@ void poTypeChecker::checkAssignment(poNode* node)
             {
                 setError("Error checking types in assignment.", assignment->token());
             } 
+        }
+        else if (assignment->left()->type() == poNodeType::ARRAY_ACCESSOR)
+        {
+            const int lhs = checkArray(assignment->left());
+            if (lhs != rhs)
+            {
+                setError("Error checking types in assignment.", assignment->token());
+            }
         }
         else
         {
@@ -513,6 +562,9 @@ int poTypeChecker::checkExpr(poNode* node)
     case poNodeType::MEMBER:
         type = checkMember(node);
         break;
+    case poNodeType::ARRAY_ACCESSOR:
+        type = checkArray(node);
+        break;
     case poNodeType::VARIABLE:
     {
         type = getVariable(node->token().string());
@@ -564,6 +616,24 @@ int poTypeChecker::checkExpr(poNode* node)
     return type;
 }
 
+int poTypeChecker::checkArray(poNode* node)
+{
+    poArrayAccessor* array = static_cast<poArrayAccessor*>(node);
+    assert(array->type() == poNodeType::ARRAY_ACCESSOR);
+
+    const int expr = checkExpr(array->child());
+    if (expr != -1)
+    {
+        auto& type = _module.types()[expr];
+        if (type.isArray())
+        {
+            return type.baseType();
+        }
+    }
+
+    return -1;
+}
+
 int poTypeChecker::checkMember(poNode* node)
 {
     poUnaryNode* member = static_cast<poUnaryNode*>(node);
@@ -573,7 +643,7 @@ int poTypeChecker::checkMember(poNode* node)
     if (expr > TYPE_OBJECT)
     {
         const std::string& memberName = member->token().string();
-        const poType& type = _module.types()[expr - TYPE_OBJECT - 1];
+        const poType& type = _module.types()[expr];
         for (const poField& field : type.fields())
         {
             if (field.name() == memberName)

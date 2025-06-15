@@ -31,6 +31,8 @@ namespace po
     constexpr int IR_MALLOC = 0x41;
     constexpr int IR_LOAD = 0x42;
     constexpr int IR_STORE = 0x43;
+    constexpr int IR_PTR = 0x44;
+    constexpr int IR_ELEMENT_PTR = 0x45;
 
     constexpr int IR_JUMP_UNCONDITIONAL = 0x0;
     constexpr int IR_JUMP_EQUALS = 0x1;

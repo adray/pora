@@ -297,11 +297,12 @@ double poConstantPool::getF64(const int id)
 // Function
 //================
 
-poFunction::poFunction(const std::string& name, int arity, poAttributes attribute)
+poFunction::poFunction(const std::string& name, int arity, poAttributes attribute, poCallConvention callingConvention)
     :
     _name(name),
     _arity(arity),
-    _attribute(attribute)
+    _attribute(attribute),
+    _callingConvention(callingConvention)
 {
 }
 
@@ -332,6 +333,35 @@ void poModule::addType(const poType& type)
 {
     _types.push_back(type);
     _typeMapping.insert(std::pair<std::string, int>(type.name(), type.id()));
+
+    if (type.isArray())
+    {
+        _arrayTypes.insert(std::pair<int, int>(type.baseType(), type.id()));
+    }
+    else if (type.isPointer())
+    {
+        _pointerTypes.insert(std::pair<int, int>(type.baseType(), type.id()));
+    }
+}
+
+int poModule::getArrayType(const int baseType) const
+{
+    const auto& it = _arrayTypes.find(baseType);
+    if (it != _arrayTypes.end())
+    {
+        return it->second;
+    }
+    return -1;
+}
+
+int poModule::getPointerType(const int baseType) const
+{
+    const auto& it = _pointerTypes.find(baseType);
+    if (it != _pointerTypes.end())
+    {
+        return it->second;
+    }
+    return -1;
 }
 
 int poModule::getTypeFromName(const std::string& name) const
@@ -456,10 +486,16 @@ void poModule::dump()
                         std::cout << " IR_MALLOC " << int(ins.type()) << " " << int(ins.left());
                         break;
                     case IR_LOAD:
-                        std::cout << " IR_LOAD " << int(ins.type()) << " " << int(ins.left()) << " #" << int(ins.memOffset());
+                        std::cout << " IR_LOAD " << int(ins.type()) << " " << int(ins.left());
                         break;
                     case IR_STORE:
-                        std::cout << " IR_STORE " << int(ins.type()) << " " << int(ins.left()) << " " << int(ins.right()) << " #" << int(ins.memOffset());
+                        std::cout << " IR_STORE " << int(ins.type()) << " " << int(ins.left()) << " " << int(ins.right());
+                        break;
+                    case IR_PTR:
+                        std::cout << " IR_PTR " << int(ins.type()) << " " << int(ins.left()) << " " << int(ins.right()) << " #" << int(ins.memOffset());
+                        break;
+                    case IR_ELEMENT_PTR:
+                        std::cout << " IR_ELEMENT_PTR " << int(ins.type()) << " " << int(ins.left()) << " " << int(ins.right()) << " #" << int(ins.memOffset());
                         break;
                     }
                     std::cout << std::endl;

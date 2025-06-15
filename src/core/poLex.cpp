@@ -75,6 +75,7 @@ poLexer::poLexer()
     addKeyword("false", poTokenType::FALSE);
     addKeyword("boolean", poTokenType::BOOLEAN);
     addKeyword("struct", poTokenType::STRUCT);
+    addKeyword("extern", poTokenType::EXTERN);
 }
 
 void poLexer::addKeyword(const std::string& keyword, poTokenType token)

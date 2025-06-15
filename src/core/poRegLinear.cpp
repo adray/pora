@@ -6,6 +6,8 @@
 #include "poType.h"
 #include "poModule.h"
 
+#include <assert.h>
+
 using namespace po;
 
 
@@ -149,6 +151,7 @@ void poRegLinear::setNumRegisters(const int numRegisters)
     _type.resize(_numRegisters);
     _registerUsed.resize(_numRegisters);
     _registerExpiry.resize(_numRegisters);
+    _registersSet.resize(_numRegisters);
     _variables.resize(_numRegisters);
 }
 
@@ -270,7 +273,9 @@ void poRegLinear::allocateRegister(const int pos, const poRegType type, const in
     if (foundRegister != _registerMap.end())
     {
         _registerUsed[foundRegister->second] = true;
-        _registerExpiry[foundRegister->second] = pos + live;
+        _registerExpiry[foundRegister->second] = std::max(
+            _registerExpiry[foundRegister->second],
+            pos + live);
         _registers.push_back(foundRegister->second);
         return;
     }
@@ -294,6 +299,7 @@ void poRegLinear::allocateRegister(const int pos, const poRegType type, const in
         {
             _registersUsedByType[(int)type]++;
             _registerUsed[i] = true;
+            _registersSet[i] = true;
             _registerExpiry[i] = pos + live;
             _variables[i] = variable;
             _registers.push_back(i);
@@ -357,6 +363,22 @@ void poRegLinear::allocateRegisters(poFlowGraph& cfg)
                 break;
             }
 
+            if (ins.code() == IR_ALLOCA)
+            {
+                _registers.push_back(0);
+                pos++;
+
+                const poType& type = _module.types()[ins.type()];
+                assert(type.isPointer() || type.isArray());
+
+                const poType& baseType = _module.types()[type.baseType()];
+
+                const int elements = ins.left();
+                const int size = _module.types()[baseType.id()].size();
+                _stackSlots.insert(std::pair<int, int>(pos, _stackAlloc.allocateSlot(ins.name(), size * elements)));
+                continue;
+            }
+
             poRegType type;
             switch (ins.type())
             {
@@ -374,17 +396,17 @@ void poRegLinear::allocateRegisters(poFlowGraph& cfg)
                 type = poRegType::SSE;
                 break;
             default:
-                //type = poRegType::General;
-                _registers.push_back(0);
-                pos++;
-                if (ins.type() >= TYPE_OBJECT)
+                if (!_module.types()[ins.type()].isPointer())
                 {
-                    _stackSlots.insert(std::pair<int, int>(pos, _stackAlloc.allocateSlot(ins.name(), _module.types()[ins.type() - TYPE_OBJECT - 1].size())));
+                    _registers.push_back(0);
+                    pos++;
+                    continue;
                 }
-                continue;
+                type = poRegType::General;
+                break;
             }
 
-            spillRegisters(pos, type, ins, uses);
+            //spillRegisters(pos, type, ins, uses);
             allocateRegister(pos, type, live, ins.name());
 
             pos++;

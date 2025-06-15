@@ -338,7 +338,7 @@ void poLiveRange::compute(poFlowGraph& cfg)
         {
             auto& instruction = ins[i];
 
-            if (isSpecialInstruction(instruction.code()))
+            if (!isSpecialInstruction(instruction.code()))
             {
                 if (instruction.left() != -1)
                 {

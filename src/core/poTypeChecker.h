@@ -38,7 +38,9 @@ namespace po
         void checkReturn(poNode* node, const int returnType);
         int checkExpr(poNode* node);
         int checkMember(poNode* node);
+        int checkArray(poNode* node);
         int checkCall(poNode* node);
+        int getArrayType(const int baseType, const int arrayRank);
         int getType(const poToken& token);
         void checkIfStatement(po::poNode* node, const int returnType);
         void checkWhileStatement(po::poNode* node, const int returnType);

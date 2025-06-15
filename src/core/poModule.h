@@ -15,6 +15,11 @@ namespace po
         INTERNAL
     };
 
+    enum class poCallConvention
+    {
+        X86_64
+    };
+
     template<typename T>
     class poResult
     {
@@ -72,9 +77,10 @@ namespace po
     class poFunction
     {
     public:
-        poFunction(const std::string& name, int arity, poAttributes attribute);
+        poFunction(const std::string& name, int arity, poAttributes attribute, poCallConvention callingConvention);
         inline const std::string& name() const { return _name; }
         inline const poAttributes attribute() const { return _attribute; }
+        inline const poCallConvention callConvention() const { return _callingConvention; }
         inline poFlowGraph& cfg() { return _cfg; }
         inline void addVariable(const int name) { _variables.push_back(name); }
         inline const std::vector<int> variables() const { return _variables; }
@@ -84,6 +90,7 @@ namespace po
         poAttributes _attribute;
         std::string _name;
         poFlowGraph _cfg;
+        poCallConvention _callingConvention;
         std::vector<int> _variables;
     };
 
@@ -152,11 +159,15 @@ namespace po
         bool getSymbol(const int id, std::string& symbol);
         void addType(const poType& type);
         int getTypeFromName(const std::string& name) const;
+        int getArrayType(const int baseType) const;
+        int getPointerType(const int baseType) const;
         void dump();
 
     private:
         std::vector<poType> _types;
         std::unordered_map<std::string, int> _typeMapping;
+        std::unordered_map<int, int> _arrayTypes; /* mapping from base type -> array type */
+        std::unordered_map<int, int> _pointerTypes; /* mapping from base type -> pointer type */
         std::unordered_map<int, std::string> _symbols;
         std::vector<poNamespace> _namespaces;
         poConstantPool _constants;

@@ -72,6 +72,7 @@ namespace po
         TRY,
         IMPORT,
         NAMESPACE,
+        EXTERN,
         STATIC,
         I64_TYPE,
         I32_TYPE,

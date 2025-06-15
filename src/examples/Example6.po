@@ -15,11 +15,60 @@ namespace Example
         vec3 scale;
     }
 
+    struct myStruct
+    {
+        //i64 x;
+        //i64 y;
+        //i64 z;
+        i64 w;
+    }
+
+    //static void test2(i64[8] arr)
+    //{
+    //    i64 y = arr[5];
+    //}
+
+    //static void test(transform t)
+    //{
+    //    f64 x = t.pos.z;
+    //}
+    
+    //static void test(myStruct t)
+    //{
+    //    i64 x = t.w;
+    //}
+
+    static myStruct test(myStruct t)
+    {
+        t.w = t.w + 4;
+        return t;
+    }
+
     static void main()
     {
-        transform t;
-        //vec3 pos = t.pos;
-        t.scale.z = 10.5;
-        f64 x = t.scale.z;
+        //transform t;
+        //t.scale.z = 10.5;
+        //f64 x = t.scale.z;
+
+        myStruct m;
+        //m.x = 1;
+        //m.y = 2;
+        //m.z = 3;
+        m.w = 5;
+        myStruct w;
+        w = test(m);
+        //i64 q = w.w;
+
+        //w = m;
+        //i64 q = w.w;
+
+        i64[8] testArray;
+        for (i64 i = 0; i < 8; i = i + 1)
+        {
+            testArray[i] = i + 4;
+        }
+        i64 p = testArray[0];
+
+        //test2(testArray);
     }
 }

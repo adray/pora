@@ -84,7 +84,7 @@ namespace po
         inline const int getRegister(const int index) const { return _registers[index]; }
         inline const int numRegisters() const { return _numRegisters; }
         inline const int numInstructions() const { return int(_registers.size()); }
-        inline const bool isRegisterUsed(const int index) const { return _registerUsed[index]; }
+        inline const bool isRegisterSet(const int index) const { return _registersSet[index]; }
         inline const bool isVolatile(const int index) const { return _volatile[index]; }
         inline const int stackSize() const { return _stackAlloc.numSlots(); }
         //inline const poStackAllocator& getStackAllocator() const { return _stackAlloc; }
@@ -106,6 +106,7 @@ namespace po
         std::vector<int> _registerExpiry;
         std::vector<int> _registersUsedByType;
         std::vector<int> _maxRegistersUsedByType;
+        std::vector<int> _registersSet; /* the registers which have been used at any point */
         std::unordered_map<int, poRegSpill> _spills; /* a mapping from instruction index -> spill */
         std::unordered_map<int, int> _registerMap; /* mapping from variable -> register  */
         std::unordered_map<int, int> _stackSlots; /* instruction -> stack slot */

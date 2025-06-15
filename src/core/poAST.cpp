@@ -116,3 +116,18 @@ poListNode::poListNode(poNodeType type, const std::vector<poNode*>& nodes, const
 {
 }
 
+poArrayNode::poArrayNode(const int64_t arraySize, poNode* node, const poNodeType type, const poToken& token)
+    :
+    poUnaryNode(type, node, token),
+    _arraySize(arraySize)
+{
+}
+
+poArrayAccessor::poArrayAccessor(poNode* accessor, poNode* child, const poNodeType type, const poToken& token)
+    :
+    _child(child),
+    _accessor(accessor),
+    poNode(type, token)
+{
+}
+

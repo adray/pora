@@ -93,7 +93,7 @@ static void checkSyntax(const std::string& testName, const std::string& program,
     {
         if (success)
         {
-            std::cout << "FAILED " << lexer.errorText() << " Line:" << lexer.lineNum() << std::endl;
+            std::cout << "FAILED Lexer: " << lexer.errorText() << " Line:" << lexer.lineNum() << std::endl;
         }
         else
         {
@@ -109,7 +109,7 @@ static void checkSyntax(const std::string& testName, const std::string& program,
     {
         if (success)
         {
-            std::cout << "FAILED " << parser.error() << " Line:" << parser.errorLine() << std::endl;
+            std::cout << "FAILED Parser: " << parser.error() << " Line:" << parser.errorLine() << std::endl;
         }
         else
         {
@@ -132,7 +132,7 @@ static void checkSyntax(const std::string& testName, const std::string& program,
     {
         if (success)
         {
-            std::cout << "FAILED " << checker.errorText() << std::endl;
+            std::cout << "FAILED Type Checker: " << checker.errorText() << std::endl;
         }
         else
         {
@@ -706,6 +706,98 @@ void po::syntaxTest()
         "   myArray[2 = 4;"\
         "}"\
         "}", false);
-
+    checkSyntax("Array Test #7", "namespace Test {"\
+        "struct test{"\
+        "   i64[2] x;"\
+        "}"\
+        "static void main() {"\
+        "   test t;"\
+        "   t.x[0] = 5;"\
+        "}"\
+        "}", true);
+    checkSyntax("Array Test #8", "namespace Test {"\
+        "struct test{"\
+        "   i64[2] x;"\
+        "}"\
+        "static void main() {"\
+        "   test t;"\
+        "   i64 x = t.x[0];"\
+        "}"\
+        "}", true);
+    checkSyntax("Array Test #9", "namespace Test {"\
+        "static void main() {"\
+        "   i64[5] t;"\
+        "   i64[9] s = t;"\
+        "}"\
+        "}", false);
+    checkSyntax("Array Test #10", "namespace Test {"\
+        "struct test{"\
+        "   i64 x;"\
+        "   i64 y;"\
+        "}"\
+        "static void main() {"\
+        "   test[5] t;"\
+        "   t[0].x = 1;"\
+        "}"\
+        "}", true);
+    checkSyntax("Array Test #11", "namespace Test {"\
+        "struct test{"\
+        "   i64 x;"\
+        "   i64 y;"\
+        "}"\
+        "static void main() {"\
+        "   test[5] t;"\
+        "   i64 p = 3;"
+        "   t[p].x = 1;"\
+        "}"\
+        "}", true);
+    checkSyntax("Array Test #12", "namespace Test {"\
+        "struct test{"\
+        "   i64[4] x;"\
+        "   i64 y;"\
+        "}"\
+        "static void main() {"\
+        "   test[5] t;"\
+        "   i64 p = 3;"
+        "   t[p].x[0] = 1;"\
+        "}"\
+        "}", true);
+    checkSyntax("Array Test #13", "namespace Test {"\
+        "struct test{"\
+        "   i64[4] x;"\
+        "   i64 y;"\
+        "}"\
+        "static void main() {"\
+        "   test[5] t;"\
+        "   i64 p = 3;"
+        "   t[p].x[0 = 1;"\
+        "}"\
+        "}", false);
+    checkSyntax("Array Test #14", "namespace Test {"\
+        "struct test{"\
+        "   i64[4] x;"\
+        "   i64 y;"\
+        "}"\
+        "static void test(test t){"\
+        "   i64 y = t.y;"\
+        "}"\
+        "static void main() {"\
+        "   test[5] t;"\
+        "   t.y = 4;"\
+        "   test(t);"\
+        "}"\
+        "}", false);
+    checkSyntax("FFI Test #1", "namespace Test {"\
+        "extern i32 GetCurrentProcess(); "\
+        "static void main() {"\
+        "   i32 id = GetCurrentProcess();"\
+        "}"\
+        "}", true);
+    checkSyntax("FFI Test #2", "namespace Test {"\
+        "extern i32 MyFunction(i64 x, i64 y, i64 z); "\
+        "static void main() {"\
+        "   i32 id = MyFunction(0, 1, 2);"\
+        "}"\
+        "}", true);
 
 }

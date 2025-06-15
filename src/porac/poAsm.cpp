@@ -1359,44 +1359,112 @@ void poAsm::mc_xorps_reg_to_reg_x64(int dst, int src)
 
 //================
 
-void poAsm::ir_load(poRegLinear& linear, const poInstruction& ins, const int instructionIndex)
+void poAsm::ir_element_ptr(poModule& module, poRegLinear& linear, const poInstruction& ins)
 {
-    // We need to mov data from the stack pos to the destination register
+    // We need to get the pointer to the variable (left) optionally adding the variable (right) and a the memory offset.
 
     const int dst = linear.getRegisterByVariable(ins.name());
-    const int dst_sse = linear.getRegisterByVariable(ins.name() - VM_REGISTER_MAX);
+    const int slot = linear.getStackSlotByVariable(ins.left()); /* assume the pointer is the stack position */
 
-    const int offset = ins.memOffset();
-    const int stackPos = linear.getStackSlot(instructionIndex) + offset;
+    const poType& type = module.types()[ins.type()];
+    const int size = type.size();
+
+    const int offset = slot * 8;
+    if (ins.right() != -1)
+    {
+        const int operand = linear.getRegisterByVariable(ins.right());
+
+        // TODO: change to LEA? (load effective address)
+
+        mc_mov_imm_to_reg_x64(dst, size);
+        mc_mul_reg_to_reg_x64(dst, operand);
+
+        mc_add_reg_to_reg_x64(dst, VM_REGISTER_ESP);
+        mc_add_imm_to_reg_x64(dst, offset);
+    }
+    else
+    {
+        mc_mov_reg_to_reg_x64(dst, VM_REGISTER_ESP);
+        mc_add_imm_to_reg_x64(dst, offset);
+    }
+}
+
+void poAsm::ir_ptr(poModule& module, poRegLinear& linear, const poInstruction& ins)
+{
+    const int dst = linear.getRegisterByVariable(ins.name());
+    const poType& type = module.types()[ins.type()];
+    const int slot = linear.getStackSlotByVariable(ins.left()); /* assume the pointer is the stack position */
+    if (slot != -1)
+    {
+        // We need to get the pointer to the variable (left) optionally adding the variable (right) and the memory offset.
+
+        const int offset = slot * 8 + ins.memOffset();
+        mc_mov_reg_to_reg_x64(dst, VM_REGISTER_ESP);
+        mc_add_imm_to_reg_x64(dst, offset);
+    }
+    else
+    {
+
+        // We are just adding a memory offset to the existing pointer
+
+        const int src = linear.getRegisterByVariable(ins.left());
+        mc_mov_reg_to_reg_x64(dst, src);
+        mc_add_imm_to_reg_x64(dst, ins.memOffset());
+    }
+}
+
+void poAsm::ir_load(poRegLinear& linear, const poInstruction& ins)
+{
+    // We need to mov data from the ptr address to the destination register
+
+    const int dst = linear.getRegisterByVariable(ins.name());
+    const int dst_sse = linear.getRegisterByVariable(ins.name()) - VM_REGISTER_MAX;
+
+    const int src = linear.getRegisterByVariable(ins.left());
 
     switch (ins.type())
     {
     case TYPE_I64:
-        mc_mov_memory_to_reg_x64(dst, VM_REGISTER_ESP, stackPos);
+    case TYPE_U64:
+    case TYPE_I32:
+    case TYPE_U32:
+    case TYPE_I8:
+    case TYPE_U8:
+        mc_mov_memory_to_reg_x64(dst, src, 0);
         break;
     case TYPE_F64:
-        mc_movsd_memory_to_reg_x64(dst, VM_REGISTER_ESP, stackPos);
+        mc_movsd_memory_to_reg_x64(dst_sse, src, 0);
+        break;
+    case TYPE_F32:
+        mc_movss_memory_to_reg_x64(dst_sse, src, 0);
         break;
     }
 }
 
 void poAsm::ir_store(poRegLinear& linear, const poInstruction& ins)
 {
-    // We need to mov data from the source register to the destination stack slot
+    // We need to mov data from the source register to the destination address
 
     const int src = linear.getRegisterByVariable(ins.right());
-    const int src_sse = linear.getRegisterByVariable(ins.right() - VM_REGISTER_MAX);
+    const int src_sse = src - VM_REGISTER_MAX;
 
-    const int offset = ins.memOffset();
-    const int stackPos = linear.getStackSlotByVariable(ins.left()) + offset;
+    const int dst = linear.getRegisterByVariable(ins.left());
 
     switch (ins.type())
     {
     case TYPE_I64:
-        mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, stackPos, src);
+    case TYPE_U64:
+    case TYPE_I32:
+    case TYPE_U32:
+    case TYPE_I8:
+    case TYPE_U8:
+        mc_mov_reg_to_memory_x64(dst, 0, src);
         break;
     case TYPE_F64:
-        mc_movsd_reg_to_memory_x64(VM_REGISTER_ESP, stackPos, src_sse);
+        mc_movsd_reg_to_memory_x64(dst, src_sse, 0);
+        break;
+    case TYPE_F32:
+        mc_movss_reg_to_memory_x64(dst, src_sse, 0);
         break;
     }
 
@@ -1416,8 +1484,12 @@ void poAsm::ir_add(poRegLinear& linear, const poInstruction& ins)
     {
     case TYPE_I64:
     case TYPE_U64:
-        if (dst != src1) { mc_mov_reg_to_reg_x64(dst, src1); }
-        mc_add_reg_to_reg_x64(dst, src2);
+        if (dst == src2) { mc_add_reg_to_reg_x64(dst, src1); }
+        else if (dst == src1) { mc_add_reg_to_reg_x64(dst, src2); }
+        else {
+            mc_mov_reg_to_reg_x64(dst, src1);
+            mc_add_reg_to_reg_x64(dst, src2);
+        }
         break;
     case TYPE_F32:
         if (sse_dst != sse_src1) { mc_movss_reg_to_reg_x64(sse_dst, sse_src1); }
@@ -1771,9 +1843,16 @@ void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& 
     static const int generalArgs[] = { VM_ARG1, VM_ARG2, VM_ARG3, VM_ARG4, VM_ARG5, VM_ARG6 };
     static const int sseArgs[] = { VM_SSE_ARG1, VM_SSE_ARG2, VM_SSE_ARG3, VM_SSE_ARG4, VM_SSE_ARG5, VM_SSE_ARG6, VM_SSE_ARG7, VM_SSE_ARG8 };
 
+    const auto& types = module.types();
     const int numArgs = ins.left();
+    int slot = 0;
     for (int i = 0; i < numArgs; i++)
     {
+        const auto& type = types[args[i].type()];
+        const int baseType = type.baseType();
+        const int size = type.size();
+        int src_slot = 0;
+
         switch (args[i].type()) {
         case TYPE_I64:
         case TYPE_I32:
@@ -1781,13 +1860,25 @@ void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& 
         case TYPE_U64:
         case TYPE_U32:
         case TYPE_U8:
-            mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].name()));
+            mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].left()));
             break;
         case TYPE_F64:
-            mc_movsd_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].name()) - VM_REGISTER_MAX);
+            mc_movsd_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].left()) - VM_REGISTER_MAX);
             break;
         case TYPE_F32:
-            mc_movss_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].name()) - VM_REGISTER_MAX);
+            mc_movss_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].left()) - VM_REGISTER_MAX);
+            break;
+        default:
+            src_slot = linear.getStackSlotByVariable(args[i].left());
+            if (src_slot != -1)
+            {
+                mc_mov_reg_to_reg_x64(generalArgs[i], VM_REGISTER_ESP);
+                mc_add_imm_to_reg_x64(generalArgs[i], src_slot * 8);
+            }
+            else
+            {
+                mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].left()));
+            }
             break;
         }
     }
@@ -1820,19 +1911,24 @@ void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& 
     }
 }
 
-void poAsm::ir_param(poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_param(poModule& module, poRegLinear& linear, const poInstruction& ins)
 {
+    int slot = 0;
     const int dst = linear.getRegisterByVariable(ins.name());
     const int dst_sse = dst - VM_REGISTER_MAX;
     static const int generalArgs[] = { VM_ARG1, VM_ARG2, VM_ARG3, VM_ARG4, VM_ARG5, VM_ARG6 };
     static const int sseArgs[] = { VM_SSE_ARG1, VM_SSE_ARG2, VM_SSE_ARG3, VM_SSE_ARG4, VM_SSE_ARG5, VM_SSE_ARG6, VM_SSE_ARG7, VM_SSE_ARG8 };
     const int param = ins.left();
+    const poType& type = module.types()[ins.type()];
+    const int size = type.size();
     switch (ins.type())
     {
     case TYPE_I64:
     case TYPE_U64:
     case TYPE_I32:
+    case TYPE_U32:
     case TYPE_I8:
+    case TYPE_U8:
         if (param < VM_MAX_ARGS)
         {
             const int src = generalArgs[param];
@@ -1844,6 +1940,9 @@ void poAsm::ir_param(poRegLinear& linear, const poInstruction& ins)
         break;
     case TYPE_F32:
         mc_movss_reg_to_reg_x64(dst_sse, sseArgs[param]);
+        break;
+    default:
+        mc_mov_reg_to_reg_x64(dst, generalArgs[param]);
         break;
     }
 }
@@ -1994,7 +2093,7 @@ void poAsm::generatePrologue(poRegLinear& linear)
     int numPushed = 0;
     for (int i = 0; i < VM_REGISTER_MAX; i++)
     {
-        if (!linear.isVolatile(i) && linear.isRegisterUsed(i))
+        if (!linear.isVolatile(i) && linear.isRegisterSet(i))
         {
             mc_push_reg(i);
             numPushed++;
@@ -2015,20 +2114,27 @@ void poAsm::generatePrologue(poRegLinear& linear)
 void poAsm::generateEpilogue(poRegLinear& linear)
 {
     // Pop all non-volatile general purpose registers which are used (in backwards order)
-    int numPopped = 0;
+    int numToPop = 0;
     for (int i = VM_REGISTER_MAX - 1; i >= 0; i--)
     {
-        if (!linear.isVolatile(i) && linear.isRegisterUsed(i))
+        if (!linear.isVolatile(i) && linear.isRegisterSet(i))
         {
-            mc_pop_reg(i);
-            numPopped++;
+            numToPop++;
         }
     }
 
-    const int size = _prologueSize - 8 * numPopped;
+    const int size = _prologueSize - 8 * numToPop;
     if (size > 0)
     {
         mc_add_imm_to_reg_x64(VM_REGISTER_ESP, size);
+    }
+
+    for (int i = VM_REGISTER_MAX - 1; i >= 0; i--)
+    {
+        if (!linear.isVolatile(i) && linear.isRegisterSet(i))
+        {
+            mc_pop_reg(i);
+        }
     }
 }
 
@@ -2169,8 +2275,14 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
 
             switch (ins.code())
             {
+            case IR_ELEMENT_PTR:
+                ir_element_ptr(module, linear, ins);
+                break;
+            case IR_PTR:
+                ir_ptr(module, linear, ins);
+                break;
             case IR_LOAD:
-                ir_load(linear, ins, pos);
+                ir_load(linear, ins);
                 break;
             case IR_STORE:
                 ir_store(linear, ins);
@@ -2212,7 +2324,7 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
                 ir_mul(linear, ins);
                 break;
             case IR_PARAM:
-                ir_param(linear, ins);
+                ir_param(module, linear, ins);
                 break;
             case IR_PHI:
                 // do nothing

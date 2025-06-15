@@ -35,8 +35,9 @@ namespace po
     public:
         poFunctionParser(poParser& parser);
         poNode* parse(const poToken& ret);
+        poNode* parseExtern(const poToken& ret);
     private:
-        poNode* parseMember(const poToken& token);
+        poNode* parseMember(poNode* variable, const poToken& token);
         poNode* parseRH(poNode* lhs);
         poNode* parsePrimary();
         poNode* parseUnary();
@@ -52,7 +53,7 @@ namespace po
         poNode* parseIfStatement();
         poNode* parseWhile();
         poNode* parseFor();
-        poNode* parseDecl();
+        poNode* parseDecl(const poToken& type);
         poNode* parseStatement();
         poNode* parseExpressionStatement();
 
@@ -84,6 +85,7 @@ namespace po
         poNode* parse();
     private:
         poNode* parseFunction(const poToken& ret);
+        poNode* parseExternalFunction(const poToken& ret);
         poNode* parseStruct();
 
         poParser& _parser;

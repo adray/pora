@@ -55,7 +55,7 @@ static void ssaTest1()
 
     poModule module;
     poNamespace ns("Test");
-    poFunction function("MyFunc", 0, poAttributes::PUBLIC);
+    poFunction function("MyFunc", 0, poAttributes::PUBLIC, poCallConvention::X86_64);
     function.addVariable(0);
     poFlowGraph& cfg = function.cfg();
 
@@ -103,7 +103,7 @@ static void ssaTest2()
 
     poModule module;
     poNamespace ns("Test");
-    poFunction function("MyFunc", 0, poAttributes::PUBLIC);
+    poFunction function("MyFunc", 0, poAttributes::PUBLIC, poCallConvention::X86_64);
     function.addVariable(0);
     poFlowGraph& cfg = function.cfg();
 

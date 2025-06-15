@@ -10,11 +10,12 @@ poField::poField(const int offset, const int type, const std::string& name)
 {
 }
 
-poType::poType(const int id, const int baseType, const bool isArray, const std::string& name)
+poType::poType(const int id, const int baseType, const std::string& name)
     :
     _id(id),
     _baseType(baseType),
-    _isArray(isArray),
+    _isArray(false),
+    _isPointer(false),
     _name(name),
     _size(0)
 {
