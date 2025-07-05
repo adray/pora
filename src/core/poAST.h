@@ -6,6 +6,8 @@ namespace po
     enum class poNodeType
     {
         POINTER, /* poUnaryNode */
+        REFERENCE, /* poUnaryNode */
+        DEREFERENCE, /* poUnaryNode */
         ADD, /* poBinaryNode */
         SUB, /* poBinaryNode */
         MUL, /* poBinaryNode */
@@ -144,5 +146,16 @@ namespace po
     private:
         poNode* _accessor;
         poNode* _child;
+    };
+
+    class poPointerNode : public poUnaryNode
+    {
+    public:
+        poPointerNode(const poNodeType type, poNode* child, const poToken& token, const int count);
+
+        inline const int count() const { return _count; }
+
+    private:
+        int _count;
     };
 }

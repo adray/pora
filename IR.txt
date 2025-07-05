@@ -1,0 +1,44 @@
+Guide to the PORA intermediate representation
+
+Binary operators
+These take a left and right argument.
+
+IR_ADD - Performs an addition
+IR_SUB - Performs a binary subtraction
+IR_MUL - Performs a multiply
+IR_DIV - Performs a divide
+IR_PHI - Represents a PHI node, these should be defined at the top of a basic block
+IR_CMP - Peforms a comparison.
+IR_AND - Performs a logical and.
+IR_OR - Performs a logical or.
+IR_STORE - Stores the value specified by the right into the memory address specified by the left.
+
+Unary operators
+These take only a left argument, the right must always be -1.
+
+IR_UNARY_MINUS - Performs a unary negation.
+IR_RETURN - Returns the specified value from a function. The left may also be set to -1 to return nothing. This is only valid when placed as the last instruction in a basic block.
+IR_COPY - Propagates the value in the left argument.
+IR_LOAD - Loads the value in the address specified by the left argument.
+
+Special operators
+
+IR_CONSTANT - Defines a constant primitive. This is set in the constant field. Left and right are unused.
+IR_ALLOCA - Defines a stack allocation. The left is the num of elements to allocate. Right is unused. The type should be a pointer or an array.
+IR_PTR - Retrieves the memory address of a pointer, either on the stack or within a register. Left refers to the variable which to get the memory address of and the memOffset optionally defines an offset to add to the memory address. The right is unused.
+IR_ELEMENT_PTR - Retrieves the address of a pointer, this differs to IR_PTR as it takes a right operand instead of a memOffset. The variable within the right operand is added to the address. 
+IR_BR - Performs a branch instruction. The left here refers to the branch type. The right is unused.
+IR_PARAM - This is used to obtain a parameter passed into a function. The left refers to index of the parameter.
+IR_CALL - This performs a call to the specified function. The right value represents the symbol name of the function to call. The left is the number of IR_ARG instructions defined directly after the IR_CALL.
+IR_ARG - This represents on argument used by a IR_CALL instruction. They are only valid directly after a IR_CALL instruction. The left specifies the value to pass into the function. 
+
+
+X86_64 calling conventions
+* Return value
+If <= 8 bytes: return in RAX register.
+else: it is passed in as the first register (RCX)
+* Parameters
+General purpose registers: [RCX, RDX, R8, R9]
+SSE registers: [XMM0, XMM1, XMM2, XMM3, XMM4, XMM5]
+If <= 8 bytes: passed in via the appropriate register
+else: a pointer to the struct is used

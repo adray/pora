@@ -57,36 +57,8 @@ int poTypeResolver::getType(const poToken& token)
     return type;
 }
 
-void poTypeResolver::addPrimitives()
-{
-    _module.addType(poType(TYPE_VOID, -1, "VOID"));
-    _module.addType(poType(TYPE_I64, -1, "I64"));
-    _module.addType(poType(TYPE_I32, -1, "I32"));
-    _module.addType(poType(TYPE_I8, -1, "I8"));
-    _module.addType(poType(TYPE_F64, -1, "F64"));
-    _module.addType(poType(TYPE_F32, -1, "F32"));
-    _module.addType(poType(TYPE_U64, -1, "U64"));
-    _module.addType(poType(TYPE_U32, -1, "U32"));
-    _module.addType(poType(TYPE_U8, -1, "U8"));
-    _module.addType(poType(TYPE_BOOLEAN, -1, "BOOLEAN"));
-    _module.addType(poType(TYPE_OBJECT, -1, "OBJECT"));
-
-    auto& types = _module.types();
-    types[TYPE_I64].setSize(sizeof(int64_t));
-    types[TYPE_I32].setSize(sizeof(int32_t));
-    types[TYPE_I8].setSize(sizeof(int8_t));
-    types[TYPE_F64].setSize(sizeof(double));
-    types[TYPE_F32].setSize(sizeof(float));
-    types[TYPE_U64].setSize(sizeof(uint64_t));
-    types[TYPE_U32].setSize(sizeof(uint32_t));
-    types[TYPE_U8].setSize(sizeof(uint8_t));
-    types[TYPE_BOOLEAN].setSize(sizeof(int8_t));
-}
-
 void poTypeResolver::resolve(const std::vector<poNode*>& nodes)
 {
-    addPrimitives();
-
     for (poNode* node : nodes)
     {
         if (node->type() == poNodeType::MODULE)
@@ -146,7 +118,7 @@ void poTypeResolver::getExtern(poNode* node, poNamespace& ns)
             ns.addFunction(poFunction(
                 node->token().string(),
                 int(args->list().size()),
-                poAttributes::PUBLIC,
+                (poAttributes) (int(poAttributes::PUBLIC) | int(poAttributes::EXTERN)),
                 poCallConvention::X86_64));
         }
     }
@@ -169,6 +141,28 @@ void poTypeResolver::getFunction(poNode* node, poNamespace& ns)
                 poCallConvention::X86_64));
         }
     }
+}
+
+int poTypeResolver::getPointerType(const int baseType, const int count)
+{
+    int pointerType = baseType;
+    for (int i = 0; i < count; i++)
+    {
+        int type = _module.getPointerType(pointerType);
+        if (type == -1)
+        {
+            const poType& typeData = _module.types()[pointerType];
+
+            type = int(_module.types().size());
+            poType newType(type, pointerType, typeData.name() + "*");
+            newType.setPointer(true);
+            newType.setSize(8);
+            _module.addType(newType);
+        }
+        pointerType = type;
+
+    }
+    return pointerType;
 }
 
 void poTypeResolver::resolveTypes(poNamespace& ns)
@@ -201,6 +195,12 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
                 if (child->type() == poNodeType::DECL)
                 {
                     poUnaryNode* decl = static_cast<poUnaryNode*>(child);
+                    if (decl->child()->type() == poNodeType::POINTER)
+                    {
+                        poPointerNode* pointerNode = static_cast<poPointerNode*>(decl->child());
+                        decl = pointerNode;
+                    }
+
                     if (decl->child()->type() == poNodeType::ARRAY)
                     {
                         // An array type is in a good state if the base type is resolved.
@@ -243,19 +243,28 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
             {
                 const std::string& name = structNode->token().string();
                 const int id = int(_module.types().size());
-                poType type(id,
+                _module.addType(poType(id,
                     TYPE_OBJECT,
-                    name);
+                    name));
                 int offset = 0;
                 for (poNode* child : structNode->list())
                 {
                     if (child->type() == poNodeType::DECL)
                     {
                         poUnaryNode* decl = static_cast<poUnaryNode*>(child);
+
+                        int pointerCount = 0;
+                        if (decl->child()->type() == poNodeType::POINTER)
+                        {
+                            poPointerNode* pointerNode = static_cast<poPointerNode*>(decl->child());
+                            decl = pointerNode;
+                            pointerCount = pointerNode->count();
+                        }
+
                         if (decl->child()->type() == poNodeType::TYPE)
                         {
                             poNode* typeNode = decl->child();
-                            int fieldType = getType(typeNode->token());
+                            int fieldType = getPointerType(getType(typeNode->token()), pointerCount);
                             int size = 0;
                             if (fieldType == -1)
                             {
@@ -272,6 +281,7 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
                                 size = getTypeSize(fieldType);
                             }
 
+                            auto& type = _module.types()[id];
                             type.addField(poField(offset, fieldType, decl->token().string()));
 
                             offset += size;
@@ -280,7 +290,7 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
                         {
                             poArrayNode* arrayNode = static_cast<poArrayNode*>(decl->child());
                             poNode* typeNode = arrayNode->child();
-                            int fieldType = getType(typeNode->token());
+                            int fieldType = getPointerType(getType(typeNode->token()), pointerCount);
                             int size = 0;
                             if (fieldType == -1)
                             {
@@ -297,22 +307,25 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
                                 size = getTypeSize(fieldType);
                             }
 
-                            const int arrayType = _module.getArrayType(fieldType);
+                            int arrayType = _module.getArrayType(fieldType);
                             if (arrayType == -1)
                             {
-                                const int id = int(_module.types().size());
+                                arrayType = int(_module.types().size());
                                 std::string baseName = _module.types()[fieldType].name();
-                                poType type(id, fieldType, baseName + "[]");
+                                poType type(arrayType, fieldType, baseName + "[]");
                                 type.setArray(true);
                                 _module.addType(type);
                             }
 
+                            auto& type = _module.types()[id];
+                            type.addField(poField(offset, arrayType, decl->token().string()));
                             offset += size * int(arrayNode->arraySize());
                         }
                     }
                 }
+
+                auto& type = _module.types()[id];
                 type.setSize(offset);
-                _module.addType(type);
                 _resolvedTypes.insert(std::pair<std::string, int>(name, id));
 
                 changes = true;

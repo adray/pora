@@ -1,0 +1,16 @@
+import std;
+
+namespace Example
+{
+    struct test { i64 x; }
+
+    static void main()
+    {
+        test z;
+        z.x = 5;
+        test* y = &z;
+        test w;
+        w.x = 100;
+        *y = w;
+    }
+}

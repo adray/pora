@@ -21,6 +21,8 @@ set (PORACORE_SOURCES
     "poLive.cpp"
     "poOptFold.h"
     "poOptFold.cpp"
+    "poOptMemToReg.h"
+    "poOptMemToReg.cpp"
     "poParser.h"
     "poParser.cpp"
     "poTypeChecker.h"
@@ -39,6 +41,8 @@ set (PORACORE_SOURCES
     "poType.cpp"
     "poTypeResolver.h"
     "poTypeResolver.cpp"
+    "poOptDCE.cpp"
+    "poOptDCE.h"
 )
 
 project ("poracore")

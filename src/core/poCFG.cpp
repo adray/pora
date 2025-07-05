@@ -40,7 +40,42 @@ poInstruction::poInstruction(const int32_t name, const int16_t type, const int16
 {
 }
 
+bool poInstruction::isSpecialInstruction() const
+{
+    // 
+    // We deem these special instructions if the left or right
+    // parameters are reused for something else, other than
+    // referring to a use of another instruction.
 
+    switch (_code)
+    {
+    case (IR_CONSTANT): /* technically not, but keep it in for now */
+    case (IR_CALL):
+    case (IR_BR):
+    case (IR_PARAM):
+    case (IR_ALLOCA):
+    case (IR_MALLOC):
+        return true;
+    }
+    return false;
+}
+
+//====================
+// poInstructionRef
+//====================
+
+poInstructionRef::poInstructionRef(poBasicBlock* bb, const int ref, const int baseRef)
+    :
+    _bb(bb),
+    _ref(ref),
+    _baseRef(baseRef)
+{
+}
+
+poInstruction& poInstructionRef::getInstruction() const
+{
+    return _bb->getInstruction(_ref - _baseRef);
+}
 
 //=================
 // Basic Blocks
@@ -153,16 +188,22 @@ void poFlowGraph::optimize()
         if (bb->numInstructions() == 0)
         {
             // Remove empty block
+
             poBasicBlock* cur = bb;
-            bb = bb->getNext();
-            for (auto& incoming : cur->getIncoming())
+            if (cur->getIncoming().size() == 0 &&
+                cur->getPrev())
             {
-                incoming->setBranch(bb, incoming->unconditionalBranch());
-                bb->addIncoming(incoming);
+                bb = bb->getNext();
+
+                if (cur->getPrev()->getBranch() && !cur->getPrev()->unconditionalBranch())
+                {
+                    continue;
+                }
+
+                removeBasicBlock(cur);
+                delete cur;
+                continue;
             }
-            removeBasicBlock(cur);
-            delete cur;
-            continue;
         }
 
         bb = bb->getNext();
@@ -170,3 +211,12 @@ void poFlowGraph::optimize()
 
     // Remove unreachable basic blocks?
 }
+
+//poFlowGraph::~poFlowGraph()
+//{
+//    for (poBasicBlock* bb : _blocks)
+//    {
+//        delete bb;
+//    }
+//    _blocks.clear();
+//}

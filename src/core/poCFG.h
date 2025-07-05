@@ -58,6 +58,11 @@ namespace po
         inline void setName(const int32_t name) { _name = name; }
         inline void setLeft(const int32_t left) { _left = left; }
         inline void setRight(const int32_t right) { _right = right; }
+        inline void setCode(const int16_t code) { _code = code; }
+        inline void setType(const int16_t type) { _type = type; }
+        inline void setConstant(const int16_t constant) { _constant = constant; }
+
+        bool isSpecialInstruction() const;
 
     private:
         int32_t _name;
@@ -72,15 +77,31 @@ namespace po
         int16_t _code;
     };
 
+    class poInstructionRef
+    {
+    public:
+        poInstructionRef(poBasicBlock* bb, const int ref, const int baseRef);
+        inline poBasicBlock* getBasicBlock() const { return _bb; }
+        inline const int getRef() const { return _ref; }
+        inline const int getAdjustedRef() const { return _ref - _baseRef; }
+        poInstruction& getInstruction() const;
+
+    private:
+        poBasicBlock* _bb;
+        int _ref;
+        int _baseRef;
+    };
+
     class poPhi
     {
     public:
         poPhi(const int name, const int type);
         void addValue(const int value, poBasicBlock* bb);
+        inline void setValue(const int index, const int value) { _rhs[index] = value; }
         inline const std::vector<int>& values() const { return _rhs; }
         inline void setName(const int name) { _name = name; }
         inline const int name() const { return _name; }
-        inline const int initalName() const { return _initialName; }
+        inline const int initialName() const { return _initialName; }
         inline void setType(const int type) { _type = type; }
         inline const int getType() const { return _type; }
         inline const std::vector<poBasicBlock*>& getBasicBlock() const { return _bb; }
@@ -150,6 +171,8 @@ namespace po
         poBasicBlock* getFirst() const;
 
         void optimize();
+
+        //~poFlowGraph();
 
     private:
         std::vector<poBasicBlock*> _blocks;

@@ -14,7 +14,8 @@ using namespace po;
 
 poDomNode::poDomNode(poBasicBlock* bb)
     :
-    _bb(bb)
+    _bb(bb),
+    _immediateDominator(-1)
 {
 }
 
@@ -184,7 +185,7 @@ void poDom::computeImmediateDominators()
     // This algorithm is not the most efficient solution.
     // But it is quite easy to understand, simply take a node X and look at the nodes
     // it dominates. Then try to find a node which is 'between' them. If such a node
-    // exists it can't be the immediate dominator. 'Between' them is if a theorectical node Z
+    // exists it can't be the immediate dominator. 'Between' them is if a theoretical node Z
     // exists which X strictly dominates and node Z strictly dominates Y then
     // Z would be 'between' them in the dominator tree.
 
@@ -224,6 +225,7 @@ void poDom::computeImmediateDominators()
 
                 if (ok)
                 {
+                    _nodes[dominatedBy[k]].setImmediateDominator(int(i));
                     _nodes[i].addImmediateDominatedBy(dominatedBy[k]);
                 }
             }

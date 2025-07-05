@@ -189,7 +189,12 @@ static void dominatorTest3()
     const bool success =
         checkImmediateDominators(dom.get(0), { 1 }) &&
         checkImmediateDominators(dom.get(1), { 2, 3, 4 }) &&
-        checkImmediateDominators(dom.get(2), { });
+        checkImmediateDominators(dom.get(2), { }) &&
+    
+        dom.get(1).immediateDominator() == 0 &&
+        dom.get(2).immediateDominator() == 1 &&
+        dom.get(3).immediateDominator() == 1 &&
+        dom.get(4).immediateDominator() == 1;
 
     if (success)
     {

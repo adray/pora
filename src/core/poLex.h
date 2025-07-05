@@ -52,6 +52,7 @@ namespace po
         AND,
         OR,
         DOT,
+        AMPERSAND,
 
         IF,
         ELSE,

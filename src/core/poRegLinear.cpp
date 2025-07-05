@@ -207,7 +207,7 @@ void poRegLinear::spillRegisters(const int pos, const poRegType type, const poIn
         toSpill.push_back(variable);
     }
 
-    for (int variable : toSpill)
+    for (const int variable : toSpill)
     {
         // We need to evict a register; ideally the one which is next used furthest away
 

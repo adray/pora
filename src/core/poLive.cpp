@@ -8,21 +8,6 @@
 
 using namespace po;
 
-static bool isSpecialInstruction(const int code)
-{
-    switch (code)
-    {
-    case (IR_CONSTANT):
-    case (IR_CALL):
-    case (IR_BR):
-    case (IR_PARAM):
-    case (IR_ALLOCA):
-    case (IR_MALLOC):
-        return true;
-    }
-    return false;
-}
-
 //=====================
 // poLiveNode
 //=====================
@@ -165,7 +150,7 @@ void poLive::dagDfs(poDom& dom, const int id)
         if (instruction.code() != IR_PHI)
         {
             live.removeLiveIn(instruction.name());
-            if (!isSpecialInstruction(instruction.code()))
+            if (!instruction.isSpecialInstruction())
             {
                 if (instruction.left() != -1)
                 {
@@ -338,7 +323,7 @@ void poLiveRange::compute(poFlowGraph& cfg)
         {
             auto& instruction = ins[i];
 
-            if (!isSpecialInstruction(instruction.code()))
+            if (!instruction.isSpecialInstruction())
             {
                 if (instruction.left() != -1)
                 {

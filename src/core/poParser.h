@@ -37,6 +37,8 @@ namespace po
         poNode* parse(const poToken& ret);
         poNode* parseExtern(const poToken& ret);
     private:
+        const int parsePointer();
+
         poNode* parseMember(poNode* variable, const poToken& token);
         poNode* parseRH(poNode* lhs);
         poNode* parsePrimary();
@@ -75,6 +77,8 @@ namespace po
         poStructParser(poParser& parser);
         poNode* parse();
     private:
+        const int parsePointer();
+
         poParser& _parser;
     };
 

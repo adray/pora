@@ -1,0 +1,22 @@
+import std;
+
+namespace Example
+{
+    struct test { i64 x; i64 y; i64 z; i64 w; }
+
+    static void main()
+    {
+        test z;
+        z.x = 5;
+        z.y = 6;
+        z.z = 7;
+        z.w = 8;
+        test* y = &z;
+        test w;
+        w.x = 100;
+        w.y = 101;
+        w.z = 102;
+        w.w = 103;
+        *y = w;
+    }
+}

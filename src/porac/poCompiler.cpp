@@ -7,6 +7,8 @@
 #include "poTypeChecker.h"
 #include "poEmit.h"
 #include "poOptFold.h"
+#include "poOptMemToReg.h"
+#include "poOptDCE.h"
 #include "poSSA.h"
 #include "poTypeResolver.h"
 
@@ -88,7 +90,16 @@ int poCompiler:: compile()
     // Convert to SSA form and insert PHI nodes
     poSSA ssa;
     ssa.construct(module);
-    //module.dump();
+    module.dump();
+
+    // Convert unnecessary memory accesses to registers
+    poOptMemToReg regToMem;
+    regToMem.optimize(module);
+
+    // Eliminate any dead code
+    poOptDCE dce;
+    dce.optimize(module);
+    module.dump();
 
     // Convert the basic blocks/cfg to machine code
     _assembler.generate(module);

@@ -1,0 +1,11 @@
+import std;
+
+namespace Example
+{
+    extern i64 GetCurrentProcessId();
+        
+    static void main()
+    {
+        i64 process = GetCurrentProcessId();
+    }
+}

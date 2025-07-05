@@ -1,0 +1,11 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        i64 z = 10;
+        i64* y = &z;
+        i64 x = *y;
+    }
+}

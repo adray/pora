@@ -1,0 +1,24 @@
+import std;
+
+namespace Example
+{
+    struct foo
+    {
+        u8 x;
+        u8 y;
+        u8 z;
+        u8 w;
+    }
+    
+    static u8 test(foo f)
+    {
+        return f.x;
+    }
+
+    static void main()
+    {
+        foo f;
+        f.x = 10b;
+        f.y = test(f);
+    }
+}

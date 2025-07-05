@@ -17,6 +17,12 @@ set (PORA_TEST_SOURCES
     "poRegLinearTests.cpp"
     "poNLFTests.h"
     "poNLFTests.cpp"
+    "poIntegrationTest.h"
+    "poIntegrationTest.cpp"
+    "poOptMemoryToRegTests.h"
+    "poOptMemoryToRegTests.cpp"
+    "poOptDCETests.h"
+    "poOptDCETests.cpp"
 )
 
 project ("poratest")

@@ -5,6 +5,9 @@
 #include "poLiveTests.h"
 #include "poRegLinearTests.h"
 #include "poNLFTests.h"
+#include "poIntegrationTest.h"
+#include "poOptMemoryToRegTests.h"
+#include "poOptDCETests.h"
 
 #include <iostream>
 
@@ -19,6 +22,13 @@ int main(int numArgs, const char** const args)
     runLiveTests();
     runRegLinearTests();
     runNestedLoopForestsTests();
+    runOptMemoryToRegTests();
+    runOptDCETests();
+
+    if (numArgs >= 3)
+    {
+        runIntegrationTests(args[1], args[2]);
+    }
 
     return 0;
 }

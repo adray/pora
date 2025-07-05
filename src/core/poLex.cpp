@@ -489,7 +489,7 @@ void poLexer::scanLine(const std::string& line)
             }
             else
             {
-                setError("Bitwise AND not supported.");
+                addToken(poTokenType::AMPERSAND);
             }
             break;
         case '|':

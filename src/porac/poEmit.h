@@ -92,6 +92,7 @@ namespace po
 
         int getType(const poToken& token);
         int getTypeSize(const int type);
+        int getVariable(const std::string& name);
         int getOrAddVariable(const std::string& name, const int type);
         int addVariable(const std::string& name, const int type);
         int getArrayType(const int baseType, const int arrayRank);
@@ -109,6 +110,8 @@ namespace po
         void emitArgs(poNode* node, poFlowGraph& cfg);
         void emitParameter(const int type, poBasicBlock* bb, const int paramIndex, const int varName);
         void emitStatement(poNode* node, poFlowGraph& cfg);
+        int emitPassByValue(const int expr, poFlowGraph& cfg);
+        int emitPassByReference(const int expr, poFlowGraph& cfg);
         int emitCall(poNode* node, poFlowGraph& cfg);
         void emitReturn(poNode* node, poFlowGraph& cfg);
         void emitDecl(poNode* node, poFlowGraph& cfg);
@@ -117,6 +120,8 @@ namespace po
         void emitWhileStatement(poNode* node, poFlowGraph& cfg, poBasicBlock* endBB);
         void emitIfExpression(poConditionGraphNode& cgn, poFlowGraph& cfg, poBasicBlock* successBB, poBasicBlock* failBB);
         int emitExpr(poNode* node, poFlowGraph& cfg);
+        int emitDereference(poNode* node, poFlowGraph& cfg);
+        int emitReference(poNode* node, poFlowGraph& cfg);
         int emitConstantExpr(poNode* node, poFlowGraph& cfg);
         int emitBinaryExpr(poNode* node, poFlowGraph& cfg);
         int emitUnaryMinus(poNode* node, poFlowGraph& cfg);
@@ -124,6 +129,7 @@ namespace po
         void emitStoreArray(poNode* node, poFlowGraph& cfg, const int id);
         int emitLoadMember(poNode* node, poFlowGraph& cfg);
         void emitStoreMember(poNode* node, poFlowGraph& cfg, const int id);
+        int emitLoadVariable(poNode* node, poFlowGraph& cfg);
 
         poModule& _module;
         poConditionGraph _graph;

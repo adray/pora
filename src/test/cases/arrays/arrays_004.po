@@ -1,0 +1,13 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        f32[16] x;
+        for (i64 i = 0; i < 16; i = i + 1)
+        {
+            x[i] = 9.0f;
+        }        
+    }
+}

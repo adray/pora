@@ -1,0 +1,15 @@
+import std;
+
+namespace Example
+{
+    static void test(i64* x)
+    {
+        
+    }
+
+    static void main()
+    {
+        i64* z;
+        test(z);
+    }
+}

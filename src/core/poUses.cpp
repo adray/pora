@@ -5,55 +5,59 @@
 
 using namespace po;
 
-void poUses::addUse(const int variable, const int pos)
+void poUses::addUse(const int variable, const int pos, const int basePos, poBasicBlock* bb)
 {
     const auto& it = _uses.find(variable);
     if (it != _uses.end())
     {
         auto& myUses = it->second;
-        const auto& lower = std::lower_bound(myUses.begin(), myUses.end(), pos);
-        it->second.insert(lower, pos);
+        auto lower = std::lower_bound(myUses.begin(), myUses.end(), pos, [](const poInstructionRef& ref, const int pos) -> bool
+            {
+                return ref.getRef() < pos;
+            });
+        it->second.insert(lower, poInstructionRef(bb, pos, basePos));
     }
     else
     {
-        std::vector<int> uses;
-        uses.push_back(pos);
-        _uses.insert(std::pair<int, std::vector<int>>(variable, uses));
+        std::vector<poInstructionRef> uses;
+        uses.push_back(poInstructionRef(bb, pos, basePos));
+        _uses.insert(std::pair<int, std::vector<poInstructionRef>>(variable, uses));
     }
 }
 
 void poUses::analyze(poFlowGraph& cfg)
 {
+    _uses.clear();
+
     int pos = 0;
+    int basePos = 0;
     poBasicBlock* bb = cfg.getFirst();
     while (bb)
     {
         auto& instructions = bb->instructions();
         for (auto& ins : instructions)
         {
-            switch (ins.code())
+            if (ins.isSpecialInstruction())
             {
-            case IR_BR:
-            case IR_PARAM:
-            case IR_CONSTANT:
-            case IR_CALL:
-                break;
-            default:
-                if (ins.left() != -1)
-                {
-                    addUse(ins.left(), pos);
-                }
-                if (ins.right() != -1)
-                {
-                    addUse(ins.right(), pos);
-                }
-                break;
+                // Special instructions do not have uses
+                pos++;
+                continue;
+            }
+
+            if (ins.left() != -1)
+            {
+                addUse(ins.left(), pos, basePos, bb);
+            }
+            if (ins.right() != -1)
+            {
+                addUse(ins.right(), pos, basePos, bb);
             }
 
             pos++;
         }
 
         bb = bb->getNext();
+        basePos = pos;
     }
 }
 
@@ -63,8 +67,11 @@ const int poUses::findNextUse(const int variable, const int pos) const
 
     if (it != _uses.end())
     {
-        const auto& lowerBound = std::lower_bound(it->second.begin(), it->second.end(), pos);
-        const int value = (*lowerBound);
+        const auto& lowerBound = std::lower_bound(it->second.begin(), it->second.end(), pos, [](const poInstructionRef& ref, const int pos) -> bool
+            {
+                return ref.getRef() < pos;
+            });
+        const int value = lowerBound->getRef();
         return value;
     }
 

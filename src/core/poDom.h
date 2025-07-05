@@ -20,6 +20,7 @@ namespace po
         inline void addSuccessor(const int id) { _successors.push_back(id); }
         inline void addDominanceFrontier(const int id) { _dominanceFrontier.push_back(id); }
         inline void addImmediateDominatedBy(const int id) { _immediateDominatedBy.push_back(id); }
+        inline void setImmediateDominator(const int id) { _immediateDominator = id; }
 
         inline void clearPredecessors() { _predecessors.clear(); }
         inline void clearDominators() { _dominators.clear(); }
@@ -31,9 +32,11 @@ namespace po
         inline const std::vector<int>& dominatedBy() const { return _dominatedBy; }
         inline const std::vector<int>& dominanceFrontier() const { return _dominanceFrontier; }
         inline const std::vector<int>& immediateDominatedBy() const { return _immediateDominatedBy; }
+        inline int immediateDominator() const { return _immediateDominator; }
 
     private:
         poBasicBlock* _bb;
+        int _immediateDominator; /* the node which is the immediate dominator of this node */
         std::vector<int> _predecessors; /* the immediate predecessors of this node */
         std::vector<int> _successors; /* the immediate successors of this node */
         std::vector<int> _dominators; /* nodes which dominate this node */

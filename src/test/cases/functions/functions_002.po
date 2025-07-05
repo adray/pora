@@ -1,0 +1,16 @@
+import std;
+
+namespace Example
+{
+    static f64 test(f64 x, f64 w)
+    {
+        f64 y = x + w;
+        return y;
+    }
+
+    static void main()
+    {
+        f64 y = test(10.2, 5.3);
+        f64 p = test(20.1, 6.2);
+    }
+}

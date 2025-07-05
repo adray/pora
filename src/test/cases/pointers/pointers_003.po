@@ -1,0 +1,20 @@
+import std;
+
+namespace Example
+{
+    struct foo
+    {
+        i64 x;
+    }
+    
+    static void test(foo* x)
+    {
+        return;
+    }
+
+    static void main()
+    {
+        foo* z;
+        test(z);
+    }
+}

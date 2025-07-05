@@ -198,6 +198,22 @@ void po::syntaxTest()
         "   i64 x = 6 + test();"\
         "}"\
         "}", true);
+    checkSyntax("Function Test #9", "namespace Test {"\
+        "static i64 test() {"\
+        "   return 5;"\
+        "}"\
+        "static void main() {"\
+        "   test(;"\
+        "}"\
+        "}", false);
+    checkSyntax("Function Test #10", "namespace Test {"\
+        "static i64 test(i64 x, i64 u) {"\
+        "   return x + u;"\
+        "}"\
+        "static void main() {"\
+        "   test(5, ;"\
+        "}"\
+        "}", false);
     checkSyntax("Type Test #1", "namespace Test {"\
         "static void main() {"\
         "   i32 x = 5;"\
@@ -256,6 +272,60 @@ void po::syntaxTest()
         "   u8 x = 90b;"\
         "}"\
         "}", true);
+    checkSyntax("Type Test #12", "namespace Test {"\
+        "static void main() {"\
+        "   u8*[16] x;"\
+        "}"\
+        "}", true);
+    checkSyntax("Type Test #13", "namespace Test {"\
+        "struct test{}"
+        "static void func(test* t){}"
+        "static void main() {"\
+        "   test t;"\
+        "   func(t);"\
+        "}"\
+        "}", false);
+    checkSyntax("Type Test #14", "namespace Test {"\
+        "struct test{}"\
+        "static void func(test* t){}"\
+        "static void main() {"\
+        "}"\
+        "}", true);
+    checkSyntax("Type Test #15", "namespace Test {"\
+        "struct test{ i64* ptr; }"\
+        "static void main() {"\
+        "   test t;"\
+        "   i64* ptr = t.ptr;"\
+        "}"\
+        "}", true);
+    checkSyntax("Type Test #16", "namespace Test {"\
+        "struct test{ i64*[16] ptr; }"\
+        "static void main() {"\
+        "   test t;"\
+        "   i64* ptr = t.ptr[0];"\
+        "}"\
+        "}", true);
+    checkSyntax("Type Test #17", "namespace Test {"\
+        "struct test{ i64*[16] ptr; }"\
+        "static void main() {"\
+        "   test t;"\
+        "   test s = -t;"\
+        "}"\
+        "}", false);
+    checkSyntax("Type Test #18", "namespace Test {"\
+        "struct test{ i64*[16] ptr; }"\
+        "static void main() {"\
+        "   test t;"\
+        "   test s = t+t;"\
+        "}"\
+        "}", false);
+    checkSyntax("Type Test #19", "namespace Test {"\
+        "struct test{ i64*[16] ptr; }"\
+        "static void main() {"\
+        "   test t;"\
+        "   test s = t || t;"\
+        "}"\
+        "}", false);
     checkSyntax("Numeric Test #1", "namespace Test {"\
         "static void main() {"\
         "   u64 x = 10000000000000000000u;"\
@@ -806,6 +876,66 @@ void po::syntaxTest()
         "   test[5] t;"\
         "   t.y = 4;"\
         "   test(t);"\
+        "}"\
+        "}", false);
+    checkSyntax("Pointers Test #1", "namespace Test {"\
+        "static void main() {"\
+        "   i64 x = 900;"\
+        "   i64* y = &x;"\
+        "}"\
+        "}", true);
+    checkSyntax("Pointers Test #2", "namespace Test {"\
+        "static void test(i64* q) {"\
+        "   i64 p = *q;"\
+        "}"\
+        "static void main() {"\
+        "   i64 x = 900;"\
+        "   test(&x);"\
+        "}"\
+        "}", true);
+    checkSyntax("Pointers Test #3", "namespace Test {"\
+        "struct test { i64 p; }"\
+        "static void main() {"\
+        "   test x;"\
+        "   test* y = &x;"\
+        "}"\
+        "}", true);
+    checkSyntax("Pointers Test #4", "namespace Test {"\
+        "struct test { i64 p; }"\
+        "static void main() {"\
+        "   test x;"\
+        "   test* y = &x;"\
+        "   test z = *y;"\
+        "}"\
+        "}", true);
+    checkSyntax("Pointers Test #5", "namespace Test {"\
+        "static void main() {"\
+        "   i64 x;"\
+        "   i64* y = &x;"\
+        "   *y = 6;"\
+        "}"\
+        "}", true);
+    checkSyntax("Pointers Test #6", "namespace Test {"\
+        "struct test { i64 p; }"\
+        "static void main() {"\
+        "   test x;"\
+        "   test* y = &x;"\
+        "   test z;"\
+        "   *y = z;"\
+        "}"\
+        "}", true);
+    checkSyntax("Pointers Test #7", "namespace Test {"\
+        "static void main() {"\
+        "   i64 x;"\
+        "   i64* y = &x;"\
+        "   *y ;"\
+        "}"\
+        "}", false);
+    checkSyntax("Pointers Test #8", "namespace Test {"\
+        "static void main() {"\
+        "   i64 x;"\
+        "   i64* y = &x;"\
+        "   *y = ;"\
         "}"\
         "}", false);
     checkSyntax("FFI Test #1", "namespace Test {"\

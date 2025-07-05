@@ -10,9 +10,10 @@ namespace po
 {
     enum class poAttributes
     {
-        PUBLIC,
-        PRIVATE,
-        INTERNAL
+        PUBLIC = 0x1,
+        PRIVATE = 0x2,
+        INTERNAL = 0x4,
+        EXTERN = 0x8
     };
 
     enum class poCallConvention
@@ -84,6 +85,7 @@ namespace po
         inline poFlowGraph& cfg() { return _cfg; }
         inline void addVariable(const int name) { _variables.push_back(name); }
         inline const std::vector<int> variables() const { return _variables; }
+        inline const bool hasAttribute(poAttributes attribute) const { return (int(_attribute) & int(attribute)) == int(attribute); }
 
     private:
         int _arity;
@@ -150,6 +152,7 @@ namespace po
     class poModule
     {
     public:
+        poModule();
         void addNamespace(const poNamespace& ns);
         poResult<poNamespace> getNamespace(const std::string& name);
         inline std::vector<poNamespace>& namespaces() { return _namespaces; }
@@ -164,6 +167,8 @@ namespace po
         void dump();
 
     private:
+        void addPrimitives();
+
         std::vector<poType> _types;
         std::unordered_map<std::string, int> _typeMapping;
         std::unordered_map<int, int> _arrayTypes; /* mapping from base type -> array type */

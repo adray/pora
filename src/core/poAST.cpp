@@ -131,3 +131,9 @@ poArrayAccessor::poArrayAccessor(poNode* accessor, poNode* child, const poNodeTy
 {
 }
 
+poPointerNode::poPointerNode(const poNodeType type, poNode* child, const poToken& token, const int count)
+    :
+    poUnaryNode(type, child, token),
+    _count(count)
+{
+}

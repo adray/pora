@@ -17,7 +17,6 @@ namespace po
         void resolve(const std::vector<poNode*>& nodes);
 
     private:
-        void addPrimitives();
         void resolveTypes(poNamespace& ns);
         void getNamespaces(poNode* node);
         void getStruct(poNode* node, poNamespace& ns);
@@ -26,6 +25,7 @@ namespace po
 
         int getTypeSize(const int type);
         int getType(const poToken& token);
+        int getPointerType(const int baseType, const int count);
 
         poModule& _module;
         std::vector<poNode*> _userTypes;

@@ -1,0 +1,18 @@
+import std;
+
+namespace Example
+{
+    struct test { i64 x; }
+
+    static i64 test(test x)
+    {
+        return x.x;
+    }
+
+    static void main()
+    {
+        test x;
+        x.x = 8;
+        i64 p = test(x);
+    }
+}

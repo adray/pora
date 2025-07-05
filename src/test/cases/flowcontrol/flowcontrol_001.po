@@ -1,0 +1,15 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        i64 i = 0;
+        i64 x = 0;
+        while ( i < 100 )
+        {
+            x = x + 2;
+            i = i + 1;
+        }        
+    }
+}

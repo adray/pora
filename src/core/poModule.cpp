@@ -324,6 +324,37 @@ void poNamespace::addFunction(const poFunction& function)
 // Module
 //================
 
+poModule::poModule()
+{
+    addPrimitives();
+}
+
+void poModule::addPrimitives()
+{
+    addType(poType(TYPE_VOID, -1, "VOID"));
+    addType(poType(TYPE_I64, -1, "I64"));
+    addType(poType(TYPE_I32, -1, "I32"));
+    addType(poType(TYPE_I8, -1, "I8"));
+    addType(poType(TYPE_F64, -1, "F64"));
+    addType(poType(TYPE_F32, -1, "F32"));
+    addType(poType(TYPE_U64, -1, "U64"));
+    addType(poType(TYPE_U32, -1, "U32"));
+    addType(poType(TYPE_U8, -1, "U8"));
+    addType(poType(TYPE_BOOLEAN, -1, "BOOLEAN"));
+    addType(poType(TYPE_OBJECT, -1, "OBJECT"));
+
+    auto& types = _types;
+    types[TYPE_I64].setSize(sizeof(int64_t));
+    types[TYPE_I32].setSize(sizeof(int32_t));
+    types[TYPE_I8].setSize(sizeof(int8_t));
+    types[TYPE_F64].setSize(sizeof(double));
+    types[TYPE_F32].setSize(sizeof(float));
+    types[TYPE_U64].setSize(sizeof(uint64_t));
+    types[TYPE_U32].setSize(sizeof(uint32_t));
+    types[TYPE_U8].setSize(sizeof(uint8_t));
+    types[TYPE_BOOLEAN].setSize(sizeof(int8_t));
+}
+
 void poModule::addNamespace(const poNamespace& ns)
 {
     _namespaces.push_back(ns);
@@ -414,6 +445,11 @@ void poModule::dump()
         std::cout << "===================" << std::endl;
         for (auto& func : ns.functions())
         {
+            if (func.hasAttribute(poAttributes::EXTERN))
+            {
+                continue;
+            }
+
             std::cout << ns.name() << "::" << func.name() << std::endl;
             
             const int numBB = int(func.cfg().numBlocks());

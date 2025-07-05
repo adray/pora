@@ -48,6 +48,8 @@ namespace po
         inline const int size() const { return _size; }
         inline const bool isArray() const { return _isArray; }
         inline const bool isPointer() const { return _isPointer; }
+        inline const bool isPrimitive() const { return _id < TYPE_OBJECT; }
+        inline const bool isObject() const { return _id == TYPE_OBJECT; }
         inline const std::string& name() const { return _name; }
 
     private:

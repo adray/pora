@@ -23,7 +23,7 @@ decl := (primitive | IDENTIFIER) ('[' I64 ']')?  IDENTIFIER ('=' rhs)? ;
 rhs := term ;
 term := factor (('+' | '-') factor)* ;
 factor := unary (('*' | '\') unary)* ;
-unary := '-' primary | primary ;
+unary := '-' primary | primary | ('&' | '*') IDENTIFIER;
 
 primary := TRUE | FALSE | f32 | f64 | I32 | I64 | I8 | U32 | U64 | U8 | STRING | CHAR |
 	IDENTIFIER ( ( '.' IDENTIFIER )? ( '(' call ')' )? )* |

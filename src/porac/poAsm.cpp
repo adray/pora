@@ -554,7 +554,7 @@ void poAsm::emit_um(const vm_instruction& ins, char reg)
     if (ins.rex > 0) { _programData.push_back(ins.rex); }
     _programData.push_back(ins.ins);
 
-    if (reg == VM_REGISTER_ESP)
+    if ((reg % 8) == VM_REGISTER_ESP)
     {
         _programData.push_back(((ins.subins & 0x7) << 3) | 0x4 | (0x0 << 6));
         _programData.push_back(0x24); // SIB byte
@@ -571,7 +571,7 @@ void poAsm::emit_umo(const vm_instruction& ins, char reg, int offset)
     if (ins.rex > 0) { _programData.push_back(ins.rex); }
     _programData.push_back(ins.ins);
 
-    if (reg == VM_REGISTER_ESP)
+    if ((reg % 8) == VM_REGISTER_ESP)
     {
         _programData.push_back(((ins.subins & 0x7) << 3) | 0x4 | (0x2 << 6));
         _programData.push_back(0x24); // SIB byte
@@ -638,7 +638,7 @@ void poAsm::emit_brm(const vm_instruction& ins, char dst, char src)
     if (ins.rex > 0) { _programData.push_back(ins.rex); }
     _programData.push_back(ins.ins);
 
-    if (src == VM_REGISTER_ESP)
+    if ((src % 8) == VM_REGISTER_ESP)
     {
         _programData.push_back(((dst & 0x7) << 3) | 0x4 | (0x0 << 6));
         _programData.push_back(0x24); // SIB byte
@@ -655,7 +655,7 @@ void poAsm::emit_bmr(const vm_instruction& ins, char dst, char src)
     if (ins.rex > 0) { _programData.push_back(ins.rex); }
     _programData.push_back(ins.ins);
 
-    if (dst == VM_REGISTER_ESP)
+    if ((dst % 8) == VM_REGISTER_ESP)
     {
         _programData.push_back(((src & 0x7) << 3) | 0x4 | (0x0 << 6));
         _programData.push_back(0x24); // SIB byte
@@ -676,7 +676,7 @@ void poAsm::emit_brmo(const vm_instruction& ins, char dst, char src, int offset)
     _programData.push_back(ins.ins);
     if (ins.subins != VMI_UNUSED) { _programData.push_back(ins.subins); }
 
-    if (src == VM_REGISTER_ESP)
+    if ((src % 8) == VM_REGISTER_ESP)
     {
         _programData.push_back((((dst % 8) & 0x7) << 3) | 0x4 | (0x2 << 6));
         _programData.push_back(0x24); // SIB byte
@@ -704,7 +704,7 @@ void poAsm::emit_bmro(const vm_instruction& ins, char dst, char src, int offset)
     }
     _programData.push_back(ins.ins);
 
-    if (dst == VM_REGISTER_ESP)
+    if ((dst % 8) == VM_REGISTER_ESP)
     {
         _programData.push_back(((src & 0x7) << 3) | 0x4 | (0x2 << 6));
         _programData.push_back(0x24); // SIB byte
@@ -1361,7 +1361,7 @@ void poAsm::mc_xorps_reg_to_reg_x64(int dst, int src)
 
 void poAsm::ir_element_ptr(poModule& module, poRegLinear& linear, const poInstruction& ins)
 {
-    // We need to get the pointer to the variable (left) optionally adding the variable (right) and a the memory offset.
+    // We need to get the pointer to the variable (left) optionally adding the variable (right) and a memory offset.
 
     const int dst = linear.getRegisterByVariable(ins.name());
     const int slot = linear.getStackSlotByVariable(ins.left()); /* assume the pointer is the stack position */
@@ -1404,7 +1404,7 @@ void poAsm::ir_ptr(poModule& module, poRegLinear& linear, const poInstruction& i
     }
     else
     {
-
+        //
         // We are just adding a memory offset to the existing pointer
 
         const int src = linear.getRegisterByVariable(ins.left());
@@ -1438,6 +1438,10 @@ void poAsm::ir_load(poRegLinear& linear, const poInstruction& ins)
     case TYPE_F32:
         mc_movss_memory_to_reg_x64(dst_sse, src, 0);
         break;
+    default:
+        /* copy pointer value */
+        mc_mov_memory_to_reg_x64(dst, src, 0);
+        break;
     }
 }
 
@@ -1449,6 +1453,7 @@ void poAsm::ir_store(poRegLinear& linear, const poInstruction& ins)
     const int src_sse = src - VM_REGISTER_MAX;
 
     const int dst = linear.getRegisterByVariable(ins.left());
+    const int src_slot = linear.getStackSlotByVariable(ins.right());
 
     switch (ins.type())
     {
@@ -1465,6 +1470,17 @@ void poAsm::ir_store(poRegLinear& linear, const poInstruction& ins)
         break;
     case TYPE_F32:
         mc_movss_reg_to_memory_x64(dst, src_sse, 0);
+        break;
+    default:
+        /* copy pointer value (stack) */
+        if (src_slot != -1)
+        {
+            mc_mov_reg_to_memory_x64(dst, src_slot * 8, VM_REGISTER_ESP);
+        }
+        else
+        {
+            mc_mov_reg_to_memory_x64(dst, 0, src);
+        }
         break;
     }
 
@@ -2365,6 +2381,11 @@ void poAsm::generate(poModule& module)
         std::vector<poFunction>& functions = ns.functions();
         for (poFunction& function : functions)
         {
+            if (function.hasAttribute(poAttributes::EXTERN))
+            {
+                continue;
+            }
+
             _mapping.insert(std::pair<std::string, int>(function.name(), int(_programData.size())));
 
             generate(module, function.cfg());
@@ -2443,7 +2464,7 @@ void poAsm::patchCalls()
         else
         {
             std::stringstream ss;
-            ss << "Unsolved symbol " << symbol;
+            ss << "Unresolved symbol " << symbol;
             setError(ss.str());
         }
     }
