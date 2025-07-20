@@ -2,10 +2,54 @@ import std;
 
 namespace Example
 {
-    extern i64 GetCurrentProcessId();
-        
+    struct vec3
+    {
+        f32 x;
+        f32 y;
+        f32 z;
+    }
+
+    struct transform
+    {
+        vec3 position;
+        vec3 rotation;
+        vec3 scale;
+    }
+
     static void main()
     {
-        i64 process = GetCurrentProcessId();
+        i64 process = (i64)GetCurrentProcessId();
+
+        //startupInfo info;
+        //info.cb = (i32)sizeof(startupInfo);
+        //GetStartupInfoW(&info);
+
+        i64 heap = GetProcessHeap();
+        i32 flags;
+        transform* t = (transform*) HeapAlloc(heap, flags, sizeof(transform));
+        t.position.x = 1.0f;
+        t.position.y = 5.0f;
+
+        i32 error;
+        PROCESSENTRY32 entry;
+        entry.dwSize = (i32) sizeof(PROCESSENTRY32);
+        i64 handle = CreateToolhelp32Snapshot((i32)2, (i32)0);
+        if (handle == 0) {
+            error = GetLastError();
+        }
+        boolean ok = Process32First(handle, &entry);
+        if (ok == false) { error = GetLastError(); }
+        u8[4] name;
+        name[0] = entry.szExeFile[0];
+        name[1] = entry.szExeFile[1];
+        name[2] = entry.szExeFile[2];
+        name[3] = entry.szExeFile[3];
+        if (ok){
+            ok = Process32Next(handle, &entry);
+            name[0] = entry.szExeFile[0];
+            name[1] = entry.szExeFile[1];
+            name[2] = entry.szExeFile[2];
+            name[3] = entry.szExeFile[3];
+        }
     }
 }

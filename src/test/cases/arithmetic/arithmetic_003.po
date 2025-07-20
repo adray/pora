@@ -1,0 +1,10 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        u32 x = (u32)6;
+        u32 y = x + (u32)10 * -(u32)7;
+    }
+}

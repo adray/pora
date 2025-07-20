@@ -32,6 +32,18 @@ poConstant::poConstant(int32_t i32)
     _type(TYPE_I32)
 {
 }
+poConstant::poConstant(int16_t i16)
+    :
+    _i16(i16),
+    _type(TYPE_I16)
+{
+}
+poConstant::poConstant(uint16_t u16)
+    :
+    _u16(u16),
+    _type(TYPE_U16)
+{
+}
 poConstant::poConstant(int8_t i8)
     :
     _i8(i8),
@@ -108,6 +120,32 @@ int poConstantPool::addConstant(const uint32_t u32)
         const int id = int(_constants.size());
         _constants.push_back(poConstant(u32));
         _u32.insert(std::pair<uint32_t, int>(u32, id));
+        return id;
+    }
+    return -1;
+}
+
+int poConstantPool::addConstant(const int16_t i16)
+{
+    const auto& it = _i16.find(i16);
+    if (it == _i16.end())
+    {
+        const int id = int(_constants.size());
+        _constants.push_back(poConstant(i16));
+        _i16.insert(std::pair<int16_t, int>(i16, id));
+        return id;
+    }
+    return -1;
+}
+
+int poConstantPool::addConstant(const uint16_t u16)
+{
+    const auto& it = _u16.find(u16);
+    if (it == _u16.end())
+    {
+        const int id = int(_constants.size());
+        _constants.push_back(poConstant(u16));
+        _u16.insert(std::pair<uint16_t, int>(u16, id));
         return id;
     }
     return -1;
@@ -268,6 +306,11 @@ int32_t poConstantPool::getI32(const int id)
     return _constants[id].i32();
 }
 
+int16_t poConstantPool::getI16(const int id)
+{
+    return _constants[id].i16();
+}
+
 uint64_t poConstantPool::getU64(const int id)
 {
     return _constants[id].u64();
@@ -276,6 +319,11 @@ uint64_t poConstantPool::getU64(const int id)
 uint32_t poConstantPool::getU32(const int id)
 {
     return _constants[id].u32();
+}
+
+uint16_t poConstantPool::getU16(const int id)
+{
+    return _constants[id].u16();
 }
 
 uint8_t poConstantPool::getU8(const int id)
@@ -334,25 +382,149 @@ void poModule::addPrimitives()
     addType(poType(TYPE_VOID, -1, "VOID"));
     addType(poType(TYPE_I64, -1, "I64"));
     addType(poType(TYPE_I32, -1, "I32"));
+    addType(poType(TYPE_I16, -1, "I16"));
     addType(poType(TYPE_I8, -1, "I8"));
     addType(poType(TYPE_F64, -1, "F64"));
     addType(poType(TYPE_F32, -1, "F32"));
     addType(poType(TYPE_U64, -1, "U64"));
     addType(poType(TYPE_U32, -1, "U32"));
+    addType(poType(TYPE_U16, -1, "U16"));
     addType(poType(TYPE_U8, -1, "U8"));
     addType(poType(TYPE_BOOLEAN, -1, "BOOLEAN"));
+    addType(poType(TYPE_NULLPTR, -1, "NULLPTR"));
     addType(poType(TYPE_OBJECT, -1, "OBJECT"));
 
     auto& types = _types;
-    types[TYPE_I64].setSize(sizeof(int64_t));
-    types[TYPE_I32].setSize(sizeof(int32_t));
-    types[TYPE_I8].setSize(sizeof(int8_t));
-    types[TYPE_F64].setSize(sizeof(double));
-    types[TYPE_F32].setSize(sizeof(float));
-    types[TYPE_U64].setSize(sizeof(uint64_t));
-    types[TYPE_U32].setSize(sizeof(uint32_t));
-    types[TYPE_U8].setSize(sizeof(uint8_t));
-    types[TYPE_BOOLEAN].setSize(sizeof(int8_t));
+    types[TYPE_I64].setSize(8);
+    types[TYPE_I32].setSize(4);
+    types[TYPE_I16].setSize(2);
+    types[TYPE_I8].setSize(1);
+    types[TYPE_F64].setSize(8);
+    types[TYPE_F32].setSize(4);
+    types[TYPE_U64].setSize(8);
+    types[TYPE_U32].setSize(4);
+    types[TYPE_U16].setSize(2);
+    types[TYPE_U8].setSize(1);
+    types[TYPE_BOOLEAN].setSize(1);
+
+    for (auto& type : types)
+    {
+        type.setAlignment(type.size());
+    }
+
+    addExplicitCastOperators();
+}
+
+void poModule::addExplicitCastOperators()
+{
+    /* Allow explicit casts for all numeric types */
+    
+    auto& types = _types;
+    for (int i = TYPE_I64; i <= TYPE_I8; i++)
+    {
+        auto& dstType = types[i];
+        /* Signed to Signed */
+        for (int j = TYPE_I64; j <= TYPE_I8; j++)
+        {
+            if (i != j)
+            {
+                auto& srcType = types[j];
+                int flags = OPERATOR_FLAG_NONE;
+                if (dstType.size() > srcType.size())
+                {
+                    flags = OPERATOR_FLAG_SIGN_EXTEND;
+                }
+                dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, j, flags));
+            }
+        }
+
+        /* Signed to Unsigned */
+        for (int j = TYPE_U64; j <= TYPE_U8; j++)
+        {
+            if (i != j)
+            {
+                auto& srcType = types[j];
+                int flags = OPERATOR_FLAG_SIGN_EXTEND;
+                if (dstType.size() <= srcType.size())
+                {
+                    flags = OPERATOR_FLAG_NONE;
+                }
+                dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, j, flags));
+            }
+        }
+
+        /* Signed to floating point */
+        dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, TYPE_F32, OPERATOR_FLAG_CONVERT_TO_REAL));
+        dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, TYPE_F64, OPERATOR_FLAG_CONVERT_TO_REAL));
+    }
+
+    for (int i = TYPE_U64; i <= TYPE_U8; i++)
+    {
+        auto& dstType = types[i];
+        /* Unsigned to Signed */
+        for (int j = TYPE_I64; j <= TYPE_I8; j++)
+        {
+            if (i != j)
+            {
+                auto& srcType = types[j];
+                dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, j, OPERATOR_FLAG_NONE));
+            }
+        }
+
+        /* Unsigned to Unsigned */
+        for (int j = TYPE_U64; j <= TYPE_U8; j++)
+        {
+            if (i != j)
+            {
+                auto& srcType = types[j];
+                int flags = OPERATOR_FLAG_ZERO_EXTEND;
+                if (dstType.size() < srcType.size())
+                if (dstType.size() < srcType.size())
+                {
+                    flags = OPERATOR_FLAG_NONE;
+                }
+                dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, j, flags));
+            }
+        }
+
+        /* Unsigned to floating point */
+        //dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, TYPE_F32, OPERATOR_FLAG_CONVERT_TO_REAL));
+        //dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, TYPE_F64, OPERATOR_FLAG_CONVERT_TO_REAL));
+    }
+
+    for (int i = TYPE_F64; i <= TYPE_F32; i++)
+    {
+        auto& dstType = types[i];
+        /* Floating point to Signed */
+        for (int j = TYPE_I64; j <= TYPE_I8; j++)
+        {
+            if (i != j)
+            {
+                auto& srcType = types[j];
+                dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, j, OPERATOR_FLAG_CONVERT_TO_INTEGER));
+            }
+        }
+
+        /* Floating point to Unsigned */
+        for (int j = TYPE_U64; j <= TYPE_U8; j++)
+        {
+            if (i != j)
+            {
+                auto& srcType = types[j];
+                dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, j, OPERATOR_FLAG_CONVERT_TO_INTEGER));
+            }
+        }
+
+        /* Floating point to Floating point */
+        for (int j = TYPE_F64; j <= TYPE_F32; j++)
+        {
+            if (i != j)
+            {
+                auto& srcType = types[j];
+                dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, j, OPERATOR_FLAG_NONE));
+            }
+        }
+    }
 }
 
 void poModule::addNamespace(const poNamespace& ns)
@@ -532,6 +704,18 @@ void poModule::dump()
                         break;
                     case IR_ELEMENT_PTR:
                         std::cout << " IR_ELEMENT_PTR " << int(ins.type()) << " " << int(ins.left()) << " " << int(ins.right()) << " #" << int(ins.memOffset());
+                        break;
+                    case IR_SIGN_EXTEND:
+                        std::cout << " IR_SIGN_EXTEND " << int(ins.type()) << " " << int(ins.left()) << " /" << int(ins.memOffset());
+                        break;
+                    case IR_ZERO_EXTEND:
+                        std::cout << " IR_ZERO_EXTEND " << int(ins.type()) << " " << int(ins.left()) << " /" << int(ins.memOffset());
+                        break;
+                    case IR_BITWISE_CAST:
+                        std::cout << " IR_BITWISE_CAST " << int(ins.type()) << " " << int(ins.left()) << " /" << int(ins.memOffset());
+                        break;
+                    case IR_CONVERT:
+                        std::cout << " IR_CONVERT " << int(ins.type()) << " " << int(ins.left()) << " /" << int(ins.memOffset());
                         break;
                     }
                     std::cout << std::endl;

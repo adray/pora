@@ -1,0 +1,15 @@
+import std;
+
+namespace Example
+{
+    static boolean test()
+    {
+        return true;
+    }
+
+    static void main()
+    {
+        boolean x;
+        x = test();
+    }
+}

@@ -13,9 +13,10 @@ namespace po
         void setError(const std::string& text);
         void advance();
         const poToken& peek();
-        bool match(poTokenType type);
-        bool lookahead(poTokenType type);
-        bool eof();
+        bool match(poTokenType type) const;
+        bool matchPrimitiveType() const;
+        bool lookahead(const poTokenType type, const int amount);
+        bool eof() const;
         inline const std::string& error() const { return _errorText; }
         inline int errorLine() const { return _line; }
         inline int errorColumn() const { return _col; }

@@ -94,7 +94,7 @@ bool poCommonObjectFileFormat::open(const std::string& filename)
     char signature[9] = {};
     ss.read((char*)signature, sizeof(signature)-1);
 
-    if (strcmp(signature, "!<arch>\n") != 0)
+    if (std::strcmp(signature, "!<arch>\n") != 0)
     {
         return false;
     }
@@ -135,7 +135,7 @@ bool poCommonObjectFileFormat::open(const std::string& filename)
         }
     }
 
-    std::cout << "Linker headers done" << std::endl;
+    ///std::cout << "Linker headers done" << std::endl;
 
     for (int i = 0; i < int(_linkerMember2.numSymbols()); i++)
     {
@@ -165,39 +165,7 @@ bool poCommonObjectFileFormat::open(const std::string& filename)
         const int importType = int(sd.Type & 0x3);
         const int importNameType = int((sd.Type >> 2) & 0x7);
 
-        std::string importTypeString;
-        switch (importType)
-        {
-        case 0:
-            importTypeString = "Executable code.";
-            break;
-        case 1:
-            importTypeString = "Data.";
-            break;
-        case 2:
-            importTypeString = "CONST";
-            break;
-        }
-
-        std::string importNameTypeString;
-        switch (importNameType)
-        {
-        case 0:
-            importNameTypeString = "IMPORT_OBJECT_ORDINAL";
-            break;
-        case 1:
-            importNameTypeString = "IMPORT_OBJECT_NAME";
-            break;
-        case 2:
-            importNameTypeString = "IMPORT_OBJECT_NAME_NOPREFIX";
-            break;
-        case 3:
-            importNameTypeString = "IMPORT_OBJECT_NAME_UNDECORATE";
-            break;
-        }
-
-        std::cout << name << std::hex << "|" << offset << "|" << importTypeString << "|" << importNameTypeString << "|"
-            << sd.Machine << "|" << sd.Ordinal << "|" << importName << "|" << dllName << std::endl;
+        _imports.emplace_back(importType, importNameType, sd.Ordinal, importName, dllName, sd.Machine);
     }
 
     return true;
@@ -205,11 +173,11 @@ bool poCommonObjectFileFormat::open(const std::string& filename)
 
 void po::poCommonObjectFileFormat::parseSecondLinkerHeader(std::ifstream& ss)
 {
-    std::cout << "2nd Linker member" << std::endl;
+    //std::cout << "2nd Linker member" << std::endl;
 
     uint32_t numMembers;
     ss.read((char*)&numMembers, sizeof(numMembers));
-    std::cout << "Num members: " << numMembers << std::endl;
+    //std::cout << "Num members: " << numMembers << std::endl;
     for (uint32_t i = 0; i < numMembers; i++)
     {
         uint32_t offsets;
@@ -219,7 +187,7 @@ void po::poCommonObjectFileFormat::parseSecondLinkerHeader(std::ifstream& ss)
 
     uint32_t numSymbols;
     ss.read((char*)&numSymbols, sizeof(numSymbols));
-    std::cout << "Num symbols: " << numSymbols << std::endl;
+    //std::cout << "Num symbols: " << numSymbols << std::endl;
     for (uint32_t i = 0; i < numSymbols; i++)
     {
         uint16_t indicies;
@@ -241,14 +209,14 @@ void po::poCommonObjectFileFormat::parseSecondLinkerHeader(std::ifstream& ss)
 
 void po::poCommonObjectFileFormat::parseFirstLinkerHeader(std::ifstream& ss)
 {
-    std::cout << "1st Linker member" << std::endl;
+    //std::cout << "1st Linker member" << std::endl;
 
     unsigned char numSymbols[4];
     ss.read((char*)numSymbols, sizeof(numSymbols));
 
     uint32_t num = uint32_t(numSymbols[0]) << 24 | uint32_t(numSymbols[1]) << 16 | uint32_t(numSymbols[2]) << 8 | uint32_t(numSymbols[3]);
 
-    std::cout << "Num symbols: " << num << std::endl;
+    //std::cout << "Num symbols: " << num << std::endl;
 
     for (uint32_t i = 0; i < num; i++)
     {
@@ -267,5 +235,45 @@ void po::poCommonObjectFileFormat::parseFirstLinkerHeader(std::ifstream& ss)
         }
         ss.get();
         _linkerMember1.addSymbolName(name);
+    }
+}
+
+void poCommonObjectFileFormat::dump() const
+{
+    for (const poImport& import : _imports)
+    {
+        std::string importTypeString;
+        switch (import.importType())
+        {
+        case 0:
+            importTypeString = "Executable code.";
+            break;
+        case 1:
+            importTypeString = "Data.";
+            break;
+        case 2:
+            importTypeString = "CONST";
+            break;
+        }
+
+        std::string importNameTypeString;
+        switch (import.importNameType())
+        {
+        case 0:
+            importNameTypeString = "IMPORT_OBJECT_ORDINAL";
+            break;
+        case 1:
+            importNameTypeString = "IMPORT_OBJECT_NAME";
+            break;
+        case 2:
+            importNameTypeString = "IMPORT_OBJECT_NAME_NOPREFIX";
+            break;
+        case 3:
+            importNameTypeString = "IMPORT_OBJECT_NAME_UNDECORATE";
+            break;
+        }
+
+        std::cout << import.importName() << /*std::hex << "|" << offset <<*/ "|" << importTypeString << "|" << importNameTypeString << "|"
+            << import.machine() << "|" << import.importOrdinal() << "|" << import.importName() << "|" << import.dllName() << std::endl;
     }
 }

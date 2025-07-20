@@ -27,6 +27,10 @@ namespace po
     constexpr int IR_ARG = 0x31;
     constexpr int IR_RETURN = 0x32;
     constexpr int IR_COPY = 0x33;
+    constexpr int IR_SIGN_EXTEND = 0x34;
+    constexpr int IR_ZERO_EXTEND = 0x35;
+    constexpr int IR_BITWISE_CAST = 0x36;
+    constexpr int IR_CONVERT = 0x37;
     constexpr int IR_ALLOCA = 0x40;
     constexpr int IR_MALLOC = 0x41;
     constexpr int IR_LOAD = 0x42;

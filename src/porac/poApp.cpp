@@ -1,11 +1,64 @@
 #include "poApp.h"
 #include "poPE.h"
 #include "poCompiler.h"
+#include "poCOFF.h"
 #include <iostream>
 #include <string>
 #include <cstring>
+#include <filesystem>
 
 using namespace po;
+
+#ifdef WIN32
+static bool openLibraryFile(const std::string& fileName, poCommonObjectFileFormat& coff)
+{
+    const std::vector<std::string> searchPaths = {
+        "c:\\Program Files (x86)\\Windows Kits\\10\\Lib",
+        "c:\\Program Files\\Windows Kits\\10\\Lib"
+    };
+
+    std::string targetDir;
+    for (const std::string& path : searchPaths)
+    {
+        std::filesystem::path dir(path);
+        if (!std::filesystem::exists(dir) || !std::filesystem::is_directory(dir))
+        {
+            continue;
+        }
+
+        for (const auto& entry : std::filesystem::directory_iterator(dir))
+        {
+            if (entry.is_directory())
+            {
+                const std::string fullPath = entry.path().string() + "\\um\\x64\\" + fileName;
+                if (!std::filesystem::exists(fullPath))
+                {
+                    continue;
+                }
+
+                /* Choose the most recent version of the windows kits */
+                if (targetDir.empty())
+                {
+                    targetDir = fullPath;
+                }
+                else if (fullPath > targetDir)
+                {
+                    targetDir = fullPath;
+                }
+            }
+        }
+    }
+
+    if (coff.open(targetDir))
+    {
+        std::cout << "Loaded " << targetDir << std::endl;
+        return true;
+    }
+
+    std::cout << "Failed to open " << fileName << std::endl;
+    return false;
+}
+#endif
 
 
 int main(const int numArgs, const char** const args)
@@ -21,6 +74,16 @@ int main(const int numArgs, const char** const args)
 
     if (option == "build")
     {
+#if WIN32
+        // Link the Windows libraries
+        poCommonObjectFileFormat coff;
+        if (!openLibraryFile("kernel32.lib", coff))
+        {
+            std::cout << "Failed to open kernel32.lib" << std::endl;
+            return 0;
+        }
+#endif
+
         poCompiler compiler;
 
         for (int i = 2; i < numArgs; i++)
@@ -47,35 +110,50 @@ int main(const int numArgs, const char** const args)
 
         const std::vector<unsigned char>& programData = compiler.assembler().programData();
         const std::vector<unsigned char>& initializedData = compiler.assembler().initializedData();
+        std::unordered_map<std::string, int>& imports = compiler.assembler().imports();
+
+        // Create portable executable
+        poPortableExecutable exe;
+
+        // Build the import tables
+#ifdef WIN32
+        poPortableExecutableImportTable& importTable = exe.addImportTable("Kernel32.dll");
+        for (const poImport& import : coff.imports())
+        {
+            if (imports.find(import.importName()) != imports.end())
+            {
+                // TODO: we adding duplicate entries?
+                importTable.addImport(import.importName(), import.importOrdinal());
+            }
+        }
+#endif
 
         // Create the data sections
-        poPortableExecutableSection text(poSectionType::TEXT);
-        text.data().resize(1024);
-
-        poPortableExecutableSection initialized(poSectionType::INITIALIZED);
-        initialized.data().resize(1024);
-
-        poPortableExecutableSection uninitialized(poSectionType::UNINITIALIZED);
-        uninitialized.data().resize(1024);
-
-        poPortableExecutableSection iData(poSectionType::IDATA);
-        iData.data().resize(1024);
-
+        exe.setEntryPoint(compiler.assembler().entryPoint());
+        exe.addSection(poSectionType::TEXT, 1024*2);
+        exe.addSection(poSectionType::INITIALIZED, 1024);
+        exe.addSection(poSectionType::UNINITIALIZED, 1024);
+        exe.addSection(poSectionType::IDATA, 1024);
+        exe.initializeSections();
+        
         // Final linking..
-        compiler.assembler().link(0, 0x1000 /* image alignment? */);
+#ifdef WIN32
+        for (poImportEntry& importEntry : importTable.imports())
+        {
+            const auto& it = imports.find(importEntry.name());
+            if (it != imports.end())
+            {
+                it->second = importEntry.addressRVA();
+            }
+        }
+#endif
+        compiler.assembler().link(0x1000, 0x2000 /* image alignment? */);
 
         // Write program data
-        memcpy(text.data().data(), programData.data(), programData.size());
-        memcpy(initialized.data().data(), initializedData.data(), initializedData.size());
+        std::memcpy(exe.textSection().data().data(), programData.data(), programData.size());
+        std::memcpy(exe.initializedDataSection().data().data(), initializedData.data(), initializedData.size());
 
         // Write the executable file
-        poPortableExecutable exe;
-        exe.setEntryPoint(compiler.assembler().entryPoint());
-        exe.addSection(text);
-        exe.addSection(initialized);
-        exe.addSection(uninitialized);
-        exe.addSection(iData);
-        exe.addDataSections();
         exe.write("app.exe");
 
         std::cout << "Program compiled successfully: app.exe" << std::endl;

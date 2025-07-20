@@ -8,6 +8,7 @@ namespace po
         POINTER, /* poUnaryNode */
         REFERENCE, /* poUnaryNode */
         DEREFERENCE, /* poUnaryNode */
+        NULLPTR, /* poNode */
         ADD, /* poBinaryNode */
         SUB, /* poBinaryNode */
         MUL, /* poBinaryNode */
@@ -21,6 +22,7 @@ namespace po
         STRIDE, /* poUnaryNode */
         CONTINUE, /* poNode */
         BREAK, /* poNode */
+        CAST, /* poUnaryNode */
         CALL, /* poListNode */
         MEMBER_CALL, /* poBinaryNode */
         CALL_CONVENTION, /* poNode */
@@ -29,6 +31,7 @@ namespace po
         PARAMETER, /* poUnaryNode */
         ARGS, /* poListNode */
         TYPE, /* poNode */
+        RETURN_TYPE, /* poUnaryNode */
         ARRAY, /* poArrayNode */
         ARRAY_ACCESSOR, /* poArrayAccessorNode */
         DECL, /* poUnaryNode */
@@ -49,7 +52,8 @@ namespace po
         STRUCT, /* poListNode */
         NAMESPACE, /* poListNode */
         MODULE, /* poListNode */
-        IMPORT /* poNode */
+        IMPORT, /* poNode */
+        SIZEOF /* poNode */
     };
 
     class poNode

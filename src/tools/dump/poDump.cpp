@@ -41,6 +41,7 @@ int main(const int numArgs, const char** const args)
             if (coff.open(args[1]))
             {
                 std::cout << "Import LIB opened" << std::endl;
+                coff.dump();
             }
         }
         else

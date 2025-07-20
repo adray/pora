@@ -149,6 +149,29 @@ void poTypeChecker::popScope()
     _variables.erase(_variables.begin() + _variables.size() - 1);
 }
 
+bool poTypeChecker::checkEquivalence(const int lhs, const int rhs)
+{
+    if (lhs == -1 || rhs == -1)
+    {
+        return false;
+    }
+
+    if (lhs == rhs)
+    {
+        return true;
+    }
+
+    const poType& lhsType = _module.types()[lhs];
+    const poType& rhsType = _module.types()[rhs];
+
+    if (lhsType.isPointer() && rhsType.id() == TYPE_NULLPTR)
+    {
+        return true;
+    }
+
+    return false;
+}
+
 void poTypeChecker::checkModules(poNode* node)
 {
     assert(node->type() == poNodeType::MODULE);
@@ -204,7 +227,7 @@ void poTypeChecker::checkFunctions(poNode* node)
 
     poListNode* args = nullptr;
     poNode* body = nullptr;
-    poNode* type = nullptr;
+    poUnaryNode* type = nullptr;
 
     for (poNode* child : func->list())
     {
@@ -218,10 +241,10 @@ void poTypeChecker::checkFunctions(poNode* node)
             assert(args == nullptr);
             args = static_cast<poListNode*>(child);
         }
-        else if (child->type() == poNodeType::TYPE)
+        else if (child->type() == poNodeType::RETURN_TYPE)
         {
             assert(type == nullptr);
-            type = child;
+            type = static_cast<poUnaryNode*>(child);
         }
         else
         {
@@ -264,7 +287,13 @@ void poTypeChecker::checkFunctions(poNode* node)
             }
         }
 
-        const int returnType = getType(type->token());
+        int returnType = getType(type->token());
+        if (type->child()->type() == poNodeType::POINTER)
+        {
+            poPointerNode* pointerNode = static_cast<poPointerNode*>(type->child());
+            returnType = getPointerType(returnType, pointerNode->count());
+        }
+
         if (returnType == -1)
         {
             setError("Undefined type.", type->token());
@@ -354,21 +383,23 @@ void poTypeChecker::checkReturn(poNode* node, const int returnType)
 int poTypeChecker::getPointerType(const int baseType, const int count)
 {
     int pointerType = baseType;
-    for (int i = 0; i < count; i++)
+    if (pointerType != -1)
     {
-        int type =  _module.getPointerType(pointerType);
-        if (type == -1)
+        for (int i = 0; i < count; i++)
         {
-            const poType& typeData = _module.types()[pointerType];
+            int type = _module.getPointerType(pointerType);
+            if (type == -1)
+            {
+                const poType& typeData = _module.types()[pointerType];
 
-            type = int(_module.types().size());
-            poType newType(type, pointerType, typeData.name() + "*");
-            newType.setPointer(true);
-            newType.setSize(8);
-            _module.addType(newType);
+                type = int(_module.types().size());
+                poType newType(type, pointerType, typeData.name() + "*");
+                newType.setPointer(true);
+                newType.setSize(8);
+                _module.addType(newType);
+            }
+            pointerType = type;
         }
-        pointerType = type;
-        
     }
     return pointerType;
 }
@@ -400,6 +431,9 @@ int poTypeChecker::getType(const poToken& token)
     case poTokenType::I32_TYPE:
         type = TYPE_I32;
         break;
+    case poTokenType::I16_TYPE:
+        type = TYPE_I16;
+        break;
     case poTokenType::I8_TYPE:
         type = TYPE_I8;
         break;
@@ -408,6 +442,9 @@ int poTypeChecker::getType(const poToken& token)
         break;
     case poTokenType::U32_TYPE:
         type = TYPE_U32;
+        break;
+    case poTokenType::U16_TYPE:
+        type = TYPE_U16;
         break;
     case poTokenType::U8_TYPE:
         type = TYPE_U8;
@@ -458,7 +495,7 @@ void poTypeChecker::checkDecl(poNode* node)
                 }
 
                 const int rhs = checkExpr(assignment->right());
-                if (rhs != lhs)
+                if (!checkEquivalence(lhs, rhs))
                 {
                     setError("Error checking types in declaration.", decl->token());
                 }
@@ -485,9 +522,9 @@ void poTypeChecker::checkDecl(poNode* node)
             {
                 setError("Undefined type.", decl->token());
             }
-        
+
             const int rhs = checkExpr(assignment->right());
-            if (rhs != type)
+            if (!checkEquivalence(type, rhs))
             {
                 setError("Error checking types in declaration.", decl->token());
             }
@@ -594,7 +631,7 @@ void poTypeChecker::checkAssignment(poNode* node)
         {
             const auto& token = assignment->left()->token();
             const std::string& name = token.string();
-            if (rhs != getVariable(name))
+            if (!checkEquivalence(getVariable(name), rhs))
             {
                 setError("Error checking types in assignment.", token);
             }
@@ -602,7 +639,7 @@ void poTypeChecker::checkAssignment(poNode* node)
         else if (assignment->left()->type() == poNodeType::MEMBER)
         {
             const int lhs = checkMember(assignment->left());
-            if (lhs != rhs)
+            if (!checkEquivalence(lhs, rhs))
             {
                 setError("Error checking types in assignment.", assignment->token());
             } 
@@ -610,7 +647,7 @@ void poTypeChecker::checkAssignment(poNode* node)
         else if (assignment->left()->type() == poNodeType::ARRAY_ACCESSOR)
         {
             const int lhs = checkArray(assignment->left());
-            if (lhs != rhs)
+            if (!checkEquivalence(lhs, rhs))
             {
                 setError("Error checking types in assignment.", assignment->token());
             }
@@ -634,7 +671,7 @@ void poTypeChecker::checkAssignment(poNode* node)
                     setError("Cannot perform assignment of non-pointer type.", ptr->token());
                 }
 
-                if (rhs != type.baseType())
+                if (!checkEquivalence(type.baseType(), rhs))
                 {
                     setError("Error checking types in assignment.", assignment->token());
                 }
@@ -661,11 +698,17 @@ int poTypeChecker::checkExpr(poNode* node)
         case poTokenType::I32:
             type = TYPE_I32;
             break;
+        case poTokenType::I16:
+            type = TYPE_I16;
+            break;
         case poTokenType::I8:
             type = TYPE_I8;
             break;
         case poTokenType::U64:
             type = TYPE_U64;
+            break;
+        case poTokenType::U16:
+            type = TYPE_U16;
             break;
         case poTokenType::U32:
             type = TYPE_U32;
@@ -714,6 +757,8 @@ int poTypeChecker::checkExpr(poNode* node)
         {
         case TYPE_U8:
         case TYPE_I8:
+        case TYPE_U16:
+        case TYPE_I16:
         case TYPE_U32:
         case TYPE_I32:
         case TYPE_U64:
@@ -766,6 +811,8 @@ int poTypeChecker::checkExpr(poNode* node)
         {
         case TYPE_U8:
         case TYPE_I8:
+        case TYPE_U16:
+        case TYPE_I16:
         case TYPE_U32:
         case TYPE_I32:
         case TYPE_U64:
@@ -783,6 +830,9 @@ int poTypeChecker::checkExpr(poNode* node)
         }
         break;
     }
+    case poNodeType::CAST:
+        type = checkCast(node);
+        break;
     case poNodeType::OR:
     case poNodeType::AND:
     {
@@ -802,8 +852,60 @@ int poTypeChecker::checkExpr(poNode* node)
         type = (checkExpr(binary->left()) == checkExpr(binary->right())) ? TYPE_BOOLEAN : -1;
     }
         break;
+    case poNodeType::NULLPTR:
+        type = TYPE_NULLPTR;
+        break;
+    case poNodeType::SIZEOF:
+    {
+        poUnaryNode* sizeofNode = static_cast<poUnaryNode*>(node);
+        poNode* typeNode = sizeofNode->child();
+        if (getType(typeNode->token()) != -1)
+        {
+            type = TYPE_U64; // sizeof returns size
+        }
+        break;
+    }
     }
     return type;
+}
+
+int poTypeChecker::checkCast(poNode* node)
+{
+    poUnaryNode* castNode = static_cast<poUnaryNode*>(node);
+    assert(castNode->child()->type() == poNodeType::TYPE);
+    poUnaryNode* typeNode = static_cast<poUnaryNode*>(castNode->child());
+    int dstType = getType(typeNode->token());
+
+    if (typeNode->child()->type() == poNodeType::POINTER)
+    {
+        poPointerNode* pointerNode = static_cast<poPointerNode*>(typeNode->child());
+        dstType = getPointerType(dstType, pointerNode->count());
+        typeNode = pointerNode;
+    }
+
+    const int srcType = checkExpr(typeNode->child());
+
+    if (dstType == srcType)
+    {
+        return dstType; // no cast needed
+    }
+
+    const auto& typeData = _module.types()[dstType];
+    if (typeData.isPointer())
+    {
+        return dstType; // pointer type, bitwise cast
+    }
+    
+    for (poOperator op : typeData.operators())
+    {
+        if (op.getOperator() == poOperatorType::EXPLICIT_CAST &&
+            op.otherType() == srcType)
+        {
+            return dstType;
+        }
+    }
+
+    return -1;
 }
 
 int poTypeChecker::checkArray(poNode* node)
@@ -834,11 +936,25 @@ int poTypeChecker::checkMember(poNode* node)
     {
         const std::string& memberName = member->token().string();
         const poType& type = _module.types()[expr];
-        for (const poField& field : type.fields())
+        if (type.isPointer())
         {
-            if (field.name() == memberName)
+            const poType& baseType = _module.types()[type.baseType()];
+            for (const poField& field : baseType.fields())
             {
-                return field.type();
+                if (field.name() == memberName)
+                {
+                    return field.type();
+                }
+            }
+        }
+        else
+        {
+            for (const poField& field : type.fields())
+            {
+                if (field.name() == memberName)
+                {
+                    return field.type();
+                }
             }
         }
     }
@@ -862,9 +978,16 @@ int poTypeChecker::checkCall(poNode* node)
         poListNode* args = nullptr;
         for (poNode* child : function->list())
         {
-            if (child->type() == poNodeType::TYPE)
+            if (child->type() == poNodeType::RETURN_TYPE)
             {
+                poUnaryNode* returnTypeNode = static_cast<poUnaryNode*>(child);
                 type = getType(child->token());
+                if (returnTypeNode->child()->type() == poNodeType::POINTER)
+                {
+                    poPointerNode* pointerNode = static_cast<poPointerNode*>(returnTypeNode->child());
+                    type = getPointerType(type, pointerNode->count());
+                }
+
                 if (type == -1)
                 {
                     setError("Undefined type.", child->token());

@@ -326,6 +326,26 @@ void po::syntaxTest()
         "   test s = t || t;"\
         "}"\
         "}", false);
+    checkSyntax("Type Test #20", "namespace Test {"\
+        "static void main() {"\
+        "   i16 i;"\
+        "   u16 u;"\
+        "}"\
+        "}", true);
+    checkSyntax("Type Test #21", "namespace Test {"\
+        "static i16 test1() {"\
+        "   i16 x;"\
+        "   return x;"\
+        "}"\
+        "static u16 test2() {"\
+        "   u16 x;"\
+        "   return x;"\
+        "}"\
+        "static void main() {"\
+        "   i16 i = test1();"\
+        "   u16 u = test2();"\
+        "}"\
+        "}", true);
     checkSyntax("Numeric Test #1", "namespace Test {"\
         "static void main() {"\
         "   u64 x = 10000000000000000000u;"\
@@ -938,6 +958,63 @@ void po::syntaxTest()
         "   *y = ;"\
         "}"\
         "}", false);
+    checkSyntax("Pointers Test #9", "namespace Test {"\
+        "static i64* test(i64* x) {"\
+        "   return x;"\
+        "}"
+        "static void main() {"\
+        "   i64 x;"\
+        "   i64* y = &x;"\
+        "   i64* w = test(y);"\
+        "}"\
+        "}", true);
+    checkSyntax("Pointers Test #10", "namespace Test {"\
+        "static void main() {"\
+        "   i64* x = null;"\
+        "}"\
+        "}", true);
+    checkSyntax("Pointers Test #11", "namespace Test {"\
+        "struct test {"\
+        "   i64 x;"\
+        "}"\
+        "static void main() {"\
+        "   test x;"\
+        "   test* y = &x;"\
+        "   i64 z = y.x;"\
+        "}"\
+        "}", true);
+    checkSyntax("Cast Test #1", "namespace Test {"\
+        "static void main() {"\
+        "   i32 id = (i32)10;"\
+        "}"\
+        "}", true);
+    checkSyntax("Cast Test #2", "namespace Test {"\
+        "static void main() {"\
+        "   i32 id = (i32)5 + (i32)10;"\
+        "}"\
+        "}", true);
+    checkSyntax("Cast Test #3", "namespace Test {"\
+        "static void main() {"\
+        "   i32 id = (i32)true + (i32)10;"\
+        "}"\
+        "}", false);
+    checkSyntax("Cast Test #4", "namespace Test {"\
+        "static void main() {"\
+        "   boolean id = (boolean)10;"\
+        "}"\
+        "}", false);
+    checkSyntax("Cast Test #5", "namespace Test {"\
+        "static void main() {"\
+        "   boolean id = (boolean)true;"\
+        "}"\
+        "}", true);
+    checkSyntax("Cast Test #6", "namespace Test {"\
+        "static void main() {"\
+        "   u8 q = 100b;"\
+        "   u8* p = &q;"\
+        "   i8* w = (i8*)p;"\
+        "}"\
+        "}", true);
     checkSyntax("FFI Test #1", "namespace Test {"\
         "extern i32 GetCurrentProcess(); "\
         "static void main() {"\
@@ -950,5 +1027,36 @@ void po::syntaxTest()
         "   i32 id = MyFunction(0, 1, 2);"\
         "}"\
         "}", true);
+    checkSyntax("Sizeof Test #1", "namespace Test {"\
+        "static void main() {"\
+        "   u64 size = sizeof(i32);"\
+        "}"\
+        "}", true);
+    checkSyntax("Sizeof Test #2", "namespace Test {"\
+        "struct test { i32 x; }"\
+        "static void main() {"\
+        "   u64 size = sizeof(test);"\
+        "}"\
+        "}", true);
+    checkSyntax("Sizeof Test #3", "namespace Test {"\
+        "static void main() {"\
+        "   u64 size = sizeof(boolean);"\
+        "}"\
+        "}", true);
+    checkSyntax("Sizeof Test #4", "namespace Test {"\
+        "static void main() {"\
+        "   u64 size = sizeof(foo);"\
+        "}"\
+        "}", false);
+    checkSyntax("Sizeof Test #5", "namespace Test {"\
+        "static void main() {"\
+        "   u64 size = sizeof("\
+        "}"\
+        "}", false);
+    checkSyntax("Sizeof Test #6", "namespace Test {"\
+        "static void main() {"\
+        "   u64 size = sizeof(i32"\
+        "}"\
+        "}", false);
 
 }

@@ -1,0 +1,12 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        u8 x = (u8)6 / (u8)3;
+        u16 y = (u16)6 / (u16)3;
+        u32 z = (u32)6 / (u32)3;
+        u64 w = (u64)6 / (u64)z;
+    }
+}

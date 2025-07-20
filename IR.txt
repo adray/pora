@@ -20,6 +20,10 @@ IR_UNARY_MINUS - Performs a unary negation.
 IR_RETURN - Returns the specified value from a function. The left may also be set to -1 to return nothing. This is only valid when placed as the last instruction in a basic block.
 IR_COPY - Propagates the value in the left argument.
 IR_LOAD - Loads the value in the address specified by the left argument.
+IR_BITCAST - 
+IR_SIGN_EXTEND - Changes the size of an integer type performing sign extension. The left argument specifies the input value.
+IR_ZERO_EXTEND - 
+IR_CONVERT - 
 
 Special operators
 

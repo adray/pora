@@ -120,6 +120,8 @@ namespace po
         void emitWhileStatement(poNode* node, poFlowGraph& cfg, poBasicBlock* endBB);
         void emitIfExpression(poConditionGraphNode& cgn, poFlowGraph& cfg, poBasicBlock* successBB, poBasicBlock* failBB);
         int emitExpr(poNode* node, poFlowGraph& cfg);
+        int emitNullptr(poNode* node, poFlowGraph& cfg);
+        int emitCast(poNode* node, poFlowGraph& cfg);
         int emitDereference(poNode* node, poFlowGraph& cfg);
         int emitReference(poNode* node, poFlowGraph& cfg);
         int emitConstantExpr(poNode* node, poFlowGraph& cfg);
@@ -130,6 +132,7 @@ namespace po
         int emitLoadMember(poNode* node, poFlowGraph& cfg);
         void emitStoreMember(poNode* node, poFlowGraph& cfg, const int id);
         int emitLoadVariable(poNode* node, poFlowGraph& cfg);
+        int emitSizeof(poNode* node, poFlowGraph& cfg);
 
         poModule& _module;
         poConditionGraph _graph;

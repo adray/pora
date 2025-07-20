@@ -46,6 +46,8 @@ namespace po
         poConstant(int64_t i64);
         poConstant(int32_t i32);
         poConstant(uint32_t u32);
+        poConstant(int16_t i16);
+        poConstant(uint16_t u16);
         poConstant(int8_t i8);
         poConstant(uint8_t u8);
         poConstant(const float f32);
@@ -55,6 +57,8 @@ namespace po
         inline int64_t i64() const { return _i64; }
         inline int32_t i32() const { return _i32; }
         inline uint32_t u32() const { return _u32; }
+        inline int16_t i16() const { return _i16; }
+        inline uint16_t u16() const { return _u16; }
         inline int8_t i8() const { return _i8; }
         inline uint8_t u8() const { return _u8; }
         inline float f32() const { return _f32; }
@@ -68,6 +72,8 @@ namespace po
             int64_t _i64;
             int32_t _i32;
             uint32_t _u32;
+            int16_t _i16;
+            uint16_t _u16;
             int8_t _i8;
             uint8_t _u8;
             double _f64;
@@ -103,6 +109,7 @@ namespace po
         void addFunction(const poFunction& function);
         inline const std::string& name() const { return _name; }
         inline std::vector<poFunction>& functions() { return _functions; }
+        inline const std::vector<poFunction>& functions() const { return _functions; }
 
     private:
         std::string _name;
@@ -116,6 +123,8 @@ namespace po
         int addConstant(const int64_t i64);
         int addConstant(const int32_t i32);
         int addConstant(const uint32_t u32);
+        int addConstant(const int16_t i16);
+        int addConstant(const uint16_t u16);
         int addConstant(const int8_t i8);
         int addConstant(const uint8_t u8);
         int addConstant(const double f64);
@@ -130,9 +139,11 @@ namespace po
         int getConstant(const float f32);
         int64_t getI64(const int id);
         int32_t getI32(const int id);
+        int16_t getI16(const int id);
         int8_t getI8(const int id);
         uint64_t getU64(const int id);
         uint32_t getU32(const int id);
+        uint16_t getU16(const int id);
         uint8_t getU8(const int id);
         float getF32(const int id);
         double getF64(const int id);
@@ -142,6 +153,8 @@ namespace po
         std::unordered_map<int64_t, int> _i64;
         std::unordered_map<int32_t, int> _i32;
         std::unordered_map<uint32_t, int> _u32;
+        std::unordered_map<int16_t, int> _i16;
+        std::unordered_map<uint16_t, int> _u16;
         std::unordered_map<int8_t, int> _i8;
         std::unordered_map<uint8_t, int> _u8;
         std::unordered_map<double, int> _f64;
@@ -168,6 +181,7 @@ namespace po
 
     private:
         void addPrimitives();
+        void addExplicitCastOperators();
 
         std::vector<poType> _types;
         std::unordered_map<std::string, int> _typeMapping;

@@ -13,12 +13,14 @@ namespace po
         STRING,
         CHAR,
         I8,
+        I16,
         I32,
         I64,
         F32,
         F64,
         U64,
         U32,
+        U16,
         U8,
         TRUE,
         FALSE,
@@ -79,14 +81,18 @@ namespace po
         STATIC,
         I64_TYPE,
         I32_TYPE,
+        I16_TYPE,
         I8_TYPE,
         F64_TYPE,
         F32_TYPE,
         U64_TYPE,
         U32_TYPE,
+        U16_TYPE,
         U8_TYPE,
         BOOLEAN,
-        VOID
+        VOID,
+        NULLPTR,
+        SIZEOF
     };
 
     class poToken
@@ -96,9 +102,11 @@ namespace po
         inline poTokenType token() const { return _tok; }
         inline long long i64() const { return std::atoll(_value.c_str()); }
         inline int i32() const { return std::atol(_value.c_str()); }
+        inline short i16() const { return (short) std::atol(_value.c_str()); }
         inline char i8() const { return static_cast<char>(std::atoi(_value.c_str()));; }
         uint64_t u64() const;
         inline unsigned int u32() const { return std::atol(_value.c_str()); }
+        inline unsigned short u16() const { return (unsigned short) std::atol(_value.c_str()); }
         inline unsigned char u8() const { return static_cast<unsigned char>(std::atoi(_value.c_str())); }
         inline unsigned char character() const { return _value[0]; }
         inline const std::string& string() const { return _value; }

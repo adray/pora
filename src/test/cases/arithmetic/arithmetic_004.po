@@ -1,0 +1,10 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        u16 x = (u16)6;
+        u16 y = x + (u16)10 * -(u16)7;
+    }
+}

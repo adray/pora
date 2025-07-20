@@ -118,6 +118,7 @@ void poOptMemToReg::optimize(poModule& module, poFlowGraph& cfg)
             allocaIns.setLeft(-1);
             allocaIns.setRight(-1);
             allocaIns.setCode(IR_CONSTANT);
+            allocaIns.setType(baseType);
             poConstantPool& pool = module.constants();
             int constant = -1;
             switch (baseType)
@@ -135,6 +136,13 @@ void poOptMemToReg::optimize(poModule& module, poFlowGraph& cfg)
                 if (constant == -1)
                 {
                     constant = pool.addConstant(uint8_t(0));
+                }
+                break;
+            case TYPE_U16:
+                constant = pool.getConstant((uint16_t)0);
+                if (constant == -1)
+                {
+                    constant = pool.addConstant(uint16_t(0));
                 }
                 break;
             case TYPE_U32:
@@ -156,6 +164,13 @@ void poOptMemToReg::optimize(poModule& module, poFlowGraph& cfg)
                 if (constant == -1)
                 {
                     constant = pool.addConstant(int32_t(0));
+                }
+                break;
+            case TYPE_I16:
+                constant = pool.getConstant((int16_t)0);
+                if (constant == -1)
+                {
+                    constant = pool.addConstant(int16_t(0));
                 }
                 break;
             case TYPE_I8:

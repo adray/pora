@@ -1,0 +1,16 @@
+import std;
+
+namespace Example
+{
+    static i64* test(i64* x)
+    {
+        return x;
+    }
+
+    static void main()
+    {
+        i64 x = 10;
+        i64* y = &x;
+        i64* w = test(y);
+    }
+}

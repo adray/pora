@@ -29,6 +29,9 @@ int poTypeResolver::getType(const poToken& token)
     case poTokenType::I32_TYPE:
         type = TYPE_I32;
         break;
+    case poTokenType::I16_TYPE:
+        type = TYPE_I16;
+        break;
     case poTokenType::I8_TYPE:
         type = TYPE_I8;
         break;
@@ -37,6 +40,9 @@ int poTypeResolver::getType(const poToken& token)
         break;
     case poTokenType::U32_TYPE:
         type = TYPE_U32;
+        break;
+    case poTokenType::U16_TYPE:
+        type = TYPE_U16;
         break;
     case poTokenType::U8_TYPE:
         type = TYPE_U8;
@@ -143,6 +149,22 @@ void poTypeResolver::getFunction(poNode* node, poNamespace& ns)
     }
 }
 
+int poTypeResolver::align(const int offset, const int alignment) const
+{
+    if (alignment <= 0)
+    {
+        return 0; // No alignment needed
+    }
+
+    const int mod = offset % alignment;
+    if (mod == 0)
+    {
+        return 0;
+    }
+
+    return alignment - mod;
+}
+
 int poTypeResolver::getPointerType(const int baseType, const int count)
 {
     int pointerType = baseType;
@@ -157,6 +179,7 @@ int poTypeResolver::getPointerType(const int baseType, const int count)
             poType newType(type, pointerType, typeData.name() + "*");
             newType.setPointer(true);
             newType.setSize(8);
+            newType.setAlignment(8);
             _module.addType(newType);
         }
         pointerType = type;
@@ -247,6 +270,7 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
                     TYPE_OBJECT,
                     name));
                 int offset = 0;
+                int sizeOfLargestField = 0;
                 for (poNode* child : structNode->list())
                 {
                     if (child->type() == poNodeType::DECL)
@@ -281,10 +305,16 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
                                 size = getTypeSize(fieldType);
                             }
 
+                            // Align the offset to the size of the type
+                            const int alignment = _module.types()[fieldType].alignment();
+                            const int padding = align(offset, alignment);
+                            offset += padding;
+
                             auto& type = _module.types()[id];
                             type.addField(poField(offset, fieldType, decl->token().string()));
 
                             offset += size;
+                            sizeOfLargestField = std::max(sizeOfLargestField, alignment);
                         }
                         else if (decl->child()->type() == poNodeType::ARRAY)
                         {
@@ -317,15 +347,24 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
                                 _module.addType(type);
                             }
 
+                            const int alignment = size * _module.types()[fieldType].alignment();
+                            const int totalSize = size * int(arrayNode->arraySize());
+                            const int padding = align(offset, alignment);
+                            offset += padding;
+
                             auto& type = _module.types()[id];
                             type.addField(poField(offset, arrayType, decl->token().string()));
-                            offset += size * int(arrayNode->arraySize());
+                            offset += totalSize;
+                            sizeOfLargestField = std::max(sizeOfLargestField, alignment);
                         }
                     }
                 }
 
+                // Align the size of the type to the size of the largest field
+                const int padding = align(offset, sizeOfLargestField);
                 auto& type = _module.types()[id];
-                type.setSize(offset);
+                type.setSize(offset + padding);
+                type.setAlignment(sizeOfLargestField);
                 _resolvedTypes.insert(std::pair<std::string, int>(name, id));
 
                 changes = true;

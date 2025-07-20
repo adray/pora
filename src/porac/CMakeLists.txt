@@ -5,8 +5,6 @@ cmake_minimum_required (VERSION 3.8)
 set (PORAC_SOURCES
     "poApp.h"
     "poApp.cpp"
-    "poAsm.h"
-    "poAsm.cpp"
     "poCompiler.h"
     "poCompiler.cpp"
     "poEmit.h"
@@ -27,10 +25,12 @@ set (PORAC_EXAMPLES
 project ("porac")
 
 include_directories("../core")
+include_directories("../backend")
 
 # Add source to this project's executable.
 add_executable(porac ${PORAC_SOURCES} ${PORAC_EXAMPLES})
 target_link_libraries(porac poracore)
+target_link_libraries(porac porabackend)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET porac PROPERTY CXX_STANDARD 20)

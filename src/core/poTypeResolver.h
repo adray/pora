@@ -26,6 +26,7 @@ namespace po
         int getTypeSize(const int type);
         int getType(const poToken& token);
         int getPointerType(const int baseType, const int count);
+        int align(const int size, const int alignment) const;
 
         poModule& _module;
         std::vector<poNode*> _userTypes;

@@ -8,6 +8,8 @@
 
 using namespace po;
 
+constexpr int EMIT_ERROR = -1;
+
 //=====================
 // Variable
 //=====================
@@ -242,6 +244,11 @@ int poCodeGenerator::getArrayType(const int baseType, const int arrayRank)
 
 int poCodeGenerator::getPointerType(const int baseType)
 {
+    if (baseType == -1)
+    {
+        return -1;
+    }
+
     const int ptr = _module.getPointerType(baseType);
     if (ptr == -1)
     {
@@ -275,6 +282,9 @@ int poCodeGenerator::getType(const poToken& token)
     case poTokenType::I32_TYPE:
         type = TYPE_I32;
         break;
+    case poTokenType::I16_TYPE:
+        type = TYPE_I16;
+        break;
     case poTokenType::I8_TYPE:
         type = TYPE_I8;
         break;
@@ -283,6 +293,9 @@ int poCodeGenerator::getType(const poToken& token)
         break;
     case poTokenType::U32_TYPE:
         type = TYPE_U32;
+        break;
+    case poTokenType::U16_TYPE:
+        type = TYPE_U16;
         break;
     case poTokenType::U8_TYPE:
         type = TYPE_U8;
@@ -295,6 +308,9 @@ int poCodeGenerator::getType(const poToken& token)
         break;
     case poTokenType::VOID:
         type = TYPE_VOID;
+        break;
+    case poTokenType::BOOLEAN:
+        type = TYPE_U8; // Boolean is represented as a single byte
         break;
     default:
         type = _module.getTypeFromName(token.string());
@@ -423,10 +439,16 @@ void poCodeGenerator::emitFunction(poNode* node, poFunction& function)
             // body
             body = child;
         }
-        else if (child->type() == poNodeType::TYPE)
+        else if (child->type() == poNodeType::RETURN_TYPE)
         {
             // return type
             retType = getType(child->token());
+
+            poUnaryNode* returnTypeNode = static_cast<poUnaryNode*>(child);
+            if (returnTypeNode->child()->type() == poNodeType::POINTER)
+            {
+                retType = getPointerType(retType);
+            }
         }
     }
 
@@ -851,20 +873,71 @@ int poCodeGenerator::emitPassByReference(const int expr, poFlowGraph& cfg)
 
 int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg)
 {
-    std::vector<int> args;
     poListNode* call = static_cast<poListNode*>(node);
-    for (poNode* child : call->list())
+
+    std::vector<int> args;
+    std::vector<int> argTypes;
+    int returnType = 0;
+    const std::string& name = call->token().string();
+    poListNode* argsNode = nullptr;
+    poListNode* functionNode = static_cast<poListNode*>(_functions[name]);
+    for (poNode* child : functionNode->list())
     {
-        const int expr = emitExpr(child, cfg);
-        if (expr == -1)
+        if (child->type() == poNodeType::ARGS)
         {
-            return -1;
+            argsNode = static_cast<poListNode*>(child);
         }
+        else if (child->type() == poNodeType::RETURN_TYPE)
+        {
+            returnType = getType(child->token());
+
+            poUnaryNode* returnTypeNode = static_cast<poUnaryNode*>(child);
+            if (returnTypeNode->child()->type() == poNodeType::POINTER)
+            {
+                poPointerNode* pointerNode = static_cast<poPointerNode*>(returnTypeNode->child());
+                returnType = getPointerType(returnType);
+            }
+        }
+    }
+
+    assert(argsNode);
+    assert(returnType != -1);
+
+    /* Extract the expected types from the AST */
+
+    for (int i = 0; i < int(argsNode->list().size()); i++)
+    {
+        poNode* node = argsNode->list()[i];
+        poUnaryNode* param = static_cast<poUnaryNode*>(node);
+        int type = getType(param->child()->token());
+        if (param->child()->type() == poNodeType::POINTER)
+        {
+            poPointerNode* pointerNode = static_cast<poPointerNode*>(param->child());
+            type = getPointerType(type);
+        }
+
+        argTypes.push_back(type);
+    }
+
+    /* Determine what should be passed into the function */
+
+    for (int i = 0; i < int(call->list().size()); i++)
+    {
+        poNode* child = call->list()[i];
+        const int expr = emitExpr(child, cfg);
+        if (expr == EMIT_ERROR)
+        {
+            return EMIT_ERROR;
+        }
+
+        const int targetType = argTypes[i];
+        const poType& targetTypeData = _module.types()[targetType];
 
         const int type = _types[expr];
         const poType& typeData = _module.types()[type];
         if (typeData.isPointer() &&
-            _module.types()[typeData.baseType()].baseType() == TYPE_OBJECT)
+            _module.types()[typeData.baseType()].baseType() == TYPE_OBJECT &&
+            !targetTypeData.isPointer())
         {
             // X86_64 calling convention: structs smaller/equal to 8 bytes can be passed by value
             // Greater than that pass in via a pointer to a IR_ALLOCA
@@ -887,23 +960,9 @@ int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg)
         }
     }
 
-    int returnType = 0;
-    const std::string& name = call->token().string();
-    poListNode* argsNode = nullptr;
-    poListNode* functionNode = static_cast<poListNode*>(_functions[name]);
-    for (poNode* child : functionNode->list())
-    {
-        if (child->type() == poNodeType::ARGS)
-        {
-            argsNode = static_cast<poListNode*>(child);
-        }
-        else if (child->type() == poNodeType::TYPE)
-        {
-            returnType = getType(child->token());
-        }
-    }
-
     int numArgs = int(call->list().size());
+
+    /* Generate the call instruction also handle the return variable */
 
     const int retVariable = _instructionCount;
     const poType& typeData = _module.types()[returnType];
@@ -936,17 +995,11 @@ int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg)
         emitInstruction(poInstruction(_instructionCount++, returnType, numArgs, symbol, IR_CALL), cfg.getLast());
     }
 
+    /* Generate the param instructions */
+
     for (int i = 0; i < int(args.size()); i++)
     {
-        poNode* node = argsNode->list()[i];
-        poUnaryNode* param = static_cast<poUnaryNode*>(node);
-        int type = getType(param->child()->token());
-        if (param->child()->type() == poNodeType::POINTER)
-        {
-            poPointerNode* pointerNode = static_cast<poPointerNode*>(param->child());
-            type = getPointerType(type);
-        }
-
+        const int type = argTypes[i];
         const poType& typeData = _module.types()[type];
         if (typeData.baseType() == TYPE_OBJECT)
         {
@@ -970,6 +1023,8 @@ int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg)
         }
     }
 
+    /* Complete any further handling of the return value */
+
     if (typeData.baseType() == TYPE_OBJECT && typeData.size() <= 8)
     {
         // X86_64 - we need to load the value into a struct
@@ -992,6 +1047,13 @@ void poCodeGenerator::emitAssignment(poNode* node, poFlowGraph& cfg)
 {
     poBinaryNode* assignment = static_cast<poBinaryNode*>(node);
     const int right = emitExpr(assignment->right(), cfg);
+    if (right == EMIT_ERROR)
+    {
+        // Error: expression could not be evaluated
+        setError("Assignment expression could not be evaluated.");
+        return;
+    }
+
     const int type = _types[right];
     assert(type != -1);
 
@@ -1060,7 +1122,7 @@ void poCodeGenerator::emitReturn(poNode* node, poFlowGraph& cfg)
     if (returnNode->child())
     {
         const int expr = emitExpr(returnNode->child(), cfg);
-        if (expr == -1)
+        if (expr == EMIT_ERROR)
         {
             // Error: expression could not be evaluated
             setError("Return expression could not be evaluated.");
@@ -1191,6 +1253,9 @@ void poCodeGenerator::emitDecl(poNode* node, poFlowGraph& cfg)
         case TYPE_U8:
             constant = pool.getConstant((uint8_t)0);
             break;
+        case TYPE_U16:
+            constant = pool.getConstant((uint16_t)0);
+            break;
         case TYPE_U32:
             constant = pool.getConstant((uint32_t)0);
             break;
@@ -1202,6 +1267,9 @@ void poCodeGenerator::emitDecl(poNode* node, poFlowGraph& cfg)
             break;
         case TYPE_I32:
             constant = pool.getConstant((int32_t)0);
+            break;
+        case TYPE_I16:
+            constant = pool.getConstant((int16_t)0);
             break;
         case TYPE_I8:
             constant = pool.getConstant((int8_t)0);
@@ -1229,7 +1297,7 @@ void poCodeGenerator::emitDecl(poNode* node, poFlowGraph& cfg)
 
 int poCodeGenerator::emitExpr(poNode* node, poFlowGraph& cfg)
 {
-    int instructionId = -1;
+    int instructionId = EMIT_ERROR;
     switch (node->type())
     {
     case poNodeType::ADD:
@@ -1268,8 +1336,92 @@ int poCodeGenerator::emitExpr(poNode* node, poFlowGraph& cfg)
     case poNodeType::REFERENCE:
         instructionId = emitReference(node, cfg);
         break;
+    case poNodeType::CAST:
+        instructionId = emitCast(node, cfg);
+        break;
+    case poNodeType::NULLPTR:
+        instructionId = emitNullptr(node, cfg);
+        break;
+    case poNodeType::SIZEOF:
+        instructionId = emitSizeof(node, cfg);
+        break;
     }
     return instructionId;
+}
+
+int poCodeGenerator::emitNullptr(poNode* node, poFlowGraph& cfg)
+{
+    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, _module.constants().getConstant((int64_t)0), IR_CONSTANT), cfg.getLast());
+    return _instructionCount - 1;
+}
+
+int poCodeGenerator::emitCast(poNode* node, poFlowGraph& cfg)
+{
+    poUnaryNode* castNode = static_cast<poUnaryNode*>(node);
+    assert(castNode->child()->type() == poNodeType::TYPE);
+
+    poUnaryNode* typeNode = static_cast<poUnaryNode*>(castNode->child());
+
+    int dstType = getType(typeNode->token());
+    if (typeNode->child()->type() == poNodeType::POINTER)
+    {
+        poPointerNode* pointerNode = static_cast<poPointerNode*>(typeNode->child());
+        dstType = getPointerType(dstType);
+        typeNode = pointerNode;
+    }
+
+    const int expr = emitExpr(typeNode->child(), cfg);
+    if (expr == EMIT_ERROR)
+    {
+        setError("Cast expression could not be evaluated.");
+        return EMIT_ERROR;
+    }
+
+    const int srcType = _types[expr];
+
+    if (srcType == dstType)
+    {
+        // No cast needed, return the expression as is.
+        return expr;
+    }
+
+    const poType& dstTypeData = _module.types()[dstType];
+    if (dstTypeData.isPointer())
+    {
+        const int castId = _instructionCount++;
+        emitInstruction(poInstruction(castId, dstType, expr, -1, srcType, IR_BITWISE_CAST), cfg.getLast());
+        return castId;
+    }
+
+    for (const poOperator& op : dstTypeData.operators())
+    {
+        if (op.getOperator() == poOperatorType::EXPLICIT_CAST && op.otherType() == srcType)
+        {
+            // We have a cast operator, use it.
+            int operand = IR_BITWISE_CAST;
+            switch (op.flags())
+            {
+            case OPERATOR_FLAG_SIGN_EXTEND:
+                operand = IR_SIGN_EXTEND;
+                break;
+            case OPERATOR_FLAG_ZERO_EXTEND:
+                operand = IR_ZERO_EXTEND;
+                break;
+            case OPERATOR_FLAG_CONVERT_TO_INTEGER:
+            case OPERATOR_FLAG_CONVERT_TO_REAL:
+                operand = IR_CONVERT;
+                break;
+            default:
+                break;
+            }
+
+            const int castId = _instructionCount++;
+            emitInstruction(poInstruction(castId, dstType, expr, -1, srcType, operand), cfg.getLast());
+            return castId;
+        }
+    }
+
+    return EMIT_ERROR;
 }
 
 int poCodeGenerator::emitReference(poNode* node, poFlowGraph& cfg)
@@ -1279,21 +1431,21 @@ int poCodeGenerator::emitReference(poNode* node, poFlowGraph& cfg)
     if (child->type() != poNodeType::VARIABLE)
     {
         setError("Reference can only be applied to a variable.");
-        return -1;
+        return EMIT_ERROR;
     }
 
     const int expr = getVariable(child->token().string());
-    if (expr == -1)
+    if (expr == EMIT_ERROR)
     {
         setError("Reference failed, variable not found.");
-        return -1;
+        return EMIT_ERROR;
     }
 
     const int type = _types[expr];
     const poType& typeData = _module.types()[type];
     if (!typeData.isPointer())
     {
-        return -1;
+        return EMIT_ERROR;
     }
 
     return expr;
@@ -1301,20 +1453,20 @@ int poCodeGenerator::emitReference(poNode* node, poFlowGraph& cfg)
 
 int poCodeGenerator::emitDereference(poNode* node, poFlowGraph& cfg)
 {
-    int id = -1;
+    int id = EMIT_ERROR;
     poUnaryNode* derefNode = static_cast<poUnaryNode*>(node);
     poNode* child = static_cast<poNode*>(derefNode->child());
     if (child->type() != poNodeType::VARIABLE)
     {
         setError("Dereference can only be applied to a variable.");
-        return -1;
+        return EMIT_ERROR;
     }
 
     const int expr = emitLoadVariable(child, cfg);
-    if (expr == -1)
+    if (expr == EMIT_ERROR)
     {
         setError("Dereference failed, variable not found.");
-        return -1;
+        return EMIT_ERROR;
     }
 
     const int type = _types[expr];
@@ -1331,6 +1483,32 @@ int poCodeGenerator::emitDereference(poNode* node, poFlowGraph& cfg)
     {
         setError("Dereferencing a non-pointer type.");
     }
+    return id;
+}
+
+int poCodeGenerator::emitSizeof(poNode* node, poFlowGraph& cfg)
+{
+    poUnaryNode* sizeofNode = static_cast<poUnaryNode*>(node);
+    poNode* child = sizeofNode->child();
+    if (child->type() != poNodeType::TYPE)
+    {
+        setError("Sizeof can only be applied to a type.");
+        return EMIT_ERROR;
+    }
+
+    const int type = getType(child->token());
+    const poType& typeData = _module.types()[type];
+
+    const uint64_t size = typeData.size();
+    poConstantPool& pool = _module.constants();
+    int constantId = pool.getConstant(size);
+    if (constantId == -1)
+    {
+        constantId = pool.addConstant(size);
+    }
+
+    const int id = _instructionCount++;
+    emitInstruction(poInstruction(id, TYPE_U64, int16_t(constantId), IR_CONSTANT), cfg.getLast());
     return id;
 }
 
@@ -1407,7 +1585,7 @@ void poCodeGenerator::emitStoreMember(poNode* node, poFlowGraph& cfg, const int 
 {
     poUnaryNode* member = static_cast<poUnaryNode*>(node);
 
-    int expr = -1;
+    int expr = EMIT_ERROR;
     std::vector<poUnaryNode*> stack = { member };
     while (member)
     {
@@ -1433,9 +1611,23 @@ void poCodeGenerator::emitStoreMember(poNode* node, poFlowGraph& cfg, const int 
     for (int i = int(stack.size() - 1); i >= 0; i--)
     {
         poNode* member = stack[i];
+
+        if (_module.types()[fieldType].isPointer())
+        {
+            /* We need to dereference the pointer first and reset the offset */
+
+            const poType& type = _module.types()[fieldType];
+            const int ptr = _instructionCount; /* result of IR_PTR */
+            emitInstruction(poInstruction(_instructionCount++, type.id(), expr, -1, offset, IR_PTR), cfg.getLast());
+
+            expr = _instructionCount; /* result of IR_LOAD */
+            emitInstruction(poInstruction(_instructionCount++, type.baseType(), ptr, -1, IR_LOAD), cfg.getLast());
+            offset = 0;
+            fieldType = type.baseType(); /* Fix the type used when dereferencing a pointer */
+        }
+
         const int typeId = fieldType;
         const poType& type = _module.types()[typeId];
-      
         int fieldOffset = 0;
         for (const poField field : type.fields())
         {
@@ -1461,7 +1653,7 @@ int poCodeGenerator::emitLoadMember(poNode* node, poFlowGraph& cfg)
 {
     poUnaryNode* member = static_cast<poUnaryNode*>(node);
 
-    int expr = -1;
+    int expr = EMIT_ERROR;
     std::vector<poUnaryNode*> stack = { member };
     while (member)
     {
@@ -1487,10 +1679,27 @@ int poCodeGenerator::emitLoadMember(poNode* node, poFlowGraph& cfg)
     for (int i = int(stack.size() - 1); i >= 0; i--)
     {
         poNode* member = stack[i];
+
+        if (_module.types()[fieldType].isPointer())
+        {
+            /* We need to dereference the pointer first and reset the offset */
+
+            const poType& type = _module.types()[fieldType];
+            const int ptr = _instructionCount; /* result of IR_PTR */
+            emitInstruction(poInstruction(_instructionCount++, type.id(), expr, -1, offset, IR_PTR), cfg.getLast());
+
+            expr = _instructionCount; /* result of IR_LOAD */
+            emitInstruction(poInstruction(_instructionCount++, type.baseType(), ptr, -1, IR_LOAD), cfg.getLast());
+            offset = 0;
+            fieldType = type.baseType(); /* Fix the type used when dereferencing a pointer */
+        }
+
         const int typeId = fieldType;
         const poType& type = _module.types()[typeId];
       
         int fieldOffset = 0;
+        assert(!type.isPointer());
+
         for (const poField field : type.fields())
         {
             if (field.name() == member->token().string())
@@ -1518,7 +1727,7 @@ int poCodeGenerator::emitConstantExpr(poNode* node, poFlowGraph& cfg)
     poConstantNode* constant = static_cast<poConstantNode*>(node);
     poConstantPool& constants = _module.constants();
     int id = -1;
-    int instructionId = -1;
+    int instructionId = EMIT_ERROR;
     switch (constant->type())
     {
     case TYPE_I64:
@@ -1568,7 +1777,7 @@ int poCodeGenerator::emitUnaryMinus(poNode* node, poFlowGraph& cfg)
 
 int poCodeGenerator::emitBinaryExpr(poNode* node, poFlowGraph& cfg)
 {
-    int instructionId = -1;
+    int instructionId = EMIT_ERROR;
     poBinaryNode* binary = static_cast<poBinaryNode*>(node);
     const int left = emitExpr(binary->left(), cfg);
     const int right = emitExpr(binary->right(), cfg);

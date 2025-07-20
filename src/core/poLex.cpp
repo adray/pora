@@ -66,18 +66,22 @@ poLexer::poLexer()
     addKeyword("static", poTokenType::STATIC);
     addKeyword("i64", poTokenType::I64_TYPE);
     addKeyword("i32", poTokenType::I32_TYPE);
+    addKeyword("i16", poTokenType::I16_TYPE);
     addKeyword("i8", poTokenType::I8_TYPE);
     addKeyword("f64", poTokenType::F64_TYPE);
     addKeyword("f32", poTokenType::F32_TYPE);
     addKeyword("void", poTokenType::VOID);
     addKeyword("u64", poTokenType::U64_TYPE);
     addKeyword("u32", poTokenType::U32_TYPE);
+    addKeyword("u16", poTokenType::U16_TYPE);
     addKeyword("u8", poTokenType::U8_TYPE);
     addKeyword("true", poTokenType::TRUE);
     addKeyword("false", poTokenType::FALSE);
     addKeyword("boolean", poTokenType::BOOLEAN);
     addKeyword("struct", poTokenType::STRUCT);
     addKeyword("extern", poTokenType::EXTERN);
+    addKeyword("null", poTokenType::NULLPTR);
+    addKeyword("sizeof", poTokenType::SIZEOF);
 }
 
 void poLexer::addKeyword(const std::string& keyword, poTokenType token)
