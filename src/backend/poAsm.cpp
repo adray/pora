@@ -84,28 +84,56 @@ void poAsm::ir_element_ptr(poModule& module, poRegLinear& linear, const poInstru
     const poType& type = module.types()[ins.type()];
     const int size = type.size();
 
-    const int offset = slot * 8;
-    if (ins.right() != -1)
+    if (slot != -1)
     {
-        const int operand = linear.getRegisterByVariable(ins.right());
-
-        // TODO: change to LEA? (load effective address)
-
-        _x86_64.mc_mov_imm_to_reg_x64(dst, size);
-        _x86_64.mc_mul_reg_to_reg_x64(dst, operand);
-
-        _x86_64.mc_add_reg_to_reg_x64(dst, VM_REGISTER_ESP);
-        if (offset > 0)
+        const int offset = slot * 8;
+        if (ins.right() != -1)
         {
-            _x86_64.mc_add_imm_to_reg_x64(dst, offset);
+            const int operand = linear.getRegisterByVariable(ins.right());
+
+            // TODO: change to LEA? (load effective address)
+            // ESP + offset + operand * size
+
+            _x86_64.mc_mov_imm_to_reg_x64(dst, size);
+            _x86_64.mc_mul_reg_to_reg_x64(dst, operand);
+
+            _x86_64.mc_add_reg_to_reg_x64(dst, VM_REGISTER_ESP);
+            if (offset > 0)
+            {
+                _x86_64.mc_add_imm_to_reg_x64(dst, offset);
+            }
+        }
+        else
+        {
+            // ESP + offset
+
+            _x86_64.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_ESP);
+            if (offset > 0)
+            {
+                _x86_64.mc_add_imm_to_reg_x64(dst, offset);
+            }
         }
     }
     else
     {
-        _x86_64.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_ESP);
-        if (offset > 0)
+        if (ins.right() != -1)
         {
-            _x86_64.mc_add_imm_to_reg_x64(dst, offset);
+            const int operand = linear.getRegisterByVariable(ins.right());
+            const int left = linear.getRegisterByVariable(ins.left());
+
+            // TODO: change to LEA? (load effective address)
+            // left + operand * size
+
+            _x86_64.mc_mov_imm_to_reg_x64(dst, size);
+            _x86_64.mc_mul_reg_to_reg_x64(dst, operand);
+
+            _x86_64.mc_add_reg_to_reg_x64(dst, left);
+        }
+        else
+        {
+            const int left = linear.getRegisterByVariable(ins.left());
+            _x86_64.mc_mov_imm_to_reg_x64(dst, size);
+            _x86_64.mc_add_reg_to_reg_x64(dst, left);
         }
     }
 }
@@ -423,7 +451,9 @@ void poAsm::ir_add(poRegLinear& linear, const poInstruction& ins)
         _x86_64.mc_add_reg_to_reg_8(dst, src2);
         break;
     default:
-        assert(false);
+        std::stringstream ss;
+        ss << "Internal Error: Malformed add instruction " << ins.name();
+        setError(ss.str());
         break;
     }
 }
@@ -478,7 +508,9 @@ void poAsm::ir_sub(poRegLinear& linear, const poInstruction& ins)
         _x86_64.mc_sub_reg_to_reg_8(dst, src2);
         break;
     default:
-        assert(false);
+        std::stringstream ss;
+        ss << "Internal Error: Malformed sub instruction " << ins.name();
+        setError(ss.str());
         break;
     }
 }
@@ -563,7 +595,9 @@ void poAsm::ir_mul(poRegLinear& linear, const poInstruction& ins)
         }
         break;
     default:
-        assert(false);
+        std::stringstream ss;
+        ss << "Internal Error: Malformed mul instruction " << ins.name();
+        setError(ss.str());
         break;
     }
 }
@@ -637,7 +671,9 @@ void poAsm::ir_div(poRegLinear& linear, const poInstruction& ins)
         _x86_64.mc_divsd_reg_to_reg_x64(sse_dst, sse_src2);
         break;
     default:
-        assert(false);
+        std::stringstream ss;
+        ss << "Internal Error: Malformed div instruction " << ins.name();
+        setError(ss.str());
         break;
     }
 }
@@ -675,7 +711,9 @@ void poAsm::ir_cmp(poRegLinear& linear, const poInstruction& ins)
         _x86_64.mc_ucmps_reg_to_reg_x64(sse_src1, sse_src2);
         break;
     default:
-        assert(false);
+        std::stringstream ss;
+        ss << "Internal Error: Malformed compare instruction " << ins.name();
+        setError(ss.str());
         break;
     }
 }
@@ -752,7 +790,9 @@ void poAsm::ir_copy(poRegLinear& linear, const poInstruction& ins)
         }
         break;
     default:
-        assert(false);
+        std::stringstream ss;
+        ss << "Internal Error: Malformed copy instruction " << ins.name();
+        setError(ss.str());
         break;
     }
 }
@@ -805,7 +845,9 @@ void poAsm::ir_constant(poConstantPool& constants, poRegLinear& linear, const po
         addInitializedData(constants.getF64(ins.constant()), -int(sizeof(int32_t))); // insert patch
         break;
     default:
-        assert(false);
+        std::stringstream ss;
+        ss << "Internal Error: Malformed constant instruction " << ins.name();
+        setError(ss.str());
         break;
     }
 }
@@ -834,7 +876,9 @@ void poAsm::ir_ret(poRegLinear& linear, const poInstruction& ins)
             _x86_64.mc_movss_reg_to_reg_x64(VM_REGISTER_EAX, linear.getRegisterByVariable(left) - VM_REGISTER_MAX);
             break;
         default:
-            assert(false);
+            std::stringstream ss;
+            ss << "Internal Error: Malformed return instruction " << ins.name();
+            setError(ss.str());
             break;
         }
     }
@@ -904,7 +948,9 @@ void poAsm::ir_unary_minus(poRegLinear& linear, const poInstruction& ins)
         _x86_64.mc_neg_reg_32(dst);
         break;
     default:
-        assert(false);
+        std::stringstream ss;
+        ss << "Internal Error: Malformed unary minus instruction " << ins.name();
+        setError(ss.str());
         break;
     }
 }

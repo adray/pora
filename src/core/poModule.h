@@ -178,6 +178,7 @@ namespace po
         int getArrayType(const int baseType) const;
         int getPointerType(const int baseType) const;
         void dump();
+        void dumpTypes();
 
     private:
         void addPrimitives();

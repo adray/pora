@@ -75,7 +75,7 @@ void poOptMemToReg::optimize(poModule& module, poFlowGraph& cfg)
                 }
 
                 const poType& baseType = module.types()[type.baseType()];
-                if (baseType.baseType() == TYPE_OBJECT || baseType.isPointer())
+                if (baseType.baseType() == TYPE_OBJECT || baseType.isPointer() || baseType.isArray())
                 {
                     // If the base type is an object or pointer, we cannot promote it
                     pos++;

@@ -610,6 +610,19 @@ bool poModule::getSymbol(const int id, std::string& symbol)
     return false;
 }
 
+void poModule::dumpTypes()
+{
+    for (auto& type : _types)
+    {
+        std::cout << type.id() << " " << type.name() << " (Size: " << type.size() << ", Alignment: " << type.alignment() << ")";
+        if (type.baseType() != -1)
+        {
+            std::cout << "  Base Type: " << _types[type.baseType()].name();
+        }
+        std::cout << std::endl;
+    }
+}
+
 void poModule::dump()
 {
     for (auto& ns : _namespaces)

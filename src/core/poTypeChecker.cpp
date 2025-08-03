@@ -396,6 +396,7 @@ int poTypeChecker::getPointerType(const int baseType, const int count)
                 poType newType(type, pointerType, typeData.name() + "*");
                 newType.setPointer(true);
                 newType.setSize(8);
+                newType.setAlignment(8);
                 _module.addType(newType);
             }
             pointerType = type;
@@ -461,6 +462,9 @@ int poTypeChecker::getType(const poToken& token)
     case poTokenType::BOOLEAN:
         type = TYPE_BOOLEAN;
         break;
+    case poTokenType::OBJECT:
+        type = TYPE_OBJECT;
+        break;
     case poTokenType::IDENTIFIER:
         type = _module.getTypeFromName(token.string());
         break;
@@ -513,6 +517,41 @@ void poTypeChecker::checkDecl(poNode* node)
             else
             {
                 setError("Malformed pointer node.", pointerNode->token());
+            }
+        }
+        else if (assignment->left()->type() == poNodeType::DYNAMIC_ARRAY)
+        {
+            poUnaryNode* dynamicArray = static_cast<poUnaryNode*>(assignment->left());
+            if (dynamicArray->child()->type() == poNodeType::VARIABLE)
+            {
+                const int type = getType(decl->token());
+                if (type == -1)
+                {
+                    setError("Undefined type.", decl->token());
+                }
+                const int arrayType = getArrayType(type, 1);
+                if (arrayType == -1)
+                {
+                    setError("Undefined type.", decl->token());
+                }
+                const int rhs = checkExpr(assignment->right());
+                if (!checkEquivalence(arrayType, rhs))
+                {
+                    setError("Error checking types in declaration.", decl->token());
+                }
+                if (!isError() && dynamicArray->child()->type() == poNodeType::VARIABLE)
+                {
+                    const auto& token = dynamicArray->child()->token();
+                    const std::string& name = token.string();
+                    if (!addVariable(name, arrayType))
+                    {
+                        setError("Redefinition of variable.", decl->token());
+                    }
+                }
+            }
+            else
+            {
+                setError("Malformed dynamic array node.", dynamicArray->token());
             }
         }
         else
@@ -672,6 +711,25 @@ void poTypeChecker::checkAssignment(poNode* node)
                 }
 
                 if (!checkEquivalence(type.baseType(), rhs))
+                {
+                    setError("Error checking types in assignment.", assignment->token());
+                }
+            }
+        }
+        else if (assignment->left()->type() == poNodeType::DYNAMIC_ARRAY)
+        {
+            poUnaryNode* dynamicArray = static_cast<poUnaryNode*>(assignment->left());
+            poNode* child = dynamicArray->child();
+            assert(child->type() == poNodeType::VARIABLE);
+            const int variable = getVariable(child->token().string());
+            if (variable == -1)
+            {
+                setError("Variable is not defined.", child->token());
+            }
+            else
+            {
+                poType& type = _module.types()[variable];
+                if (!checkEquivalence(type.id(), rhs))
                 {
                     setError("Error checking types in assignment.", assignment->token());
                 }
@@ -882,6 +940,12 @@ int poTypeChecker::checkCast(poNode* node)
         dstType = getPointerType(dstType, pointerNode->count());
         typeNode = pointerNode;
     }
+    else if (typeNode->child()->type() == poNodeType::ARRAY)
+    {
+        poArrayNode* arrayNode = static_cast<poArrayNode*>(typeNode->child());
+        dstType = getArrayType(dstType, 1);
+        typeNode = arrayNode;
+    }
 
     const int srcType = checkExpr(typeNode->child());
 
@@ -890,13 +954,22 @@ int poTypeChecker::checkCast(poNode* node)
         return dstType; // no cast needed
     }
 
-    const auto& typeData = _module.types()[dstType];
-    if (typeData.isPointer())
+    const auto& dstTypeData = _module.types()[dstType];
+    if (dstTypeData.isPointer())
     {
         return dstType; // pointer type, bitwise cast
     }
+
+    if (dstTypeData.isArray())
+    {
+        poType& srcTypeData = _module.types()[srcType];
+        if (srcTypeData.isPointer() && srcTypeData.baseType() == dstTypeData.baseType())
+        {
+            return dstType; // pointer to array cast
+        }
+    }
     
-    for (poOperator op : typeData.operators())
+    for (poOperator op : dstTypeData.operators())
     {
         if (op.getOperator() == poOperatorType::EXPLICIT_CAST &&
             op.otherType() == srcType)

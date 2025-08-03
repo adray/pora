@@ -20,8 +20,8 @@ namespace Example
     {
         i64 process = (i64)GetCurrentProcessId();
 
-        //startupInfo info;
-        //info.cb = (i32)sizeof(startupInfo);
+        //STARTUPINFO info;
+        //info.cb = (i32)sizeof(STARTUPINFO);
         //GetStartupInfoW(&info);
 
         i64 heap = GetProcessHeap();
@@ -29,6 +29,13 @@ namespace Example
         transform* t = (transform*) HeapAlloc(heap, flags, sizeof(transform));
         t.position.x = 1.0f;
         t.position.y = 5.0f;
+
+        u8[] data = (u8[64])HeapAlloc(heap, flags, 64u);
+        data[0] = 0b;
+        data[1] = 1b;
+        data[2] = 2b;
+        u8 test = data[2];
+
 
         i32 error;
         PROCESSENTRY32 entry;

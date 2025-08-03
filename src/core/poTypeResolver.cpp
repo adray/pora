@@ -265,6 +265,12 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
             if (resolved)
             {
                 const std::string& name = structNode->token().string();
+                const auto& entry = _resolvedTypes.find(name);
+                if (entry != _resolvedTypes.end())
+                {
+                    continue;
+                }
+
                 const int id = int(_module.types().size());
                 _module.addType(poType(id,
                     TYPE_OBJECT,

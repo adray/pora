@@ -33,6 +33,7 @@ namespace po
         TYPE, /* poNode */
         RETURN_TYPE, /* poUnaryNode */
         ARRAY, /* poArrayNode */
+        DYNAMIC_ARRAY, /* poUnaryNode */
         ARRAY_ACCESSOR, /* poArrayAccessorNode */
         DECL, /* poUnaryNode */
         CMP_EQUALS, /* poBinaryNode */

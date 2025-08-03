@@ -346,6 +346,11 @@ void po::syntaxTest()
         "   u16 u = test2();"\
         "}"\
         "}", true);
+    checkSyntax("Type Test #22", "namespace Test {"\
+        "static void main() {"\
+        "   object o;"\
+        "}"\
+        "}", true);
     checkSyntax("Numeric Test #1", "namespace Test {"\
         "static void main() {"\
         "   u64 x = 10000000000000000000u;"\
@@ -898,6 +903,12 @@ void po::syntaxTest()
         "   test(t);"\
         "}"\
         "}", false);
+    checkSyntax("Array Test #15", "namespace Test {"\
+        "extern u8* test();"
+        "static void main() {"\
+        "   u8[] arr;"\
+        "   arr = (u8[12])test();"
+        "}", false);
     checkSyntax("Pointers Test #1", "namespace Test {"\
         "static void main() {"\
         "   i64 x = 900;"\
@@ -1013,6 +1024,12 @@ void po::syntaxTest()
         "   u8 q = 100b;"\
         "   u8* p = &q;"\
         "   i8* w = (i8*)p;"\
+        "}"\
+        "}", true);
+    checkSyntax("Cast Test #7", "namespace Test {"\
+        "static void main() {"\
+        "   u8* q;"\
+        "   u8[] p = (u8[1])q;"\
         "}"\
         "}", true);
     checkSyntax("FFI Test #1", "namespace Test {"\

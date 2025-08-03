@@ -1,6 +1,8 @@
 #include "poParser.h"
 #include "poAST.h"
 
+#include <assert.h>
+
 using namespace po;
 
 poParser::poParser(const std::vector<poToken>& tokens)
@@ -297,6 +299,39 @@ poNode* poFunctionParser::parsePrimary()
                             new poPointerNode(poNodeType::POINTER, parseExpression(), token, pointerCount),
                             token),
                         token);
+                }
+            }
+            else if (_parser.lookahead(poTokenType::OPEN_BRACKET, 0))
+            {
+                isCast = true; /* Cast to an array */
+
+                auto& token = _parser.peek();
+                _parser.advance();
+
+                if (_parser.match(poTokenType::OPEN_BRACKET))
+                {
+                    _parser.advance();
+                }
+
+                if (!_parser.isError() && _parser.match(poTokenType::I64))
+                {
+                    auto& size = _parser.peek();
+                    _parser.advance();
+
+                    if (_parser.match(poTokenType::CLOSE_BRACKET))
+                    {
+                        _parser.advance();
+                    }
+
+                    if (!_parser.isError() && _parser.match(poTokenType::CLOSE_PARAN))
+                    {
+                        _parser.advance();
+
+                        node = new poUnaryNode(poNodeType::CAST,
+                            new poUnaryNode(poNodeType::TYPE,  new poArrayNode(size.i64(), parseExpression(), poNodeType::ARRAY, token),
+                                token),
+                            token);
+                    }
                 }
             }
         }
@@ -933,7 +968,11 @@ poNode* poFunctionParser::parseStatement()
     {
         _parser.advance();
 
-        poNode* accessor = parseExpression(); /* parse the expression in the array accessor */
+        poNode* accessor = nullptr;
+        if (!_parser.match(poTokenType::CLOSE_BRACKET))
+        {
+            accessor = parseExpression(); /* parse the expression in the array accessor */
+        }
 
         if (_parser.match(poTokenType::CLOSE_BRACKET))
         {
@@ -946,23 +985,56 @@ poNode* poFunctionParser::parseStatement()
                 const poToken& name = _parser.peek();
                 _parser.advance();
 
-                if (accessor->type() == poNodeType::CONSTANT)
+                if (accessor != nullptr)
                 {
-                    poNode* variable = new poArrayNode(accessor->token().i64(),
-                        new poNode(poNodeType::VARIABLE, name),
-                        poNodeType::ARRAY, name);
+                    /* Fixed array decl */
 
-                    poNode* decl = new poUnaryNode(poNodeType::DECL,
-                        variable,
-                        id);
-                    statement = new poUnaryNode(poNodeType::STATEMENT, decl, id);
+                    if (accessor->type() == poNodeType::CONSTANT)
+                    {
+                        poNode* variable = new poArrayNode(accessor->token().i64(),
+                            new poNode(poNodeType::VARIABLE, name),
+                            poNodeType::ARRAY, name);
+
+                        poNode* decl = new poUnaryNode(poNodeType::DECL,
+                            variable,
+                            id);
+                        statement = new poUnaryNode(poNodeType::STATEMENT, decl, id);
+                    }
+                    else
+                    {
+                        _parser.setError("Array size must be constant.");
+                    }
+
+                    delete accessor;
                 }
                 else
                 {
-                    _parser.setError("Array size must be constant.");
-                }
+                    /* Dynamic array decl */
 
-                delete accessor;
+                    poNode* variable = new poUnaryNode(
+                        poNodeType::DYNAMIC_ARRAY, 
+                        new poNode(poNodeType::VARIABLE, name),
+                        name);
+
+                    poNode* child = nullptr;
+
+                    if (_parser.match(poTokenType::EQUALS))
+                    {
+                        // Array assignment
+                        poNode* rhs = parseRH(variable);
+                        child = new poUnaryNode(poNodeType::DECL,
+                            rhs,
+                            id);
+                    }
+                    else
+                    {
+                        child = new poUnaryNode(poNodeType::DECL,
+                            variable,
+                            id);
+                    }
+
+                    statement = new poUnaryNode(poNodeType::STATEMENT, child, id);
+                }
             }
             else if (_parser.match(poTokenType::EQUALS))
             {
@@ -1043,6 +1115,7 @@ poNode* poFunctionParser::parseBody(const bool isLoop)
             _parser.match(poTokenType::U8_TYPE) ||
             _parser.match(poTokenType::F32_TYPE) ||
             _parser.match(poTokenType::F64_TYPE) ||
+            _parser.match(poTokenType::OBJECT) ||
             _parser.match(poTokenType::IDENTIFIER) ||
             _parser.match(poTokenType::STAR))
         {
@@ -1158,6 +1231,7 @@ poNode* poFunctionParser::parseArg()
         _parser.match(poTokenType::U8_TYPE) ||
         _parser.match(poTokenType::F64_TYPE) ||
         _parser.match(poTokenType::F32_TYPE) ||
+        _parser.match(poTokenType::OBJECT) ||
         _parser.match(poTokenType::IDENTIFIER))
     {
         auto& type = _parser.peek();

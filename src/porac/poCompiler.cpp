@@ -91,6 +91,7 @@ int poCompiler:: compile()
     poSSA ssa;
     ssa.construct(module);
     module.dump();
+    module.dumpTypes();
 
     // Convert unnecessary memory accesses to registers
     poOptMemToReg regToMem;

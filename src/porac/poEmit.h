@@ -93,8 +93,8 @@ namespace po
         int getType(const poToken& token);
         int getTypeSize(const int type);
         int getVariable(const std::string& name);
-        int getOrAddVariable(const std::string& name, const int type);
-        int addVariable(const std::string& name, const int type);
+        int getOrAddVariable(const std::string& name, const int type, const int qualifiers);
+        int addVariable(const std::string& name, const int type, const int qualifiers);
         int getArrayType(const int baseType, const int arrayRank);
         int getPointerType(const int baseType);
         void getModules(poNode* node);
@@ -139,6 +139,7 @@ namespace po
         std::unordered_map<std::string, poNode*> _functions;
         std::unordered_map<std::string, poVariable> _variables;
         std::vector<int> _types;
+        std::vector<int> _qualifiers;
         int _instructionCount;
         int _returnInstruction;
         bool _isError;

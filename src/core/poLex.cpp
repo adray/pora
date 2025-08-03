@@ -78,6 +78,7 @@ poLexer::poLexer()
     addKeyword("true", poTokenType::TRUE);
     addKeyword("false", poTokenType::FALSE);
     addKeyword("boolean", poTokenType::BOOLEAN);
+    addKeyword("object", poTokenType::OBJECT);
     addKeyword("struct", poTokenType::STRUCT);
     addKeyword("extern", poTokenType::EXTERN);
     addKeyword("null", poTokenType::NULLPTR);
@@ -113,7 +114,7 @@ void poLexer::scanIdentifier()
     while (scanning)
     {
         char ch = peek();
-        if (isLetter(ch) || isDigit(ch))
+        if (isLetter(ch) || isDigit(ch) || ch == '_')
         {
             identifier += ch;
             advance();

@@ -91,6 +91,7 @@ namespace po
         U8_TYPE,
         BOOLEAN,
         VOID,
+        OBJECT,
         NULLPTR,
         SIZEOF
     };
