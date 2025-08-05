@@ -409,12 +409,12 @@ void poCodeGenerator::emitArrayCopy(const int src, const int dst, poBasicBlock* 
         emitInstruction(poInstruction(_instructionCount++, pointerType, src, -1, i * baseType.size(), IR_PTR), bb);
 
         const int load = _instructionCount;
-        emitInstruction(poInstruction(_instructionCount++, srcType.id(), ptr, -1, IR_LOAD), bb);
+        emitInstruction(poInstruction(_instructionCount++, baseType.id(), ptr, -1, IR_LOAD), bb);
 
         const int dstPtr = _instructionCount;
         emitInstruction(poInstruction(_instructionCount++, pointerType, dst, -1, i * baseType.size(), IR_PTR), bb);
 
-        emitInstruction(poInstruction(_instructionCount++, srcType.id(), dstPtr, load, IR_STORE), bb);
+        emitInstruction(poInstruction(_instructionCount++, baseType.id(), dstPtr, load, IR_STORE), bb);
     }
 }
 
