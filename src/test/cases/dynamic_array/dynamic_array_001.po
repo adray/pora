@@ -1,0 +1,18 @@
+import std;
+
+namespace Example
+{
+    extern i64 GetProcessHeap(); // returns HANDLE
+    extern u8* HeapAlloc(
+          i64 handle, // [in] HANDLE hHeap
+          i32 flags, // [in] DWORD  dwFlags
+          u64 numBytes // [in] SIZE_T dwBytes
+        );
+
+    static void main()
+    { 
+        i64 heap = GetProcessHeap();
+        i32 flags;
+        u8[] data = (u8[16]) HeapAlloc(heap, flags, 16u);
+    }
+}

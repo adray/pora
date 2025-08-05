@@ -575,6 +575,10 @@ void poLexer::tokenizeFile(const std::string& filename)
             scanLine(line);
         }
     }
+    else
+    {
+        setError("Could not open file: " + filename);
+    }
 }
 
 void poLexer::reset()

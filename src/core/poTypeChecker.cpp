@@ -163,7 +163,7 @@ bool poTypeChecker::checkEquivalence(const int lhs, const int rhs)
 
     const poType& lhsType = _module.types()[lhs];
     const poType& rhsType = _module.types()[rhs];
-
+    
     if (lhsType.isPointer() && rhsType.id() == TYPE_NULLPTR)
     {
         return true;

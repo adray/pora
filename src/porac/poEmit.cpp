@@ -16,10 +16,11 @@ constexpr int QUALIFIER_CONST = 1;
 // Variable
 //=====================
 
-poVariable::poVariable(const int id, const int type)
+poVariable::poVariable(const int id, const int type, const int size)
     :
     _id(id),
-    _type(type)
+    _type(type),
+    _size(size)
 {
 }
 
@@ -336,7 +337,7 @@ int poCodeGenerator::getVariable(const std::string& name)
     return var;
 }
 
-int poCodeGenerator::getOrAddVariable(const std::string& name, const int type, const int qualifiers)
+int poCodeGenerator::getOrAddVariable(const std::string& name, const int type, const int qualifiers, const int size)
 {
     int var = -1;
     const auto& it = _variables.find(name);
@@ -349,12 +350,12 @@ int poCodeGenerator::getOrAddVariable(const std::string& name, const int type, c
         _types.push_back(type);
         _qualifiers.push_back(qualifiers);
         var = _instructionCount++;
-        _variables.insert(std::pair<std::string, poVariable>(name, poVariable(var, type)));
+        _variables.insert(std::pair<std::string, poVariable>(name, poVariable(var, type, size)));
     }
     return var;
 }
 
-int poCodeGenerator::addVariable(const std::string& name, const int type, const int qualifiers)
+int poCodeGenerator::addVariable(const std::string& name, const int type, const int qualifiers, const int size)
 {
     /* TODO: shadowing variables is broken? */
 
@@ -365,7 +366,7 @@ int poCodeGenerator::addVariable(const std::string& name, const int type, const 
         _types.push_back(type);
         _qualifiers.push_back(qualifiers);
         var = _instructionCount++;
-        _variables.insert(std::pair<std::string, poVariable>(name, poVariable(var, type)));
+        _variables.insert(std::pair<std::string, poVariable>(name, poVariable(var, type, size)));
     }
     return var;
 }
@@ -390,6 +391,31 @@ int poCodeGenerator::emitAlloca(const int type, const int varName, poBasicBlock*
     const int ptrType = getPointerType(type);
     bb->addInstruction(poInstruction(varName, ptrType, 1 /* num elements */, -1, IR_ALLOCA));
     return varName;
+}
+
+void poCodeGenerator::emitArrayCopy(const int src, const int dst, poBasicBlock* bb, const int size)
+{
+    const poType& srcType = _module.types()[_types[src]];
+    const poType& dstType = _module.types()[_types[dst]];
+    assert(srcType.id() == dstType.id());
+    assert(srcType.isArray());
+
+    const poType& baseType = _module.types()[srcType.baseType()];
+    const int pointerType = getPointerType(srcType.id());
+
+    for (int i = 0; i < size; i++)
+    {
+        const int ptr = _instructionCount;
+        emitInstruction(poInstruction(_instructionCount++, pointerType, src, -1, i * baseType.size(), IR_PTR), bb);
+
+        const int load = _instructionCount;
+        emitInstruction(poInstruction(_instructionCount++, srcType.id(), ptr, -1, IR_LOAD), bb);
+
+        const int dstPtr = _instructionCount;
+        emitInstruction(poInstruction(_instructionCount++, pointerType, dst, -1, i * baseType.size(), IR_PTR), bb);
+
+        emitInstruction(poInstruction(_instructionCount++, srcType.id(), dstPtr, load, IR_STORE), bb);
+    }
 }
 
 void poCodeGenerator::emitCopy(const int src, const int dst, poBasicBlock* bb)
@@ -650,7 +676,7 @@ void poCodeGenerator::emitArgs(poNode* node, poFlowGraph& cfg)
             const poType& baseType = _module.types()[code];
 
             const int pointerType = getPointerType(baseType.id());
-            const int var = getOrAddVariable(name, pointerType, QUALIFIER_NONE);
+            const int var = getOrAddVariable(name, pointerType, QUALIFIER_NONE, 1);
             emitParameter(pointerType, bb, paramCount, var);
 
             paramCount++;
@@ -1074,6 +1100,12 @@ void poCodeGenerator::emitAssignment(poNode* node, poFlowGraph& cfg)
         {
             emitCopy(right, variable, cfg.getLast());
         }
+        else if (typeData.isArray())
+        {
+            const auto& it = _variables.find(assignment->left()->token().string());
+            const int size = it->second.size();
+            emitArrayCopy(right, variable, cfg.getLast(), size);
+        }
         else
         {
             const int pointerType = getPointerType(type);
@@ -1215,7 +1247,7 @@ void poCodeGenerator::emitDecl(poNode* node, poFlowGraph& cfg)
             /* Emit an ALLOCA for the variable we are defining */
             const int baseType = getPointerType(type);
             const int ptrType = getPointerType(baseType);
-            const int variable = getOrAddVariable(pointerNode->token().string(), ptrType, QUALIFIER_NONE);
+            const int variable = getOrAddVariable(pointerNode->token().string(), ptrType, QUALIFIER_NONE, 1);
             emitAlloca(baseType, variable, cfg.getLast());
         }
         else if (assignment->left()->type() == poNodeType::DYNAMIC_ARRAY)
@@ -1228,7 +1260,7 @@ void poCodeGenerator::emitDecl(poNode* node, poFlowGraph& cfg)
 
             const int pointerType = getPointerType(type);
             const int pointerType2 = getPointerType(pointerType);
-            const int variable = getOrAddVariable(dynamicArrayNode->token().string(), pointerType2, QUALIFIER_NONE);
+            const int variable = getOrAddVariable(dynamicArrayNode->token().string(), pointerType2, QUALIFIER_NONE, 1);
             emitAlloca(pointerType, variable, cfg.getLast());
         }
         else
@@ -1237,7 +1269,7 @@ void poCodeGenerator::emitDecl(poNode* node, poFlowGraph& cfg)
 
             /* Emit an ALLOCA for the variable we are defining */
             const int ptrType = getPointerType(type);
-            const int variable = getOrAddVariable(assignment->left()->token().string(), ptrType, QUALIFIER_NONE);
+            const int variable = getOrAddVariable(assignment->left()->token().string(), ptrType, QUALIFIER_NONE, 1);
             emitAlloca(type, variable, cfg.getLast());
         }
 
@@ -1253,7 +1285,7 @@ void poCodeGenerator::emitDecl(poNode* node, poFlowGraph& cfg)
 
         const std::string name = variable->token().string();
         const int pointerType = getPointerType(type); /* tODO: we need to get the pointer type with respect to the pointer count.. */
-        addVariable(name, pointerType, QUALIFIER_NONE);
+        addVariable(name, pointerType, QUALIFIER_NONE, 1);
     }
     else if (declNode->child()->type() == poNodeType::ARRAY)
     {
@@ -1265,7 +1297,7 @@ void poCodeGenerator::emitDecl(poNode* node, poFlowGraph& cfg)
 
         const int arrayType = getArrayType(type, 1);
         const std::string name = variable->token().string();
-        const int var = addVariable(name, arrayType, QUALIFIER_NONE);
+        const int var = addVariable(name, arrayType, QUALIFIER_NONE, int(arrayNode->arraySize()));
 
         cfg.getLast()->addInstruction(poInstruction(var, arrayType, int16_t(arrayNode->arraySize()) /* num elements */, -1, IR_ALLOCA));
     }
@@ -1277,7 +1309,7 @@ void poCodeGenerator::emitDecl(poNode* node, poFlowGraph& cfg)
         const std::string name = variable->token().string();
 
         const int ptrType = getPointerType(type);
-        const int var = addVariable(name, ptrType, QUALIFIER_NONE);
+        const int var = addVariable(name, ptrType, QUALIFIER_NONE, 1);
         emitAlloca(type, var, cfg.getLast());
 
         // Assign a default value

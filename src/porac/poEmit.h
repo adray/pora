@@ -17,13 +17,15 @@ namespace po
     class poVariable
     {
     public:
-        poVariable(const int id, const int type);
+        poVariable(const int id, const int type, const int size);
         const int type() const { return _type; }
         const int id() const { return _id; }
+        const int size() const { return _size; }
 
     private:
         int _type;
         int _id;
+        int _size; // array size
     };
 
     class poConditionGraphNode
@@ -93,8 +95,8 @@ namespace po
         int getType(const poToken& token);
         int getTypeSize(const int type);
         int getVariable(const std::string& name);
-        int getOrAddVariable(const std::string& name, const int type, const int qualifiers);
-        int addVariable(const std::string& name, const int type, const int qualifiers);
+        int getOrAddVariable(const std::string& name, const int type, const int qualifiers, const int size);
+        int addVariable(const std::string& name, const int type, const int qualifiers, const int size);
         int getArrayType(const int baseType, const int arrayRank);
         int getPointerType(const int baseType);
         void getModules(poNode* node);
@@ -104,6 +106,7 @@ namespace po
         void emitInstruction(const poInstruction& instruction, poBasicBlock* bb);
         int emitAlloca(const int type, poBasicBlock* bb);
         int emitAlloca(const int type, const int varName, poBasicBlock* bb);
+        void emitArrayCopy(const int src, const int dst, poBasicBlock* bb, const int size);
         void emitCopy(const int src, const int dst, poBasicBlock* bb);
         void emitFunction(poNode* node, poFunction& function);
         void emitBody(poNode* node, poFlowGraph& cfg, poBasicBlock* loopHeader, poBasicBlock* loopEnd);
