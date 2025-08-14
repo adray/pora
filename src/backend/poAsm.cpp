@@ -13,21 +13,6 @@
 
 using namespace po;
 
-//=================
-// poAsmJump
-//=================
-
-poAsmJump::poAsmJump(const int programDataPos, const int jumpType, const int size, poBasicBlock* bb, const int type)
-    :
-    _programDataPos(programDataPos),
-    _jumpType(jumpType),
-    _type(type),
-    _size(size),
-    _bb(bb),
-    _applied(false)
-{
-}
-
 //====================
 // poAsmBasicBlock
 //====================
@@ -94,23 +79,23 @@ void poAsm::ir_element_ptr(poModule& module, poRegLinear& linear, const poInstru
             // TODO: change to LEA? (load effective address)
             // ESP + offset + operand * size
 
-            _x86_64.mc_mov_imm_to_reg_x64(dst, size);
-            _x86_64.mc_mul_reg_to_reg_x64(dst, operand);
+            _x86_64_lower.mc_mov_imm_to_reg_x64(dst, size); //emit_unary_instruction(dst, VMI_MOV64_SRC_IMM_DST_REG);
+            _x86_64_lower.mc_mul_reg_to_reg_x64(dst, operand);
 
-            _x86_64.mc_add_reg_to_reg_x64(dst, VM_REGISTER_ESP);
+            _x86_64_lower.mc_add_reg_to_reg_x64(dst, VM_REGISTER_ESP);
             if (offset > 0)
             {
-                _x86_64.mc_add_imm_to_reg_x64(dst, offset);
+                _x86_64_lower.mc_add_imm_to_reg_x64(dst, offset);
             }
         }
         else
         {
             // ESP + offset
 
-            _x86_64.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_ESP);
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_ESP);
             if (offset > 0)
             {
-                _x86_64.mc_add_imm_to_reg_x64(dst, offset);
+                _x86_64_lower.mc_add_imm_to_reg_x64(dst, offset);
             }
         }
     }
@@ -124,16 +109,16 @@ void poAsm::ir_element_ptr(poModule& module, poRegLinear& linear, const poInstru
             // TODO: change to LEA? (load effective address)
             // left + operand * size
 
-            _x86_64.mc_mov_imm_to_reg_x64(dst, size);
-            _x86_64.mc_mul_reg_to_reg_x64(dst, operand);
+            _x86_64_lower.mc_mov_imm_to_reg_x64(dst, size);
+            _x86_64_lower.mc_mul_reg_to_reg_x64(dst, operand);
 
-            _x86_64.mc_add_reg_to_reg_x64(dst, left);
+            _x86_64_lower.mc_add_reg_to_reg_x64(dst, left);
         }
         else
         {
             const int left = linear.getRegisterByVariable(ins.left());
-            _x86_64.mc_mov_imm_to_reg_x64(dst, size);
-            _x86_64.mc_add_reg_to_reg_x64(dst, left);
+            _x86_64_lower.mc_mov_imm_to_reg_x64(dst, size);
+            _x86_64_lower.mc_add_reg_to_reg_x64(dst, left);
         }
     }
 }
@@ -148,10 +133,10 @@ void poAsm::ir_ptr(poModule& module, poRegLinear& linear, const poInstruction& i
         // We need to get the pointer to the variable (left) optionally adding the variable (right) and the memory offset.
 
         const int offset = slot * 8 + ins.memOffset();
-        _x86_64.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_ESP);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_ESP);
         if (offset > 0)
         {
-            _x86_64.mc_add_imm_to_reg_x64(dst, offset);
+            _x86_64_lower.mc_add_imm_to_reg_x64(dst, offset);
         }
     }
     else
@@ -160,10 +145,10 @@ void poAsm::ir_ptr(poModule& module, poRegLinear& linear, const poInstruction& i
         // We are just adding a memory offset to the existing pointer
 
         const int src = linear.getRegisterByVariable(ins.left());
-        _x86_64.mc_mov_reg_to_reg_x64(dst, src);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
         if (ins.memOffset() > 0)
         {
-            _x86_64.mc_add_imm_to_reg_x64(dst, ins.memOffset());
+            _x86_64_lower.mc_add_imm_to_reg_x64(dst, ins.memOffset());
         }
     }
 }
@@ -187,17 +172,17 @@ void poAsm::ir_load(poRegLinear& linear, const poInstruction& ins)
     case TYPE_U16:
     case TYPE_I8:
     case TYPE_U8:
-        _x86_64.mc_mov_memory_to_reg_x64(dst, src, 0);
+        _x86_64_lower.mc_mov_memory_to_reg_x64(dst, src, 0);
         break;
     case TYPE_F64:
-        _x86_64.mc_movsd_memory_to_reg_x64(dst_sse, src, 0);
+        _x86_64_lower.mc_movsd_memory_to_reg_x64(dst_sse, src, 0);
         break;
     case TYPE_F32:
-        _x86_64.mc_movss_memory_to_reg_x64(dst_sse, src, 0);
+        _x86_64_lower.mc_movss_memory_to_reg_x64(dst_sse, src, 0);
         break;
     default:
         /* copy pointer value */
-        _x86_64.mc_mov_memory_to_reg_x64(dst, src, 0);
+        _x86_64_lower.mc_mov_memory_to_reg_x64(dst, src, 0);
         break;
     }
 }
@@ -222,23 +207,23 @@ void poAsm::ir_store(poRegLinear& linear, const poInstruction& ins)
     case TYPE_U16:
     case TYPE_I8:
     case TYPE_U8:
-        _x86_64.mc_mov_reg_to_memory_x64(dst, 0, src);
+        _x86_64_lower.mc_mov_reg_to_memory_x64(dst, 0, src);
         break;
     case TYPE_F64:
-        _x86_64.mc_movsd_reg_to_memory_x64(dst, src_sse, 0);
+        _x86_64_lower.mc_movsd_reg_to_memory_x64(dst, src_sse, 0);
         break;
     case TYPE_F32:
-        _x86_64.mc_movss_reg_to_memory_x64(dst, src_sse, 0);
+        _x86_64_lower.mc_movss_reg_to_memory_x64(dst, src_sse, 0);
         break;
     default:
         /* copy pointer value (stack) */
         if (src_slot != -1)
         {
-            _x86_64.mc_mov_reg_to_memory_x64(dst, src_slot * 8, VM_REGISTER_ESP);
+            _x86_64_lower.mc_mov_reg_to_memory_x64(dst, src_slot * 8, VM_REGISTER_ESP);
         }
         else
         {
-            _x86_64.mc_mov_reg_to_memory_x64(dst, 0, src);
+            _x86_64_lower.mc_mov_reg_to_memory_x64(dst, 0, src);
         }
         break;
     }
@@ -255,18 +240,18 @@ void poAsm::ir_zero_extend(poRegLinear& linear, const poInstruction& ins)
     switch (srcType)
     {
     case TYPE_U32:
-        if (src != VM_REGISTER_EAX) { _x86_64.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, src); }
-        _x86_64.mc_cdqe();
-        if (dst != VM_REGISTER_EAX) { _x86_64.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX); }
+        if (src != VM_REGISTER_EAX) { _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, src); }
+        _x86_64_lower.mc_cdqe();
+        if (dst != VM_REGISTER_EAX) { _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX); }
         break;
     case TYPE_U16:
         switch (ins.type())
         {
         case TYPE_U64:
-            _x86_64.mc_movsx_16_to_64_reg_to_reg(dst, src);
+            _x86_64_lower.mc_movsx_16_to_64_reg_to_reg(dst, src);
             break;
         case TYPE_U32:
-            _x86_64.mc_movsx_16_to_32_reg_to_reg(dst, src);
+            _x86_64_lower.mc_movsx_16_to_32_reg_to_reg(dst, src);
             break;
         }
         break;
@@ -274,13 +259,13 @@ void poAsm::ir_zero_extend(poRegLinear& linear, const poInstruction& ins)
         switch (ins.type())
         {
         case TYPE_U64:
-            _x86_64.mc_movzx_8_to_64_reg_to_reg(dst, src);
+            _x86_64_lower.mc_movzx_8_to_64_reg_to_reg(dst, src);
             break;
         case TYPE_U32:
-            _x86_64.mc_movzx_8_to_32_reg_to_reg(dst, src);
+            _x86_64_lower.mc_movzx_8_to_32_reg_to_reg(dst, src);
             break;
         case TYPE_U16:
-            _x86_64.mc_movzx_8_to_16_reg_to_reg(dst, src);
+            _x86_64_lower.mc_movzx_8_to_16_reg_to_reg(dst, src);
             break;
         }
         break;
@@ -297,16 +282,16 @@ void poAsm::ir_sign_extend(poRegLinear& linear, const poInstruction& ins)
     switch (srcType)
     {
     case TYPE_I32:
-        _x86_64.mc_movsx_32_to_64_reg_to_reg(dst, src);
+        _x86_64_lower.mc_movsx_32_to_64_reg_to_reg(dst, src);
         break;
     case TYPE_I16:
         switch (ins.type())
         {
         case TYPE_I64:
-            _x86_64.mc_movsx_16_to_64_reg_to_reg(dst, src);
+            _x86_64_lower.mc_movsx_16_to_64_reg_to_reg(dst, src);
             break;
         case TYPE_I32:
-            _x86_64.mc_movsx_16_to_32_reg_to_reg(dst, src);
+            _x86_64_lower.mc_movsx_16_to_32_reg_to_reg(dst, src);
             break;
         }
         break;
@@ -314,13 +299,13 @@ void poAsm::ir_sign_extend(poRegLinear& linear, const poInstruction& ins)
         switch (ins.type())
         {
         case TYPE_I64:
-            _x86_64.mc_movsx_8_to_64_reg_to_reg(dst, src);
+            _x86_64_lower.mc_movsx_8_to_64_reg_to_reg(dst, src);
             break;
         case TYPE_I32:
-            _x86_64.mc_movsx_8_to_32_reg_to_reg(dst, src);
+            _x86_64_lower.mc_movsx_8_to_32_reg_to_reg(dst, src);
             break;
         case TYPE_I16:
-            _x86_64.mc_movsx_8_to_16_reg_to_reg(dst, src);
+            _x86_64_lower.mc_movsx_8_to_16_reg_to_reg(dst, src);
             break;
         }
         break;
@@ -334,7 +319,7 @@ void poAsm::ir_bitwise_cast(poRegLinear& linear, const poInstruction& ins)
 
     if (src != dst)
     {
-        _x86_64.mc_mov_reg_to_reg_x64(dst, src);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
     }
 }
 
@@ -351,13 +336,13 @@ void poAsm::ir_convert(poRegLinear& linear, const poInstruction& ins)
     switch (srcType)
     {
     case TYPE_I32:
-        _x86_64.mc_movsx_32_to_64_reg_to_reg(src, src);
+        _x86_64_lower.mc_movsx_32_to_64_reg_to_reg(src, src);
         break;
     case TYPE_I16:
-        _x86_64.mc_movsx_16_to_64_reg_to_reg(src, src);
+        _x86_64_lower.mc_movsx_16_to_64_reg_to_reg(src, src);
         break;
     case TYPE_I8:
-        _x86_64.mc_movsx_8_to_64_reg_to_reg(src, src);
+        _x86_64_lower.mc_movsx_8_to_64_reg_to_reg(src, src);
         break;
     default:
         break;
@@ -374,10 +359,10 @@ void poAsm::ir_convert(poRegLinear& linear, const poInstruction& ins)
         switch (ins.type())
         {
         case TYPE_F64:
-            _x86_64.mc_cvtitod_reg_to_reg_x64(dst_sse, src);
+            _x86_64_lower.mc_cvtitod_reg_to_reg_x64(dst_sse, src);
             break;
         case TYPE_F32:
-            _x86_64.mc_cvtitos_reg_to_reg_x64(dst_sse, src);
+            _x86_64_lower.mc_cvtitos_reg_to_reg_x64(dst_sse, src);
             break;
         }
         break;
@@ -412,43 +397,43 @@ void poAsm::ir_add(poRegLinear& linear, const poInstruction& ins)
     {
     case TYPE_I64:
     case TYPE_U64:
-        if (dst == src2) { _x86_64.mc_add_reg_to_reg_x64(dst, src1); }
-        else if (dst == src1) { _x86_64.mc_add_reg_to_reg_x64(dst, src2); }
+        if (dst == src2) { _x86_64_lower.mc_add_reg_to_reg_x64(dst, src1); }
+        else if (dst == src1) { _x86_64_lower.mc_add_reg_to_reg_x64(dst, src2); }
         else {
-            _x86_64.mc_mov_reg_to_reg_x64(dst, src1);
-            _x86_64.mc_add_reg_to_reg_x64(dst, src2);
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src1);
+            _x86_64_lower.mc_add_reg_to_reg_x64(dst, src2);
         }
         break;
     case TYPE_I32:
     case TYPE_U32:
-        if (dst == src2) { _x86_64.mc_add_reg_to_reg_32(dst, src1); }
-        else if (dst == src1) { _x86_64.mc_add_reg_to_reg_32(dst, src2); }
+        if (dst == src2) { _x86_64_lower.mc_add_reg_to_reg_32(dst, src1); }
+        else if (dst == src1) { _x86_64_lower.mc_add_reg_to_reg_32(dst, src2); }
         else {
-            _x86_64.mc_mov_reg_to_reg_32(dst, src1);
-            _x86_64.mc_add_reg_to_reg_32(dst, src2);
+            _x86_64_lower.mc_mov_reg_to_reg_32(dst, src1);
+            _x86_64_lower.mc_add_reg_to_reg_32(dst, src2);
         }
         break;
     case TYPE_I16:
     case TYPE_U16:
-        if (dst == src2) { _x86_64.mc_add_reg_to_reg_16(dst, src1); }
-        else if (dst == src1) { _x86_64.mc_add_reg_to_reg_16(dst, src2); }
+        if (dst == src2) { _x86_64_lower.mc_add_reg_to_reg_16(dst, src1); }
+        else if (dst == src1) { _x86_64_lower.mc_add_reg_to_reg_16(dst, src2); }
         else {
-            _x86_64.mc_mov_reg_to_reg_16(dst, src1);
-            _x86_64.mc_add_reg_to_reg_16(dst, src2);
+            _x86_64_lower.mc_mov_reg_to_reg_16(dst, src1);
+            _x86_64_lower.mc_add_reg_to_reg_16(dst, src2);
         }
         break;
     case TYPE_F32:
-        if (sse_dst != sse_src1) { _x86_64.mc_movss_reg_to_reg_x64(sse_dst, sse_src1); }
-        _x86_64.mc_addss_reg_to_reg_x64(sse_dst, sse_src2);
+        if (sse_dst != sse_src1) { _x86_64_lower.mc_movss_reg_to_reg_x64(sse_dst, sse_src1); }
+        _x86_64_lower.mc_addss_reg_to_reg_x64(sse_dst, sse_src2);
         break;
     case TYPE_F64:
-        if (sse_dst != sse_src1) { _x86_64.mc_movsd_reg_to_reg_x64(sse_dst, sse_src1); }
-        _x86_64.mc_addsd_reg_to_reg_x64(sse_dst, sse_src2);
+        if (sse_dst != sse_src1) { _x86_64_lower.mc_movsd_reg_to_reg_x64(sse_dst, sse_src1); }
+        _x86_64_lower.mc_addsd_reg_to_reg_x64(sse_dst, sse_src2);
         break;
     case TYPE_I8:
     case TYPE_U8:
-        if (dst != src1) { _x86_64.mc_mov_reg_to_reg_8(dst, src1); }
-        _x86_64.mc_add_reg_to_reg_8(dst, src2);
+        if (dst != src1) { _x86_64_lower.mc_mov_reg_to_reg_8(dst, src1); }
+        _x86_64_lower.mc_add_reg_to_reg_8(dst, src2);
         break;
     default:
         std::stringstream ss;
@@ -473,39 +458,39 @@ void poAsm::ir_sub(poRegLinear& linear, const poInstruction& ins)
     case TYPE_I64:
     case TYPE_U64:
         if (dst != src1) {
-            _x86_64.mc_mov_reg_to_reg_x64(dst, src1);
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src1);
         }
-        _x86_64.mc_sub_reg_to_reg_x64(dst, src2);
+        _x86_64_lower.mc_sub_reg_to_reg_x64(dst, src2);
         break;
     case TYPE_I32:
     case TYPE_U32:
         if (dst != src1) {
-            _x86_64.mc_mov_reg_to_reg_32(dst, src1);
+            _x86_64_lower.mc_mov_reg_to_reg_32(dst, src1);
         }
-        _x86_64.mc_sub_reg_to_reg_32(dst, src2);
+        _x86_64_lower.mc_sub_reg_to_reg_32(dst, src2);
         break;
     case TYPE_I16:
     case TYPE_U16:
         if (dst != src1) {
-            _x86_64.mc_mov_reg_to_reg_16(dst, src1);
+            _x86_64_lower.mc_mov_reg_to_reg_16(dst, src1);
         }
-        _x86_64.mc_sub_reg_to_reg_16(dst, src2);
+        _x86_64_lower.mc_sub_reg_to_reg_16(dst, src2);
         break;
     case TYPE_F32:
-        if (sse_dst != sse_src1) { _x86_64.mc_movss_reg_to_reg_x64(sse_dst, sse_src1); }
-        _x86_64.mc_subss_reg_to_reg_x64(sse_dst, sse_src2);
+        if (sse_dst != sse_src1) { _x86_64_lower.mc_movss_reg_to_reg_x64(sse_dst, sse_src1); }
+        _x86_64_lower.mc_subss_reg_to_reg_x64(sse_dst, sse_src2);
         break;
     case TYPE_F64:
-        if (sse_dst != sse_src1) { _x86_64.mc_movsd_reg_to_reg_x64(sse_dst, sse_src1); }
-        _x86_64.mc_subsd_reg_to_reg_x64(sse_dst, sse_src2);
+        if (sse_dst != sse_src1) { _x86_64_lower.mc_movsd_reg_to_reg_x64(sse_dst, sse_src1); }
+        _x86_64_lower.mc_subsd_reg_to_reg_x64(sse_dst, sse_src2);
         break;
     case TYPE_I8:
     case TYPE_U8:
         if (dst != src1)
         {
-            _x86_64.mc_mov_reg_to_reg_8(dst, src1);
+            _x86_64_lower.mc_mov_reg_to_reg_8(dst, src1);
         }
-        _x86_64.mc_sub_reg_to_reg_8(dst, src2);
+        _x86_64_lower.mc_sub_reg_to_reg_8(dst, src2);
         break;
     default:
         std::stringstream ss;
@@ -529,69 +514,69 @@ void poAsm::ir_mul(poRegLinear& linear, const poInstruction& ins)
     {
     case TYPE_I64:
         if (dst != src1) {
-            _x86_64.mc_mov_reg_to_reg_x64(dst, src1);
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src1);
         }
-        _x86_64.mc_mul_reg_to_reg_x64(dst, src2);
+        _x86_64_lower.mc_mul_reg_to_reg_x64(dst, src2);
         break;
     case TYPE_U64:
         if (src1 != VM_REGISTER_EAX) {
-            _x86_64.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, src1);
+            _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, src1);
         }
-        _x86_64.mc_umul_reg_to_reg_x64(src2);
+        _x86_64_lower.mc_umul_reg_to_reg_x64(src2);
         if (dst != VM_REGISTER_EAX) {
-            _x86_64.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX);
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX);
         }
         break;
     case TYPE_I32:
         if (dst != src1) {
-            _x86_64.mc_mov_reg_to_reg_32(dst, src1);
+            _x86_64_lower.mc_mov_reg_to_reg_32(dst, src1);
         }
-        _x86_64.mc_mul_reg_to_reg_32(dst, src2);
+        _x86_64_lower.mc_mul_reg_to_reg_32(dst, src2);
         break;
     case TYPE_U32:
         if (src1 != VM_REGISTER_EAX) {
-            _x86_64.mc_mov_reg_to_reg_32(VM_REGISTER_EAX, src1);
+            _x86_64_lower.mc_mov_reg_to_reg_32(VM_REGISTER_EAX, src1);
         }
-        _x86_64.mc_umul_reg_to_reg_32(src2);
+        _x86_64_lower.mc_umul_reg_to_reg_32(src2);
         if (dst != VM_REGISTER_EAX) {
-            _x86_64.mc_mov_reg_to_reg_32(dst, VM_REGISTER_EAX);
+            _x86_64_lower.mc_mov_reg_to_reg_32(dst, VM_REGISTER_EAX);
         }
         break;
     case TYPE_I16:
         if (dst != src1) {
-            _x86_64.mc_mov_reg_to_reg_16(dst, src1);
+            _x86_64_lower.mc_mov_reg_to_reg_16(dst, src1);
         }
-        _x86_64.mc_mul_reg_to_reg_16(dst, src2);
+        _x86_64_lower.mc_mul_reg_to_reg_16(dst, src2);
         break;
     case TYPE_U16:
         if (src1 != VM_REGISTER_EAX) {
-            _x86_64.mc_mov_reg_to_reg_16(VM_REGISTER_EAX, src1);
+            _x86_64_lower.mc_mov_reg_to_reg_16(VM_REGISTER_EAX, src1);
         }
-        _x86_64.mc_umul_reg_to_reg_16(src2);
+        _x86_64_lower.mc_umul_reg_to_reg_16(src2);
         if (dst != VM_REGISTER_EAX) {
-            _x86_64.mc_mov_reg_to_reg_16(dst, VM_REGISTER_EAX);
+            _x86_64_lower.mc_mov_reg_to_reg_16(dst, VM_REGISTER_EAX);
         }
         break;
     case TYPE_F32:
-        if (sse_dst != sse_src1) { _x86_64.mc_movss_reg_to_reg_x64(sse_dst, sse_src1); }
-        _x86_64.mc_mulss_reg_to_reg_x64(sse_dst, sse_src2);
+        if (sse_dst != sse_src1) { _x86_64_lower.mc_movss_reg_to_reg_x64(sse_dst, sse_src1); }
+        _x86_64_lower.mc_mulss_reg_to_reg_x64(sse_dst, sse_src2);
         break;
     case TYPE_F64:
-        if (sse_dst != sse_src1) { _x86_64.mc_movsd_reg_to_reg_x64(sse_dst, sse_src1); }
-        _x86_64.mc_mulsd_reg_to_reg_x64(sse_dst, sse_src2);
+        if (sse_dst != sse_src1) { _x86_64_lower.mc_movsd_reg_to_reg_x64(sse_dst, sse_src1); }
+        _x86_64_lower.mc_mulsd_reg_to_reg_x64(sse_dst, sse_src2);
         break;
     case TYPE_I8:
-        _x86_64.mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
-        _x86_64.mc_mul_reg_8(src2);
-        _x86_64.mc_mov_reg_to_reg_8(dst, VM_REGISTER_EAX);
+        _x86_64_lower.mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_mul_reg_8(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_8(dst, VM_REGISTER_EAX);
         break;
     case TYPE_U8:
         if (src1 != VM_REGISTER_EAX) {
-            _x86_64.mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
+            _x86_64_lower.mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
         }
-        _x86_64.mc_umul_reg_8(src2);
+        _x86_64_lower.mc_umul_reg_8(src2);
         if (dst != VM_REGISTER_EAX) {
-            _x86_64.mc_mov_reg_to_reg_8(dst, VM_REGISTER_EAX);
+            _x86_64_lower.mc_mov_reg_to_reg_8(dst, VM_REGISTER_EAX);
         }
         break;
     default:
@@ -615,60 +600,60 @@ void poAsm::ir_div(poRegLinear& linear, const poInstruction& ins)
     switch (ins.type())
     {
     case TYPE_I64:
-        _x86_64.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, src1);
-        _x86_64.mc_mov_imm_to_reg_x64(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
-        _x86_64.mc_div_reg_x64(src2);
-        _x86_64.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_mov_imm_to_reg_x64(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
+        _x86_64_lower.mc_div_reg_x64(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX);
         break;
     case TYPE_U64:
-        _x86_64.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, src1);
-        _x86_64.mc_mov_imm_to_reg_x64(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
-        _x86_64.mc_udiv_reg_x64(src2);
-        _x86_64.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_mov_imm_to_reg_x64(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
+        _x86_64_lower.mc_udiv_reg_x64(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX);
         break;
     case TYPE_I32:
-        _x86_64.mc_mov_reg_to_reg_32(VM_REGISTER_EAX, src1);
-        _x86_64.mc_mov_imm_to_reg_32(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
-        _x86_64.mc_div_reg_32(src2);
-        _x86_64.mc_mov_reg_to_reg_32(dst, VM_REGISTER_EAX);
+        _x86_64_lower.mc_mov_reg_to_reg_32(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_mov_imm_to_reg_32(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
+        _x86_64_lower.mc_div_reg_32(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_32(dst, VM_REGISTER_EAX);
         break;
     case TYPE_U32:
-        _x86_64.mc_mov_reg_to_reg_32(VM_REGISTER_EAX, src1);
-        _x86_64.mc_mov_imm_to_reg_32(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
-        _x86_64.mc_udiv_reg_32(src2);
-        _x86_64.mc_mov_reg_to_reg_32(dst, VM_REGISTER_EAX);
+        _x86_64_lower.mc_mov_reg_to_reg_32(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_mov_imm_to_reg_32(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
+        _x86_64_lower.mc_udiv_reg_32(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_32(dst, VM_REGISTER_EAX);
         break;
     case TYPE_I16:
-        _x86_64.mc_mov_reg_to_reg_16(VM_REGISTER_EAX, src1);
-        _x86_64.mc_mov_imm_to_reg_16(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
-        _x86_64.mc_div_reg_16(src2);
-        _x86_64.mc_mov_reg_to_reg_16(dst, VM_REGISTER_EAX);
+        _x86_64_lower.mc_mov_reg_to_reg_16(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_mov_imm_to_reg_16(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
+        _x86_64_lower.mc_div_reg_16(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_16(dst, VM_REGISTER_EAX);
         break;
     case TYPE_U16:
-        _x86_64.mc_mov_reg_to_reg_16(VM_REGISTER_EAX, src1);
-        _x86_64.mc_mov_imm_to_reg_16(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
-        _x86_64.mc_udiv_reg_16(src2);
-        _x86_64.mc_mov_reg_to_reg_16(dst, VM_REGISTER_EAX);
+        _x86_64_lower.mc_mov_reg_to_reg_16(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_mov_imm_to_reg_16(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
+        _x86_64_lower.mc_udiv_reg_16(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_16(dst, VM_REGISTER_EAX);
         break;
     case TYPE_I8:
-        _x86_64.mc_mov_imm_to_reg_x64(VM_REGISTER_EAX, 0); // TODO: replace with XOR?
-        _x86_64.mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
-        _x86_64.mc_div_reg_8(src2);
-        _x86_64.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX);
+        _x86_64_lower.mc_mov_imm_to_reg_x64(VM_REGISTER_EAX, 0); // TODO: replace with XOR?
+        _x86_64_lower.mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_div_reg_8(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX);
         break;
     case TYPE_U8:
-        _x86_64.mc_mov_imm_to_reg_x64(VM_REGISTER_EAX, 0); // TODO: replace with XOR?
-        _x86_64.mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
-        _x86_64.mc_udiv_reg_8(src2);
-        _x86_64.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX);
+        _x86_64_lower.mc_mov_imm_to_reg_x64(VM_REGISTER_EAX, 0); // TODO: replace with XOR?
+        _x86_64_lower.mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_udiv_reg_8(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX);
         break;
     case TYPE_F32:
-        if (sse_dst != sse_src1) { _x86_64.mc_movss_reg_to_reg_x64(sse_dst, sse_src1); }
-        _x86_64.mc_divss_reg_to_reg_x64(sse_dst, sse_src2);
+        if (sse_dst != sse_src1) { _x86_64_lower.mc_movss_reg_to_reg_x64(sse_dst, sse_src1); }
+        _x86_64_lower.mc_divss_reg_to_reg_x64(sse_dst, sse_src2);
         break;
     case TYPE_F64:
-        if (sse_dst != sse_src1) { _x86_64.mc_movsd_reg_to_reg_x64(sse_dst, sse_src1); }
-        _x86_64.mc_divsd_reg_to_reg_x64(sse_dst, sse_src2);
+        if (sse_dst != sse_src1) { _x86_64_lower.mc_movsd_reg_to_reg_x64(sse_dst, sse_src1); }
+        _x86_64_lower.mc_divsd_reg_to_reg_x64(sse_dst, sse_src2);
         break;
     default:
         std::stringstream ss;
@@ -690,25 +675,25 @@ void poAsm::ir_cmp(poRegLinear& linear, const poInstruction& ins)
     {
     case TYPE_I64:
     case TYPE_U64:
-        _x86_64.mc_cmp_reg_to_reg_x64(src1, src2);
+        _x86_64_lower.mc_cmp_reg_to_reg_x64(src1, src2);
         break;
     case TYPE_I32:
     case TYPE_U32:
-        _x86_64.mc_cmp_reg_to_reg_32(src1, src2);
+        _x86_64_lower.mc_cmp_reg_to_reg_32(src1, src2);
         break;
     case TYPE_I16:
     case TYPE_U16:
-        _x86_64.mc_cmp_reg_to_reg_16(src1, src2);
+        _x86_64_lower.mc_cmp_reg_to_reg_16(src1, src2);
         break;
     case TYPE_U8:
     case TYPE_I8:
-        _x86_64.mc_cmp_reg_to_reg_8(src1, src2);
+        _x86_64_lower.mc_cmp_reg_to_reg_8(src1, src2);
         break;
     case TYPE_F64:
-        _x86_64.mc_ucmpd_reg_to_reg_x64(sse_src1, sse_src2);
+        _x86_64_lower.mc_ucmpd_reg_to_reg_x64(sse_src1, sse_src2);
         break;
     case TYPE_F32:
-        _x86_64.mc_ucmps_reg_to_reg_x64(sse_src1, sse_src2);
+        _x86_64_lower.mc_ucmps_reg_to_reg_x64(sse_src1, sse_src2);
         break;
     default:
         std::stringstream ss;
@@ -720,38 +705,15 @@ void poAsm::ir_cmp(poRegLinear& linear, const poInstruction& ins)
 
 void poAsm::ir_br(poRegLinear& linear, const poInstruction& ins, poBasicBlock* bb)
 {
-    poBasicBlock* targetBB = bb->getBranch();
-
-    // Check if the targetBB has been visited already, is which case 
-
-    poAsmBasicBlock& targetAsmBB = _basicBlocks[_basicBlockMap[targetBB]];
-    if (targetAsmBB.getPos() != 0)
+    po_x86_64_basic_block* abb = _basicBlockMap[bb];
+    if (bb->getBranch())
     {
-        const int imm = targetAsmBB.getPos() - (int(_x86_64.programData().size()) + 5/*TODO*/);
-
-        ir_jump(ins.left(), imm, ins.type());
+        abb->setJumpTarget(_basicBlockMap[bb->getBranch()]);
+        abb->jumpBlock()->incomingBlocks().push_back(abb);
     }
-    else
-    {
-        // Insert patch
 
-        const int pos = int(_x86_64.programData().size());
-
-        /* Insert after we have got the position */
-        if (ins.left() == IR_JUMP_UNCONDITIONAL)
-        {
-            _x86_64.mc_jump_unconditional(0);
-        }
-        else
-        {
-            _x86_64.mc_jump_equals(0);
-        }
-
-        const int size = int(_x86_64.programData().size()) - pos;
-
-        poAsmBasicBlock* asmBB = &_basicBlocks[_basicBlockMap[bb]];
-        asmBB->jumps().push_back(poAsmJump(pos, ins.left(), size, targetBB, ins.type()));
-    }
+    // Generate the jump instruction, the immediate value is 0 as we will patch it later
+    ir_jump(ins.left(), 0, ins.type());
 }
 
 void poAsm::ir_copy(poRegLinear& linear, const poInstruction& ins)
@@ -774,19 +736,19 @@ void poAsm::ir_copy(poRegLinear& linear, const poInstruction& ins)
     case TYPE_U8:
         if (dst != src)
         {
-            _x86_64.mc_mov_reg_to_reg_x64(dst, src);
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
         }
         break;
     case TYPE_F32:
         if (sse_dst != sse_src)
         {
-            _x86_64.mc_movss_reg_to_reg_x64(sse_dst, sse_src);
+            _x86_64_lower.mc_movss_reg_to_reg_x64(sse_dst, sse_src);
         }
         break;
     case TYPE_F64:
         if (sse_dst != sse_src)
         {
-            _x86_64.mc_movsd_reg_to_reg_x64(sse_dst, sse_src);
+            _x86_64_lower.mc_movsd_reg_to_reg_x64(sse_dst, sse_src);
         }
         break;
     default:
@@ -813,36 +775,36 @@ void poAsm::ir_constant(poConstantPool& constants, poRegLinear& linear, const po
     switch (ins.type())
     {
     case TYPE_I64:
-        _x86_64.mc_mov_imm_to_reg_x64(dst, constants.getI64(ins.constant()));
+        _x86_64_lower.mc_mov_imm_to_reg_x64(dst, constants.getI64(ins.constant()));
         break;
     case TYPE_U64:
-        _x86_64.mc_mov_imm_to_reg_x64(dst, constants.getU64(ins.constant()));
+        _x86_64_lower.mc_mov_imm_to_reg_x64(dst, constants.getU64(ins.constant()));
         break;
     case TYPE_I32:
-        _x86_64.mc_mov_imm_to_reg_32(dst, constants.getI32(ins.constant()));
+        _x86_64_lower.mc_mov_imm_to_reg_32(dst, constants.getI32(ins.constant()));
         break;
     case TYPE_U32:
-        _x86_64.mc_mov_imm_to_reg_32(dst, int(constants.getU32(ins.constant())));
+        _x86_64_lower.mc_mov_imm_to_reg_32(dst, int(constants.getU32(ins.constant())));
         break;
     case TYPE_I16:
-        _x86_64.mc_mov_imm_to_reg_16(dst, constants.getI16(ins.constant()));
+        _x86_64_lower.mc_mov_imm_to_reg_16(dst, constants.getI16(ins.constant()));
         break;
     case TYPE_U16:
-        _x86_64.mc_mov_imm_to_reg_16(dst, char(constants.getU16(ins.constant())));
+        _x86_64_lower.mc_mov_imm_to_reg_16(dst, char(constants.getU16(ins.constant())));
         break;
     case TYPE_I8:
-        _x86_64.mc_mov_imm_to_reg_8(dst, constants.getI8(ins.constant()));
+        _x86_64_lower.mc_mov_imm_to_reg_8(dst, constants.getI8(ins.constant()));
         break;
     case TYPE_U8:
-        _x86_64.mc_mov_imm_to_reg_8(dst, char(constants.getU8(ins.constant())));
+        _x86_64_lower.mc_mov_imm_to_reg_8(dst, char(constants.getU8(ins.constant())));
         break;
     case TYPE_F32:
-        _x86_64.mc_movss_memory_to_reg_x64(dstSSE, 0);
-        addInitializedData(constants.getF32(ins.constant()), -int(sizeof(int32_t))); // insert patch
+        _x86_64_lower.mc_movss_memory_to_reg_x64(dstSSE, 0);
+        _x86_64_lower.cfg().getLast()->instructions().back().setId(ins.constant());
         break;
     case TYPE_F64:
-        _x86_64.mc_movsd_memory_to_reg_x64(dstSSE, 0);
-        addInitializedData(constants.getF64(ins.constant()), -int(sizeof(int32_t))); // insert patch
+        _x86_64_lower.mc_movsd_memory_to_reg_x64(dstSSE, 0);
+        _x86_64_lower.cfg().getLast()->instructions().back().setId(ins.constant());
         break;
     default:
         std::stringstream ss;
@@ -867,13 +829,13 @@ void poAsm::ir_ret(poRegLinear& linear, const poInstruction& ins)
         case TYPE_U16:
         case TYPE_I8:
         case TYPE_U8:
-            _x86_64.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, linear.getRegisterByVariable(left));
+            _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, linear.getRegisterByVariable(left));
             break;
         case TYPE_F64:
-            _x86_64.mc_movsd_reg_to_reg_x64(VM_REGISTER_EAX, linear.getRegisterByVariable(left) - VM_REGISTER_MAX);
+            _x86_64_lower.mc_movsd_reg_to_reg_x64(VM_REGISTER_EAX, linear.getRegisterByVariable(left) - VM_REGISTER_MAX);
             break;
         case TYPE_F32:
-            _x86_64.mc_movss_reg_to_reg_x64(VM_REGISTER_EAX, linear.getRegisterByVariable(left) - VM_REGISTER_MAX);
+            _x86_64_lower.mc_movss_reg_to_reg_x64(VM_REGISTER_EAX, linear.getRegisterByVariable(left) - VM_REGISTER_MAX);
             break;
         default:
             std::stringstream ss;
@@ -886,7 +848,7 @@ void poAsm::ir_ret(poRegLinear& linear, const poInstruction& ins)
     // Epilogue
     generateEpilogue(linear);
 
-    _x86_64.mc_return();
+    _x86_64_lower.mc_return();
 }
 
 void poAsm::ir_unary_minus(poRegLinear& linear, const poInstruction& ins)
@@ -903,49 +865,49 @@ void poAsm::ir_unary_minus(poRegLinear& linear, const poInstruction& ins)
     case TYPE_U64:
         if (dst != src)
         {
-            _x86_64.mc_mov_reg_to_reg_x64(dst, src);
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
         }
-        _x86_64.mc_neg_reg_x64(dst);
+        _x86_64_lower.mc_neg_reg_x64(dst);
         break;
     case TYPE_F64:
         if (dst_sse != src_sse)
         {
-            _x86_64.mc_movsd_reg_to_reg_x64(dst_sse, src_sse);
+            _x86_64_lower.mc_movsd_reg_to_reg_x64(dst_sse, src_sse);
         }
-        _x86_64.mc_xorpd_reg_to_reg_x64(dst_sse, dst_sse);
-        _x86_64.mc_subsd_reg_to_reg_x64(dst_sse, src_sse);
+        _x86_64_lower.mc_xorpd_reg_to_reg_x64(dst_sse, dst_sse);
+        _x86_64_lower.mc_subsd_reg_to_reg_x64(dst_sse, src_sse);
         break;
     case TYPE_F32:
         if (dst_sse != src_sse)
         {
-            _x86_64.mc_movss_reg_to_reg_x64(dst_sse, src_sse);
+            _x86_64_lower.mc_movss_reg_to_reg_x64(dst_sse, src_sse);
         }
-        _x86_64.mc_xorps_reg_to_reg_x64(dst_sse, dst_sse);
-        _x86_64.mc_subss_reg_to_reg_x64(dst_sse, src_sse);
+        _x86_64_lower.mc_xorps_reg_to_reg_x64(dst_sse, dst_sse);
+        _x86_64_lower.mc_subss_reg_to_reg_x64(dst_sse, src_sse);
         break;
     case TYPE_I8:
     case TYPE_U8:
         if (dst != src)
         {
-            _x86_64.mc_mov_reg_to_reg_x64(dst, src);
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
         }
-        _x86_64.mc_neg_reg_8(dst);
+        _x86_64_lower.mc_neg_reg_8(dst);
         break;
     case TYPE_I16:
     case TYPE_U16:
         if (dst != src)
         {
-            _x86_64.mc_mov_reg_to_reg_16(dst, src);
+            _x86_64_lower.mc_mov_reg_to_reg_16(dst, src);
         }
-        _x86_64.mc_neg_reg_16(dst);
+        _x86_64_lower.mc_neg_reg_16(dst);
         break;
     case TYPE_I32:
     case TYPE_U32:
         if (dst != src)
         {
-            _x86_64.mc_mov_reg_to_reg_32(dst, src);
+            _x86_64_lower.mc_mov_reg_to_reg_32(dst, src);
         }
-        _x86_64.mc_neg_reg_32(dst);
+        _x86_64_lower.mc_neg_reg_32(dst);
         break;
     default:
         std::stringstream ss;
@@ -981,37 +943,37 @@ void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& 
         case TYPE_U32:
         case TYPE_U16:
         case TYPE_U8:
-            _x86_64.mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].left()));
+            if (i > VM_MAX_ARGS) continue;
+            _x86_64_lower.mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].left()));
             break;
         case TYPE_F64:
-            _x86_64.mc_movsd_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].left()) - VM_REGISTER_MAX);
+            if (i > VM_MAX_SSE_ARGS) continue;
+            _x86_64_lower.mc_movsd_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].left()) - VM_REGISTER_MAX);
             break;
         case TYPE_F32:
-            _x86_64.mc_movss_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].left()) - VM_REGISTER_MAX);
+            if (i > VM_MAX_SSE_ARGS) continue;
+            _x86_64_lower.mc_movss_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].left()) - VM_REGISTER_MAX);
             break;
         default:
+            if (i > VM_MAX_ARGS) continue;
             src_slot = linear.getStackSlotByVariable(args[i].left());
             if (src_slot != -1)
             {
-                _x86_64.mc_mov_reg_to_reg_x64(generalArgs[i], VM_REGISTER_ESP);
-                _x86_64.mc_add_imm_to_reg_x64(generalArgs[i], src_slot * 8);
+                _x86_64_lower.mc_mov_reg_to_reg_x64(generalArgs[i], VM_REGISTER_ESP);
+                _x86_64_lower.mc_add_imm_to_reg_x64(generalArgs[i], src_slot * 8);
             }
             else
             {
-                _x86_64.mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].left()));
+                _x86_64_lower.mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].left()));
             }
             break;
         }
     }
 
     const int symbol = ins.right();
-    std::string symbolName;
-    module.getSymbol(symbol, symbolName);
 
-    // Add patch for this call
-
-    _calls.push_back(poAsmCall(int(_x86_64.programData().size()), numArgs, symbolName));
-    _x86_64.mc_call(0);
+    _x86_64_lower.mc_call(0);
+    _x86_64_lower.cfg().getLast()->instructions().back().setId(symbol);
 
     switch (ins.type())
     {
@@ -1023,18 +985,18 @@ void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& 
     case TYPE_U32:
     case TYPE_I64:
     case TYPE_U64:
-        _x86_64.mc_mov_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()), VM_REGISTER_EAX);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()), VM_REGISTER_EAX);
         break;
     case TYPE_F64:
-        _x86_64.mc_movsd_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()) - VM_REGISTER_MAX, VM_SSE_REGISTER_XMM0);
+        _x86_64_lower.mc_movsd_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()) - VM_REGISTER_MAX, VM_SSE_REGISTER_XMM0);
         break;
     case TYPE_F32:
-        _x86_64.mc_movss_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()) - VM_REGISTER_MAX, VM_SSE_REGISTER_XMM0);
+        _x86_64_lower.mc_movss_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()) - VM_REGISTER_MAX, VM_SSE_REGISTER_XMM0);
         break;
     case TYPE_VOID:
         break;
     default:
-        _x86_64.mc_mov_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()), VM_REGISTER_EAX);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()), VM_REGISTER_EAX);
         break;
     }
 }
@@ -1062,17 +1024,17 @@ void poAsm::ir_param(poModule& module, poRegLinear& linear, const poInstruction&
         if (param < VM_MAX_ARGS)
         {
             const int src = generalArgs[param];
-            _x86_64.mc_mov_reg_to_reg_x64(dst, src);
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
         }
         break;
     case TYPE_F64:
-        _x86_64.mc_movsd_reg_to_reg_x64(dst_sse, sseArgs[param]);
+        _x86_64_lower.mc_movsd_reg_to_reg_x64(dst_sse, sseArgs[param]);
         break;
     case TYPE_F32:
-        _x86_64.mc_movss_reg_to_reg_x64(dst_sse, sseArgs[param]);
+        _x86_64_lower.mc_movss_reg_to_reg_x64(dst_sse, sseArgs[param]);
         break;
     default:
-        _x86_64.mc_mov_reg_to_reg_x64(dst, generalArgs[param]);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, generalArgs[param]);
         break;
     }
 }
@@ -1091,7 +1053,7 @@ bool poAsm::ir_jump(int jump, int imm, int type)
 {
     if (jump == IR_JUMP_UNCONDITIONAL)
     {
-        _x86_64.mc_jump_unconditional(imm);
+        _x86_64_lower.mc_jump_unconditional(imm);
         return true;
     }
 
@@ -1104,22 +1066,22 @@ bool poAsm::ir_jump(int jump, int imm, int type)
         switch (jump)
         {
         case IR_JUMP_EQUALS:
-            _x86_64.mc_jump_equals(imm);
+            _x86_64_lower.mc_jump_equals(imm);
             break;
         case IR_JUMP_GREATER:
-            _x86_64.mc_jump_greater(imm);
+            _x86_64_lower.mc_jump_greater(imm);
             break;
         case IR_JUMP_LESS:
-            _x86_64.mc_jump_less(imm);
+            _x86_64_lower.mc_jump_less(imm);
             break;
         case IR_JUMP_GREATER_EQUALS:
-            _x86_64.mc_jump_greater_equal(imm);
+            _x86_64_lower.mc_jump_greater_equal(imm);
             break;
         case IR_JUMP_LESS_EQUALS:
-            _x86_64.mc_jump_less_equal(imm);
+            _x86_64_lower.mc_jump_less_equal(imm);
             break;
         case IR_JUMP_NOT_EQUALS:
-            _x86_64.mc_jump_not_equals(imm);
+            _x86_64_lower.mc_jump_not_equals(imm);
             break;
         default:
             return false;
@@ -1134,22 +1096,22 @@ bool poAsm::ir_jump(int jump, int imm, int type)
         switch (jump)
         {
         case IR_JUMP_EQUALS:
-            _x86_64.mc_jump_equals(imm);
+            _x86_64_lower.mc_jump_equals(imm);
             break;
         case IR_JUMP_GREATER:
-            _x86_64.mc_jump_not_below_equal(imm);
+            _x86_64_lower.mc_jump_not_below_equal(imm);
             break;
         case IR_JUMP_LESS:
-            _x86_64.mc_jump_not_above_equal(imm);
+            _x86_64_lower.mc_jump_not_above_equal(imm);
             break;
         case IR_JUMP_GREATER_EQUALS:
-            _x86_64.mc_jump_not_below(imm);
+            _x86_64_lower.mc_jump_not_below(imm);
             break;
         case IR_JUMP_LESS_EQUALS:
-            _x86_64.mc_jump_not_above(imm);
+            _x86_64_lower.mc_jump_not_above(imm);
             break;
         case IR_JUMP_NOT_EQUALS:
-            _x86_64.mc_jump_not_equals(imm);
+            _x86_64_lower.mc_jump_not_equals(imm);
             break;
         default:
             return false;
@@ -1160,49 +1122,43 @@ bool poAsm::ir_jump(int jump, int imm, int type)
     return true;
 }
 
-void poAsm::patchJump(const poAsmJump& jump)
+void poAsm::patchJump(po_x86_64_basic_block* jump)
 {
     const int pos = int(_x86_64.programData().size());
-    const int size = jump.getSize();
-    const int imm = pos - (jump.getProgramDataPos() + size);
+    const int size = jump->jump().getSize();
+    const int imm = pos - (jump->jump().getProgramDataPos() + size);
 
-    if (!ir_jump(jump.getJumpType(), imm, jump.getType()))
-    {
-        return;
-    }
+    _x86_64.emit_jump(jump->jump().getJumpType(), imm);
 
-    memcpy(_x86_64.programData().data() + jump.getProgramDataPos(), _x86_64.programData().data() + pos, size);
+    std::memcpy(_x86_64.programData().data() + jump->jump().getProgramDataPos(), _x86_64.programData().data() + pos, size);
     _x86_64.programData().resize(_x86_64.programData().size() - size);
 }
 
-void po::poAsm::patchForwardJumps(po::poBasicBlock* bb)
+void poAsm::patchForwardJumps(po_x86_64_basic_block* bb)
 {
-    auto& incoming = bb->getIncoming();
-    for (poBasicBlock* inc : incoming)
+    auto& incoming = bb->incomingBlocks();
+    for (po_x86_64_basic_block* inc : incoming)
     {
-        auto& asmBB = _basicBlocks[_basicBlockMap.find(inc)->second];
-        auto& jumps = asmBB.jumps();
-        for (auto& jump : jumps)
+        auto& jump = inc->jump();
+        if (jump.getProgramDataPos() != -1 &&
+            !jump.isPatched() &&
+            jump.getBasicBlock() == bb)
         {
-            if (!jump.isApplied() && jump.getBasicBlock() == bb)
-            {
-                jump.setApplied(true);
-                patchJump(jump);
-            }
+            jump.setPatched(true);
+            patchJump(inc);
         }
     }
 }
 
 void poAsm::scanBasicBlocks(poFlowGraph& cfg)
 {
-    _basicBlocks.clear();
     _basicBlockMap.clear();
 
     poBasicBlock* bb = cfg.getFirst();
     while (bb)
     {
-        auto& asmBB = _basicBlocks.emplace_back();
-        _basicBlockMap.insert(std::pair<poBasicBlock*, int>(bb, int(_basicBlocks.size()) - 1));
+        po_x86_64_basic_block* asmBB = new po_x86_64_basic_block();
+        _basicBlockMap.insert(std::pair<poBasicBlock*, po_x86_64_basic_block*>(bb, asmBB));
 
         bb = bb->getNext();
     }
@@ -1227,7 +1183,7 @@ void poAsm::generatePrologue(poRegLinear& linear)
     {
         if (!linear.isVolatile(i) && linear.isRegisterSet(i))
         {
-            _x86_64.mc_push_reg(i);
+            _x86_64_lower.mc_push_reg(i);
             numPushed++;
         }
     }
@@ -1239,7 +1195,46 @@ void poAsm::generatePrologue(poRegLinear& linear)
 
     if (resize > 0)
     {
-        _x86_64.mc_sub_imm_to_reg_x64(VM_REGISTER_ESP, resize);
+        _x86_64_lower.mc_sub_imm_to_reg_x64(VM_REGISTER_ESP, resize);
+    }
+}
+
+void poAsm::emitJump(po_x86_64_basic_block* bb)
+{
+    po_x86_64_basic_block* targetBB =  bb->jumpBlock();
+
+    // Check if the targetBB has been visited already, is which case we know its position
+
+    if (targetBB->programDataPos() != -1)
+    {
+        const int imm = targetBB->programDataPos() - (int(_x86_64.programData().size()) + 5/*TODO*/);
+
+        _x86_64.emit_jump(bb->instructions().back().opcode(), imm);
+    }
+    else
+    {
+        // Insert patch
+
+        const int pos = int(_x86_64.programData().size());
+        const int jumpType = bb->instructions().back().opcode();
+
+        /* Insert after we have got the position */
+        if (jumpType == IR_JUMP_UNCONDITIONAL)
+        {
+            _x86_64.mc_jump_unconditional(0);
+        }
+        else
+        {
+            _x86_64.mc_jump_equals(0);
+        }
+
+        const int size = int(_x86_64.programData().size()) - pos;
+
+        auto& jump = bb->jump();
+        jump.setBasicBlock(targetBB);
+        jump.setJumpType(jumpType);
+        jump.setSize(size);
+        jump.setProgramDataPos(pos);
     }
 }
 
@@ -1258,14 +1253,14 @@ void poAsm::generateEpilogue(poRegLinear& linear)
     const int size = _prologueSize - 8 * numToPop;
     if (size > 0)
     {
-        _x86_64.mc_add_imm_to_reg_x64(VM_REGISTER_ESP, size);
+        _x86_64_lower.mc_add_imm_to_reg_x64(VM_REGISTER_ESP, size);
     }
 
     for (int i = VM_REGISTER_MAX - 1; i >= 0; i--)
     {
         if (!linear.isVolatile(i) && linear.isRegisterSet(i))
         {
-            _x86_64.mc_pop_reg(i);
+            _x86_64_lower.mc_pop_reg(i);
         }
     }
 }
@@ -1281,7 +1276,6 @@ void poAsm::dump(const poRegLinear& linear, poFlowGraph& cfg)
     while (bb)
     {
        std::cout << "Basic Block " << index << ":" << std::endl;
-       poAsmBasicBlock& abb = _basicBlocks[_basicBlockMap[bb]];
 
        for (int i = 0; i < bb->numInstructions(); i++)
        {
@@ -1310,7 +1304,7 @@ void poAsm::spill(poRegLinear& linear, const int pos)
     {
         const int spillVariable = spill.spillVariable();
         const int slot = spill.spillStackSlot();
-        _x86_64.mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, -8 * (slot + 1), spill.spillRegister());
+        _x86_64_lower.mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, -8 * (slot + 1), spill.spillRegister());
     }
 }
 
@@ -1385,25 +1379,31 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
     
     dump(linear, cfg);
 
+    // Lower into machine code cfg
+    // 
+    _x86_64_lower.cfg().clear();
+    po_x86_64_basic_block* asmBB = new po_x86_64_basic_block();
+    _x86_64_lower.cfg().addBasicBlock(asmBB);
+
     // Prologue
     generatePrologue(linear);
 
-    // Generate the machine code
-    //
     poBasicBlock* bb = cfg.getFirst();
-    int pos = 0;
     while (bb)
     {
-        _basicBlocks[_basicBlockMap[bb]].setPos(int(_x86_64.programData().size()));
-        patchForwardJumps(bb);
+        asmBB = _basicBlockMap[bb];
+        if (_x86_64_lower.cfg().getLast() != asmBB)
+        {
+            _x86_64_lower.cfg().addBasicBlock(asmBB);
+        }
 
         auto& instructions = bb->instructions();
         for (int i = 0; i < int(instructions.size()); i++)
         {
             auto& ins = instructions[i];
 
-            spill(linear, pos);
-            restore(ins, linear, pos);
+            //spill(linear, pos);
+            //restore(ins, linear, pos);
 
             switch (ins.code())
             {
@@ -1483,11 +1483,93 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
                 ir_unary_minus(linear, ins);
                 break;
             }
-
-            pos++;
         }
 
         bb = bb->getNext();
+    }
+
+    // Generate the machine code
+    //
+
+    _x86_64_lower.dump();
+    generateMachineCode(module);
+}
+
+void poAsm::generateMachineCode(poModule& module)
+{
+    poConstantPool& constants = module.constants();
+
+    po_x86_64_basic_block* asmBB = nullptr;
+    for (size_t i = 0; i < _x86_64_lower.cfg().basicBlocks().size(); i++)
+    {
+        asmBB = _x86_64_lower.cfg().basicBlocks()[i];
+        asmBB->setProgramDataPos(int(_x86_64.programData().size()));
+        patchForwardJumps(asmBB);
+
+        for (auto& ins : asmBB->instructions())
+        {
+            const int pos = int(_x86_64.programData().size());
+            switch (ins.opcode())
+            {
+            case VMI_CALL:
+            case VMI_CALL_MEM:
+            {
+                const int symbol = ins.id();
+                std::string symbolName;
+                module.getSymbol(symbol, symbolName);
+
+                // Add patch for this call
+
+                _calls.push_back(poAsmCall(int(_x86_64.programData().size()), 0/*numArgs*/, symbolName));
+                _x86_64.mc_call(0); // Placeholder for the call
+            }
+                break;
+            case VMI_SSE_MOVSD_SRC_MEM_DST_REG:
+                if (ins.id() != -1)
+                {
+                    _x86_64.mc_movsd_memory_to_reg_x64(ins.dstReg(), 0);
+                    addInitializedData(constants.getF64(ins.id()), -int(sizeof(int32_t))); // insert patch
+                }
+                else
+                {
+                    _x86_64.mc_movsd_memory_to_reg_x64(ins.dstReg(), ins.srcReg(), ins.imm32());
+                }
+                break;
+            case VMI_SSE_MOVSS_SRC_MEM_DST_REG:
+                if (ins.id() != -1)
+                {
+                    _x86_64.mc_movss_memory_to_reg_x64(ins.dstReg(), 0);
+                    addInitializedData(constants.getF32(ins.id()), -int(sizeof(int32_t))); // insert patch
+                }
+                else
+                {
+                    _x86_64.mc_movss_memory_to_reg_x64(ins.dstReg(), ins.srcReg(), ins.imm32());
+                }
+                break;
+            case VMI_J8:
+            case VMI_JE8:
+            case VMI_JG8:
+            case VMI_JGE8:
+            case VMI_JL8:
+            case VMI_JLE8:
+            case VMI_J32:
+            case VMI_JE32:
+            case VMI_JG32:
+            case VMI_JGE32:
+            case VMI_JL32:
+            case VMI_JLE32:
+            case VMI_JNA32:
+            case VMI_JNB32:
+            case VMI_JNBE32:
+            case VMI_JNE32:
+            case VMI_JNAE32:
+                emitJump(asmBB);
+                break;
+            default:
+                _x86_64.emit(ins);
+                break;
+            }
+        }
     }
 }
 

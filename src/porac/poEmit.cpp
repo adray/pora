@@ -1645,7 +1645,7 @@ void poCodeGenerator::emitStoreArray(poNode* node, poFlowGraph& cfg, const int i
         const int ptr = _instructionCount; /* result of IR_PTR */
         emitInstruction(poInstruction(_instructionCount++, pointerType, expr, accessor, IR_ELEMENT_PTR), cfg.getLast());
 
-        emitInstruction(poInstruction(_instructionCount++, arrayType, ptr, id, IR_STORE), cfg.getLast());
+        emitInstruction(poInstruction(_instructionCount++, type.baseType(), ptr, id, IR_STORE), cfg.getLast());
     }
     else
     {

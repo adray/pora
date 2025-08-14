@@ -16,28 +16,6 @@ namespace po
     class poConstantPool;
     class poBasicBlock;
 
-    class poAsmJump
-    {
-    public:
-        poAsmJump(const int programDataPos, const int jumpType, const int size, poBasicBlock* bb, const int type);
-
-        inline const int getProgramDataPos() const { return _programDataPos; }
-        inline const int getJumpType() const { return _jumpType; }
-        inline const int getSize() const { return _size; }
-        inline const int getType() const { return _type; }
-        inline const poBasicBlock* getBasicBlock() const { return _bb; }
-        inline const bool isApplied() const { return _applied; }
-        inline void setApplied(bool applied) { _applied = applied; }
-
-    private:
-        bool _applied;
-        int _programDataPos;
-        int _jumpType;
-        int _type;
-        int _size;
-        poBasicBlock* _bb;
-    };
-
     class poAsmCopy
     {
     public:
@@ -60,13 +38,11 @@ namespace po
     {
     public:
         poAsmBasicBlock();
-        inline std::vector<poAsmJump>& jumps() { return _jumps; }
         inline const int getPos() const { return _pos; }
         inline void setPos(const int pos) { _pos = pos; }
 
     private:
         int _pos;
-        std::vector<poAsmJump> _jumps;
     };
 
     class poAsmCall
@@ -130,16 +106,19 @@ namespace po
         void restore(const poInstruction& ins, poRegLinear& linear, const int pos);
 
         void generate(poModule& module, poFlowGraph& cfg);
+        void generateMachineCode(poModule& module);
         void generateExternStub(poModule& module, poFlowGraph& cfg);
-        void patchForwardJumps(poBasicBlock* bb);
+        void patchForwardJumps(po_x86_64_basic_block* bb);
         void scanBasicBlocks(poFlowGraph& cfg);
-        void patchJump(const poAsmJump& jump);
+        void patchJump(po_x86_64_basic_block* jump);
         void patchCalls();
         void generatePrologue(poRegLinear& linear);
         void generateEpilogue(poRegLinear& linear);
         void setError(const std::string& errorText);
         void addInitializedData(const float f32, const int programDataOffset);
         void addInitializedData(const double f64, const int programDataOffset);
+
+        void emitJump(po_x86_64_basic_block* bb);
 
         //=====================================
         // IR to machine code routines
@@ -172,11 +151,11 @@ namespace po
         std::vector<poAsmExternCall> _externCalls;
         std::unordered_map<std::string, int> _imports;
         std::vector<poAsmConstant> _constants;
-        std::unordered_map<poBasicBlock*, int> _basicBlockMap;
-        std::vector<poAsmBasicBlock> _basicBlocks;
+        std::unordered_map<poBasicBlock*, po_x86_64_basic_block*> _basicBlockMap;
         std::vector<unsigned char> _initializedData;
         poPhiWeb _web;
         po_x86_64 _x86_64;
+        po_x86_64_Lower _x86_64_lower;
         int _entryPoint;
         bool _isError;
         std::string _errorText;

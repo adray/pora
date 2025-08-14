@@ -1,0 +1,9 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        u8[] data = "Hello, World!";
+    }
+}

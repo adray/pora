@@ -1,0 +1,14 @@
+import std;
+
+namespace Example
+{
+    static i64 test(i64 a, i64 b, i64 c, i64 d, i64 e)
+    {
+        return e;
+    }
+
+    static void main()
+    {
+        i64 x = test(0, 1, 2, 3, 4);
+    }
+}
