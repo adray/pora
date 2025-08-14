@@ -1,0 +1,80 @@
+//
+// Standard library for Windows OS
+//
+
+namespace std
+{
+    struct STARTUPINFO
+    {
+        i32  cb;
+        u16* lpReserved; //LPWSTR
+        u16* lpDesktop; //LPWSTR
+        u16* lpTitle; //LPWSTR
+        i32  dwX;
+        i32  dwY;
+        i32  dwXSize;
+        i32  dwYSize;
+        i32  dwXCountChars;
+        i32  dwYCountChars;
+        i32  dwFillAttribute;
+        i32  dwFlags;
+        i16  wShowWindow; //WORD
+        i16  cbReserved2;
+        u8* lpReserved2;
+        i64 hStdInput; // HANDLE
+        i64 hStdOutput; // HANDLE
+        i64 hStdError; // HANDLE
+    }
+
+    struct PROCESSENTRY32 {
+      i32     dwSize;
+      i32     cntUsage;
+      i32     th32ProcessID;
+      u32* th32DefaultHeapID; // ULONG_PTR
+      i32     th32ModuleID;
+      i32     cntThreads;
+      i32     th32ParentProcessID;
+      i32      pcPriClassBase; // LONG
+      i32     dwFlags;
+      u8[260]      szExeFile; // i8[MAX_PATH]
+    }
+
+    extern i32 GetLastError();
+    extern i32 GetCurrentProcessId();
+    extern i32 GetCurrentThreadId();
+    extern void ExitProcess(u32 exitCode);
+    extern void GetStartupInfoW(startupInfo* info);
+    extern i64 GetProcessHeap(); // returns HANDLE
+    extern u8* HeapAlloc(
+          i64 handle, // [in] HANDLE hHeap
+          i32 flags, // [in] DWORD  dwFlags
+          u64 numBytes // [in] SIZE_T dwBytes
+        );
+    extern i64 CreateToolhelp32Snapshot(
+        i32 dwFlags,
+        i32 th32ProcessID
+        ); // returns HANDLE
+    extern boolean Process32First(
+      i64           hSnapshot,
+      PROCESSENTRY32* lppe
+    );
+    extern boolean Process32Next(
+      i64           hSnapshot,
+      PROCESSENTRY32* lppe
+    );
+
+    struct SECURITY_ATTRIBUTES {
+      i32  nLength;
+      u8* lpSecurityDescriptor;
+      boolean   bInheritHandle;
+    }
+
+    extern i64 CreateFileMappingA(
+      i64                hFile,
+      SECURITY_ATTRIBUTES* lpFileMappingAttributes,
+      i32                 flProtect,
+      i32                 dwMaximumSizeHigh,
+      i32                 dwMaximumSizeLow,
+      u8*                lpName
+    );
+}
