@@ -2,7 +2,6 @@
 #include <fstream>
 #include <vector>
 #include <iostream>
-#include <cstdint>
 #include <string.h>
 
 using namespace po;
@@ -94,7 +93,7 @@ bool poCommonObjectFileFormat::open(const std::string& filename)
     char signature[9] = {};
     ss.read((char*)signature, sizeof(signature)-1);
 
-    if (std::strcmp(signature, "!<arch>\n") != 0)
+    if (strcmp(signature, "!<arch>\n") != 0)
     {
         return false;
     }

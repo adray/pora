@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <iostream>
 #include <string.h>
+#include <cstring>
 
 #include <assert.h>
 
@@ -26,7 +27,7 @@ namespace po
         uint16_t mNumberOfSections;
         uint32_t mTimeDateStamp;
         uint32_t mPointerToSymbolTable;
-        uint32_t mNumberOfSymbols;
+        uint32_t mNumberOfSymtbols;
         uint16_t mSizeOfOptionalHeader;
         uint16_t mCharacteristics;
     };

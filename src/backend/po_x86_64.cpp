@@ -785,7 +785,7 @@ void po_x86_64_Lower::mc_neg_reg_32(int reg) { unaryop(reg, VMI_NEG32_DST_REG); 
 
 /*64-bit operations */
 
-void po_x86_64_Lower::mc_mov_imm_to_reg_x64(char dst, long long imm) { unaryop_imm(dst, VMI_MOV64_SRC_IMM_DST_REG, imm); }
+void po_x86_64_Lower::mc_mov_imm_to_reg_x64(char dst, long long imm) { unaryop_imm(dst, VMI_MOV64_SRC_IMM_DST_REG, (int64_t)imm); }
 void po_x86_64_Lower::mc_mov_reg_to_memory_x64(char dst, int dst_offset, char src) { binop(src, dst, VMI_MOV64_SRC_REG_DST_MEM, dst_offset); }
 void po_x86_64_Lower::mc_mov_memory_to_reg_x64(char dst, char src, int src_offset) { binop(src, dst, VMI_MOV64_SRC_MEM_DST_REG, src_offset); }
 void po_x86_64_Lower::mc_mov_reg_to_reg_x64(char dst, char src) { binop(src, dst, VMI_MOV64_SRC_REG_DST_REG); }

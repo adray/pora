@@ -1,6 +1,7 @@
 #include "poCodeGen.h"
 #include "poAsm.h"
 #include "poPE.h"
+#include <cstring>
 
 #include <iostream>
 
