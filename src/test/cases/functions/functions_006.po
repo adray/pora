@@ -2,13 +2,13 @@ import std;
 
 namespace Example
 {
-    static i64 test(i64 a, i64 b, i64 c, i64 d, i64 e)
+    static i64 test(i64 a, i64 b, i64 c, i64 d, i64 e, i64 f, i64 g)
     {
-        return e;
+        return e + f + g;
     }
 
     static void main()
     {
-        i64 x = test(0, 1, 2, 3, 4);
+        i64 x = test(0, 1, 2, 3, 4, 5, 6);
     }
 }

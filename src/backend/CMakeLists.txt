@@ -7,6 +7,8 @@ set (PORABACKEND_SOURCES
     "poAsm.cpp"
     "po_x86_64.h"
     "po_x86_64.cpp"
+    "poAnalyzer.cpp"
+    "poAnalyzer.h"
 )
 
 project ("porabackend")

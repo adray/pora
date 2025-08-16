@@ -5,6 +5,7 @@
 
 #include "poLive.h"
 #include "poDom.h"
+#include "poAnalyzer.h"
 
 #include <assert.h>
 #include <sstream>
@@ -943,19 +944,23 @@ void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& 
         case TYPE_U32:
         case TYPE_U16:
         case TYPE_U8:
-            if (i > VM_MAX_ARGS) continue;
+            if (i >= VM_MAX_ARGS)
+            {
+                _x86_64_lower.mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, 0, linear.getRegisterByVariable(args[i].left()));
+                continue;
+            }
             _x86_64_lower.mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].left()));
             break;
         case TYPE_F64:
-            if (i > VM_MAX_SSE_ARGS) continue;
+            if (i >= VM_MAX_SSE_ARGS) continue;
             _x86_64_lower.mc_movsd_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].left()) - VM_REGISTER_MAX);
             break;
         case TYPE_F32:
-            if (i > VM_MAX_SSE_ARGS) continue;
+            if (i >= VM_MAX_SSE_ARGS) continue;
             _x86_64_lower.mc_movss_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].left()) - VM_REGISTER_MAX);
             break;
         default:
-            if (i > VM_MAX_ARGS) continue;
+            if (i >= VM_MAX_ARGS) continue;
             src_slot = linear.getStackSlotByVariable(args[i].left());
             if (src_slot != -1)
             {
@@ -1487,6 +1492,9 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
 
         bb = bb->getNext();
     }
+
+    poAnalyzer an;
+    an.checkCallSites(module, _x86_64_lower.cfg());
 
     // Generate the machine code
     //

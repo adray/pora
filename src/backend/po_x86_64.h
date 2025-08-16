@@ -378,6 +378,11 @@ namespace po
         inline const int32_t imm32() const { return _imm32; }
         inline const int64_t imm64() const { return _imm64; }
 
+        inline void setImm8(const int8_t imm8) { _imm8 = imm8; }
+        inline void setImm16(const int16_t imm16) { _imm16 = imm16; }
+        inline void setImm32(const int32_t imm32) { _imm32 = imm32; }
+        inline void setImm64(const int64_t imm64) { _imm64 = imm64; }
+
         inline const bool isSSE() const { return _isSSE; }
 
     private:

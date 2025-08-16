@@ -102,6 +102,7 @@ void poTypeResolver::getNamespaces(poNode* node)
         }
     }
     resolveTypes(ns);
+    updateArgs(node, ns);
     _module.addNamespace(ns);
 }
 
@@ -386,4 +387,56 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
     // then we need to a raise an error for each of the items that
     // cannot be resolved and terminate the build
 }
+
+void poTypeResolver::updateArgs(poNode* node, poNamespace& ns)
+{
+    assert(node->type() == poNodeType::NAMESPACE);
+    poListNode* namespaceNode = static_cast<poListNode*>(node);
+
+    for (poNode* child : namespaceNode->list())
+    {
+        if (child->type() != poNodeType::FUNCTION &&
+            child->type() != poNodeType::EXTERN)
+        {
+            continue;
+        }
+
+        const std::string& name = child->token().string();
+
+        poListNode* funNode = static_cast<poListNode*>(child);
+        for (poNode* funChildNode : funNode->list())
+        {
+            if (funChildNode->type() != poNodeType::ARGS)
+            {
+                continue;
+            }
+
+            poListNode* args = static_cast<poListNode*>(funChildNode);
+            for (poFunction& fun : ns.functions())
+            {
+                if (fun.name() != name) { continue; }
+
+                for (poNode* arg : args->list())
+                {
+                    poUnaryNode* unary = static_cast<poUnaryNode*>(arg);
+                    assert(unary->type() == poNodeType::PARAMETER);
+                    poNode* type = unary->child();
+            
+                    int pointerCount = 0;
+                    if (type->type() == poNodeType::POINTER)
+                    {
+                        poPointerNode* pointerNode = static_cast<poPointerNode*>(type);
+                        pointerCount = pointerNode->count();
+                        type = pointerNode->child();
+                    }
+
+                    assert(type->type() == poNodeType::TYPE);
+                    const int variableType = getPointerType(getType(type->token()), pointerCount);
+                    fun.addArgument(variableType);
+                }
+            }
+        }
+    }
+}
+
 

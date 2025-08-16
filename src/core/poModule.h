@@ -92,6 +92,8 @@ namespace po
         inline void addVariable(const int name) { _variables.push_back(name); }
         inline const std::vector<int> variables() const { return _variables; }
         inline const bool hasAttribute(poAttributes attribute) const { return (int(_attribute) & int(attribute)) == int(attribute); }
+        inline void addArgument(const int type) { _arguments.push_back(type); } 
+        inline const std::vector<int>& args() const { return _arguments; }
 
     private:
         int _arity;
@@ -100,6 +102,7 @@ namespace po
         poFlowGraph _cfg;
         poCallConvention _callingConvention;
         std::vector<int> _variables;
+        std::vector<int> _arguments;
     };
 
     class poNamespace
