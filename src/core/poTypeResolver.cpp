@@ -56,6 +56,9 @@ int poTypeResolver::getType(const poToken& token)
     case poTokenType::VOID:
         type = TYPE_VOID;
         break;
+    case poTokenType::BOOLEAN:
+        type = TYPE_BOOLEAN;
+        break;
     default:
         type = -1;
         break;
@@ -75,6 +78,21 @@ void poTypeResolver::resolve(const std::vector<poNode*>& nodes)
                 if (child->type() == poNodeType::NAMESPACE)
                 {
                     getNamespaces(child);
+                }
+            }
+        }
+    }
+
+    for (poNode* node : nodes)
+    {
+        if (node->type() == poNodeType::MODULE)
+        {
+            poListNode* moduleNode = static_cast<poListNode*>(node);
+            for (poNode* child : moduleNode->list())
+            {
+                if (child->type() == poNodeType::NAMESPACE)
+                {
+                    updateArgs(child);
                 }
             }
         }
@@ -102,8 +120,9 @@ void poTypeResolver::getNamespaces(poNode* node)
         }
     }
     resolveTypes(ns);
-    updateArgs(node, ns);
     _module.addNamespace(ns);
+
+    _namespaces.insert(std::pair<poNode*, int>(node, int(_module.namespaces().size() - 1)));
 }
 
 void poTypeResolver::getStruct(poNode* node, poNamespace& ns)
@@ -388,8 +407,10 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
     // cannot be resolved and terminate the build
 }
 
-void poTypeResolver::updateArgs(poNode* node, poNamespace& ns)
+void poTypeResolver::updateArgs(poNode* node)
 {
+    poNamespace& ns = _module.namespaces()[_namespaces[node]];
+
     assert(node->type() == poNodeType::NAMESPACE);
     poListNode* namespaceNode = static_cast<poListNode*>(node);
 
@@ -431,7 +452,17 @@ void poTypeResolver::updateArgs(poNode* node, poNamespace& ns)
                     }
 
                     assert(type->type() == poNodeType::TYPE);
-                    const int variableType = getPointerType(getType(type->token()), pointerCount);
+                    int typeId = getType(type->token());
+                    if (typeId == -1)
+                    {
+                        const auto& it = _resolvedTypes.find(type->token().string());
+                        if (it != _resolvedTypes.end())
+                        {
+                            typeId = it->second;
+                        }
+                    }
+                    
+                    const int variableType = getPointerType(typeId, pointerCount);
                     fun.addArgument(variableType);
                 }
             }

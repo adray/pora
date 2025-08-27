@@ -13,6 +13,7 @@ namespace po
     class poModule;
     class poInstruction;
     class poRegLinear;
+    class poRegLinearIterator;
     class poConstantPool;
     class poBasicBlock;
 
@@ -100,12 +101,12 @@ namespace po
         inline const std::string& errorText() const { return _errorText; }
 
     private:
-        void dump(const poRegLinear& linear, poFlowGraph& cfg);
+        void dump(const poRegLinear& linear, poRegLinearIterator& iterator, poFlowGraph& cfg);
 
         void spill(poRegLinear& linear, const int pos);
-        void restore(const poInstruction& ins, poRegLinear& linear, const int pos);
+        void restore(poRegLinear& linear, const int pos);
 
-        void generate(poModule& module, poFlowGraph& cfg);
+        void generate(poModule& module, poFlowGraph& cfg, const int numArgs);
         void generateMachineCode(poModule& module);
         void generateExternStub(poModule& module, poFlowGraph& cfg);
         void patchForwardJumps(po_x86_64_basic_block* bb);
@@ -142,8 +143,8 @@ namespace po
         void ir_copy(poRegLinear& linear, const poInstruction& ins);
         void ir_ret(poRegLinear& linear, const poInstruction& ins);
         void ir_unary_minus(poRegLinear& linear, const poInstruction& ins);
-        void ir_call(poModule& module, poRegLinear& linear, const poInstruction& ins, const std::vector<poInstruction>& args);
-        void ir_param(poModule& module, poRegLinear& linear, const poInstruction& ins);
+        void ir_call(poModule& module, poRegLinear& linear, const poInstruction& ins, const int pos, const std::vector<poInstruction>& args);
+        void ir_param(poModule& module, poRegLinear& linear, const poInstruction& ins, const int numArgs);
         bool ir_jump(const int jump, const int imm, const int type);
 
         std::unordered_map<std::string, int> _mapping;

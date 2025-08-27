@@ -61,7 +61,7 @@ static bool executeCommand(const std::string& args)
 
 using namespace po;
 
-static void runIntegrationTest(const std::string& name, const std::string& path, const std::string& compiler)
+static void runIntegrationTest(const std::string& name, const std::string& path, const std::string& compiler, const std::string& std)
 {
     std::cout << "Integration Test " << name;
 
@@ -71,7 +71,10 @@ static void runIntegrationTest(const std::string& name, const std::string& path,
     }
 
     std::stringstream ss;
-    ss << "\"" << compiler << "\" build \"" << path << "\"";
+    ss << "\"" << compiler << "\" build \"" << path << "\"" <<
+        " \"" << std << "\\os.po" << "\""
+        " \"" << std << "\\io.po" << "\""
+        ;
     if (!executeCommand(ss.str()))
     {
         std::cout << " FAILED: compiler timed out or failed to start." << std::endl;
@@ -97,7 +100,7 @@ static void runIntegrationTest(const std::string& name, const std::string& path,
     }
 }
 
-void po::runIntegrationTests(const std::string& testDir, const std::string& compiler)
+void po::runIntegrationTests(const std::string& testDir, const std::string& compiler, const std::string& std)
 {
     std::filesystem::path rootDir(testDir);
     if (std::filesystem::exists(rootDir))
@@ -113,7 +116,7 @@ void po::runIntegrationTests(const std::string& testDir, const std::string& comp
                     const auto& path = test.path();
                     if (path.extension() == ".po")
                     {
-                        runIntegrationTest(path.filename().string(), path.string(), compiler);
+                        runIntegrationTest(path.filename().string(), path.string(), compiler, std);
                     }
                 }
             }

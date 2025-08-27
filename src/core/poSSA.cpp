@@ -593,6 +593,11 @@ void poSSA_Reconstruct::reconstructUse(poDom& dom, const int node, poInstruction
         {
             for (poSSA_Phi& ssaPhi : it->second) /* get the basic block which contain a def */
             {
+                if (ssaPhi.getBasicBlock() != block)
+                {
+                    continue;
+                }
+
                 for (poPhi& phi : ssaPhi.getBasicBlock()->phis()) /* look for a phi which name matches the name of the def */
                 {
                     if (phi.name() == ssaPhi.name())

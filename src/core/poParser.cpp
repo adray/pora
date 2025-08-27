@@ -275,9 +275,19 @@ poNode* poFunctionParser::parsePrimary()
                 {
                     _parser.advance();
 
+                    poNode* castExpr = nullptr;
+                    if (_parser.match(poTokenType::OPEN_PARAN))
+                    {
+                        castExpr = parseExpression();
+                    }
+                    else
+                    {
+                        castExpr = parsePrimary();
+                    }
+                    
                     node = new poUnaryNode(poNodeType::CAST,
-                        new poUnaryNode(poNodeType::TYPE, parseExpression(), token),
-                        token);
+                            new poUnaryNode(poNodeType::TYPE, castExpr, token),
+                            token);
                 }
             }
             else if (_parser.lookahead(poTokenType::STAR, 0) &&
@@ -294,9 +304,19 @@ poNode* poFunctionParser::parsePrimary()
                 {
                     _parser.advance();
 
+                    poNode* castExpr = nullptr;
+                    if (_parser.match(poTokenType::OPEN_PARAN))
+                    {
+                        castExpr = parseExpression();
+                    }
+                    else
+                    {
+                        castExpr = parsePrimary();
+                    }
+
                     node = new poUnaryNode(poNodeType::CAST,
                         new poUnaryNode(poNodeType::TYPE,
-                            new poPointerNode(poNodeType::POINTER, parseExpression(), token, pointerCount),
+                            new poPointerNode(poNodeType::POINTER, castExpr, token, pointerCount),
                             token),
                         token);
                 }

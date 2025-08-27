@@ -4,10 +4,15 @@ namespace Example
 {
     static void main()
     {
+        u8[8] str;
+        str[0] = 'a';
+        str[1] = 0b;
+    
         i64[16] x;
         for (i64 i = 0; i < 16; i = i + 1)
         {
             x[i] = i;
+            println((u8*)str, (u32)2);
         }        
     }
 }

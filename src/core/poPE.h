@@ -103,14 +103,17 @@ namespace po
 
         inline const std::string& dllName() const { return _dllName; }
         inline const int importPosition() const { return _importPosition; }
+        inline const int importLookupPosition() const { return _importLookupPosition; }
 
         inline const std::vector<poImportEntry>& imports() const { return _imports; }
         inline std::vector<poImportEntry>& imports() { return _imports; }
 
         inline void setImportPosition(const int pos) { _importPosition = pos; }
+        inline void setImportLookupPosition(const int pos) { _importLookupPosition = pos; }
 
     private:
         int _importPosition;
+        int _importLookupPosition;
         std::string _dllName;
         std::vector<poImportEntry> _imports;
     };
@@ -154,7 +157,8 @@ namespace po
         inline poPortableExecutableSection& textSection() { return _sections[_textSection]; }
         inline poPortableExecutableSection& initializedDataSection() { return _sections[_initializedSection]; }
 
-        poPortableExecutableImportTable& addImportTable(const std::string& name);
+        const int addImportTable(const std::string& name);
+        inline poPortableExecutableImportTable& importTable(const int index) { return _imports[index]; }
 
         void dumpExports();
 

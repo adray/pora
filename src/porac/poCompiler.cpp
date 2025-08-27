@@ -96,11 +96,12 @@ int poCompiler:: compile()
     // Convert unnecessary memory accesses to registers
     poOptMemToReg regToMem;
     regToMem.optimize(module);
+    module.dump();
 
     // Eliminate any dead code
     poOptDCE dce;
     dce.optimize(module);
-    //module.dump();
+    module.dump();
 
     // Convert the basic blocks/cfg to machine code
     _assembler.generate(module);

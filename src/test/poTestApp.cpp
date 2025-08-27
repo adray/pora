@@ -25,9 +25,9 @@ int main(int numArgs, const char** const args)
     runOptMemoryToRegTests();
     runOptDCETests();
 
-    if (numArgs >= 3)
+    if (numArgs >= 4)
     {
-        runIntegrationTests(args[1], args[2]);
+        runIntegrationTests(args[1], args[2], args[3]);
     }
 
     return 0;

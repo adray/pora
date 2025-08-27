@@ -71,8 +71,11 @@ const int poUses::findNextUse(const int variable, const int pos) const
             {
                 return ref.getRef() < pos;
             });
-        const int value = lowerBound->getRef();
-        return value;
+        if (lowerBound != it->second.end())
+        {
+            const int value = lowerBound->getRef();
+            return value;
+        }
     }
 
     return -1;

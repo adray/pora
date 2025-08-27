@@ -1462,6 +1462,17 @@ int poCodeGenerator::emitCast(poNode* node, poFlowGraph& cfg)
     const poType& dstTypeData = _module.types()[dstType];
     if (dstTypeData.isPointer())
     {
+        poType& srcTypeData = _module.types()[srcType];
+        if (srcTypeData.isArray())
+        {
+            const int ptr = _instructionCount++;
+            emitInstruction(poInstruction(ptr, dstType, expr, -1, IR_PTR), cfg.getLast());
+
+            const int castId = _instructionCount++;
+            emitInstruction(poInstruction(castId, dstType, ptr, -1, srcType, IR_BITWISE_CAST), cfg.getLast());
+            return castId;
+        }
+
         const int castId = _instructionCount++;
         emitInstruction(poInstruction(castId, dstType, expr, -1, srcType, IR_BITWISE_CAST), cfg.getLast());
         return castId;
@@ -1635,7 +1646,7 @@ void poCodeGenerator::emitStoreArray(poNode* node, poFlowGraph& cfg, const int i
     poNode* child = array->child();
     const int expr = emitExpr(child, cfg);
     const int arrayType = _types[expr];
-    auto& type = _module.types()[arrayType];
+    poType type = _module.types()[arrayType];
 
     if (type.isArray())
     {
@@ -1643,7 +1654,7 @@ void poCodeGenerator::emitStoreArray(poNode* node, poFlowGraph& cfg, const int i
         const int pointerType = getPointerType(arrayType);
 
         const int ptr = _instructionCount; /* result of IR_PTR */
-        emitInstruction(poInstruction(_instructionCount++, pointerType, expr, accessor, IR_ELEMENT_PTR), cfg.getLast());
+        emitInstruction(poInstruction(_instructionCount++, type.baseType(), expr, accessor, IR_ELEMENT_PTR), cfg.getLast());
 
         emitInstruction(poInstruction(_instructionCount++, type.baseType(), ptr, id, IR_STORE), cfg.getLast());
     }
@@ -1665,7 +1676,7 @@ int poCodeGenerator::emitLoadArray(poNode* node, poFlowGraph& cfg)
     poNode* child = array->child();
     const int expr = emitExpr(child, cfg);
     const int arrayType = _types[expr];
-    auto& type = _module.types()[arrayType];
+    poType type = _module.types()[arrayType];
 
     if (type.isArray())
     {
@@ -1727,7 +1738,7 @@ void poCodeGenerator::emitStoreMember(poNode* node, poFlowGraph& cfg, const int 
     {
         poNode* member = stack[i];
 
-        if (_module.types()[fieldType].isPointer())
+        if (_module.types()[fieldType].isPointer() && i > 0)
         {
             /* We need to dereference the pointer first and reset the offset */
 
@@ -1795,7 +1806,7 @@ int poCodeGenerator::emitLoadMember(poNode* node, poFlowGraph& cfg)
     {
         poNode* member = stack[i];
 
-        if (_module.types()[fieldType].isPointer())
+        if (_module.types()[fieldType].isPointer() && i > 0)
         {
             /* We need to dereference the pointer first and reset the offset */
 

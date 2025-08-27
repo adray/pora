@@ -243,7 +243,7 @@ void poOptMemToReg::optimize(poModule& module, poFlowGraph& cfg)
 
         bb = bb->getNext();
     }
-    
+
     // 5: Phi node insertion, SSA rename
     poSSA_Reconstruct ssa;
     ssa.reconstruct(cfg, variables);

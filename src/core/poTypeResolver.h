@@ -28,10 +28,11 @@ namespace po
         int getPointerType(const int baseType, const int count);
         int align(const int size, const int alignment) const;
 
-        void updateArgs(poNode* node, poNamespace& ns);
+        void updateArgs(poNode* node);
         
         poModule& _module;
         std::vector<poNode*> _userTypes;
         std::unordered_map<std::string, int> _resolvedTypes;
+        std::unordered_map<poNode*, int> _namespaces;
     };
 }

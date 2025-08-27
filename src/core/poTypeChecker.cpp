@@ -164,7 +164,8 @@ bool poTypeChecker::checkEquivalence(const int lhs, const int rhs)
     const poType& lhsType = _module.types()[lhs];
     const poType& rhsType = _module.types()[rhs];
     
-    if (lhsType.isPointer() && rhsType.id() == TYPE_NULLPTR)
+    if ((lhsType.isPointer() && rhsType.id() == TYPE_NULLPTR) ||
+        (lhsType.id() == TYPE_NULLPTR && rhsType.isPointer()))
     {
         return true;
     }
@@ -877,11 +878,11 @@ int poTypeChecker::checkExpr(poNode* node)
         case TYPE_I64:
         case TYPE_F64:
         case TYPE_F32:
-            break;
-            if (type != checkExpr(binary->right()))
+            if (!checkEquivalence(type, checkExpr(binary->right())))
             {
                 type = -1;
             }
+            break;
         default:
             type = -1; // binary arithmetic not allowed
             break;
@@ -907,7 +908,7 @@ int poTypeChecker::checkExpr(poNode* node)
     case poNodeType::CMP_LESS:
     {
         poBinaryNode* binary = static_cast<poBinaryNode*>(node);
-        type = (checkExpr(binary->left()) == checkExpr(binary->right())) ? TYPE_BOOLEAN : -1;
+        type = checkEquivalence(checkExpr(binary->left()), checkExpr(binary->right())) ? TYPE_BOOLEAN : -1;
     }
         break;
     case poNodeType::NULLPTR:
@@ -985,6 +986,13 @@ int poTypeChecker::checkArray(poNode* node)
 {
     poArrayAccessor* array = static_cast<poArrayAccessor*>(node);
     assert(array->type() == poNodeType::ARRAY_ACCESSOR);
+
+    const int accessor = checkExpr(array->accessor());
+    if (accessor != TYPE_I64)
+    {
+        setError("Array accessor must be of type i64.", array->accessor()->token());
+        return -1;
+    }
 
     const int expr = checkExpr(array->child());
     if (expr != -1)
@@ -1089,7 +1097,7 @@ int poTypeChecker::checkCall(poNode* node)
                     paramType = pointerNode->child();
                 }
 
-                if (checkExpr(childExpr) != getPointerType(getType(paramType->token()), pointerCount))
+                if (!checkEquivalence(checkExpr(childExpr), getPointerType(getType(paramType->token()), pointerCount)))
                 {
                     setError("Mismatch in parameters.", node->token());
                     type = -1;

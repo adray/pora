@@ -1,0 +1,32 @@
+import std;
+
+namespace Example
+{
+    struct test {
+        i64* x;
+        i64 y;
+    }
+
+    static i64 main()
+    {
+        u8[4] str;
+        str[0] = 'a';
+        str[1] = 'b';
+        str[2] = 'c';
+        str[3] = 0b;
+
+        println((u8*)str, (u32)4);
+        println((u8*)str, (u32)4);
+        print_64(1002);
+
+        //i64 x = 100;
+        //test t;
+        //t.x =  &x;
+        //t.y = x;
+        //i64* y = t.x;
+        //print_64(*y);
+        //print_64(t.y);
+
+        return 0;
+    }
+}

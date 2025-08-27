@@ -21,9 +21,10 @@ poStackAllocator::poStackAllocator()
 {
 }
 
-inline const int poStackAllocator::allocateSlot(const int variable, const int size)
+const int poStackAllocator::allocateSlot(const int variable, const int size)
 {
-    const int numSlots = size / 8;
+    const int remainder = size % 8;
+    const int numSlots = (size / 8) + (remainder > 0 ? 1 : 0);
 
     // Sliding window algorithm: we start with a window the size of the num slots AAABBAAA
     // where A=free slot B=used slot
@@ -91,7 +92,7 @@ inline const int poStackAllocator::allocateSlot(const int variable, const int si
     }
     return slot;
 }
-inline const void poStackAllocator::freeSlot(const int variable)
+const void poStackAllocator::freeSlot(const int variable)
 {
     const auto& it = _occupancy.find(variable);
     if (it != _occupancy.end())
@@ -100,7 +101,7 @@ inline const void poStackAllocator::freeSlot(const int variable)
         _occupancy.erase(it);
     }
 }
-inline const int poStackAllocator::findSlot(const int variable) const
+const int poStackAllocator::findSlot(const int variable) const
 {
     int index = -1;
     const auto& it = _occupancy.find(variable);
@@ -130,6 +131,39 @@ poRegSpill::poRegSpill(const int spillRegister, const int spillVariable, const i
     _spillStackSlot(spillStackSlot)
 {
 }
+
+//
+// poRegRestore
+//
+
+poRegRestore::poRegRestore()
+    :
+    _restoreRegister(0),
+    _restoreVariable(0),
+    _restoreStackSlot(0)
+{
+}
+
+poRegRestore::poRegRestore(const int restoreRegister, const int restoreVariable, const int restoreStackSlot)
+    :
+    _restoreRegister(restoreRegister),
+    _restoreVariable(restoreVariable),
+    _restoreStackSlot(restoreStackSlot)
+{
+}
+
+//
+// poRegLinearEntry
+//
+
+poRegLinearEntry::poRegLinearEntry(const std::vector<int> variables, const std::vector<bool> registerUsed, const std::vector<int> registersUsedByType)
+    :
+    _variables(variables),
+    _registerUsed(registerUsed),
+    _registersUsedByType(registersUsedByType)
+{
+}
+
 
 
 //
@@ -177,70 +211,294 @@ void poRegLinear::setType(const int reg, const poRegType type)
 
 void poRegLinear::spillRegisters(const int pos, const poRegType type, const poInstruction& ins, poUses& uses)
 {
-    std::vector<int> toSpill;
+    // This function looks at the left and right operands of the instruction and spills registers to make room to restore the registers (if they are required).
+    // If the instruction is a variable assignment, it will need to spill a register to make space for the new variable.
+    //
+
+    std::vector<int> spillTypes(int(poRegType::MAX), 0);
 
     if (ins.left() != -1)
     {
         const int slot = _stackAlloc.findSlot(ins.left());
-        if (slot != -1)
+        if (slot != -1 && _stackSlots.find(slot) != _stackSlots.end())
         {
-            toSpill.push_back(ins.left());
+            spillTypes[int(_stackSlots[slot].type())]++;
         }
     }
 
-    if (ins.right() != -1)
+    if (ins.right() != -1 &&
+        ins.left() != ins.right())
     {
         const int slot = _stackAlloc.findSlot(ins.right());
-        if (slot != -1)
+        if (slot != -1 && _stackSlots.find(slot) != _stackSlots.end())
         {
-            toSpill.push_back(ins.right());
+            spillTypes[int(_stackSlots[slot].type())]++;
         }
     }
 
-    const int variable = ins.name();
-    const auto& foundRegister = _registerMap.find(variable);
-    const int usedVariable = foundRegister == _registerMap.end() ? -1 : _variables[_registerMap[variable]];
-
-    if (usedVariable != variable && /* we only need to spill if the variable used is not already in a register */
-        _registersUsedByType[int(type)] == _maxRegistersUsedByType[int(type)])
+    if (ins.code() != IR_ARG ||
+        ins.code() != IR_CMP)
     {
-        toSpill.push_back(variable);
+        const int variable = ins.name();
+        const auto& foundRegister = _registerMap.find(variable);
+        const int usedVariable = foundRegister == _registerMap.end() ? -1 : _variables[_registerMap[variable]];
+
+        if (usedVariable != variable && /* we only need to spill if the variable used is not already in a register */
+            _registersUsedByType[int(type)] == _maxRegistersUsedByType[int(type)])
+        {
+            spillTypes[int(type)]++;
+        }
     }
 
-    for (const int variable : toSpill)
+    for (size_t j = 0; j < spillTypes.size(); j++)
     {
-        // We need to evict a register; ideally the one which is next used furthest away
+        const poRegType type = (poRegType)j;
+        const int numAvailable = _maxRegistersUsedByType[j] - _registersUsedByType[j];
+        const int numToSpill = spillTypes[j] - numAvailable;
 
-        int variableToSpill = -1;
-        int registerToSpill = -1;
-        int longestDistance = -1;
-
-        for (int i = 0; i < _numRegisters; i++)
+        for (int k = 0; k < numToSpill; k++)
         {
-            if (_registerUsed[i] && _type[i] == type)
+            // We need to evict a register; ideally the one which is next used furthest away
+
+            int variableToSpill = -1;
+            int registerToSpill = -1;
+            int longestDistance = -1;
+
+            for (int i = 0; i < _numRegisters; i++)
             {
-                // Search for the next use
-
-                const int distance = uses.findNextUse(_variables[i], pos) - pos;
-
-                if (distance > longestDistance)
+                if (_registerUsed[i] && _type[i] == type)
                 {
-                    longestDistance = distance;
-                    registerToSpill = i;
-                    variableToSpill = _variables[i];
+                    // Search for the next use
+
+                    const int nextUse = uses.findNextUse(_variables[i], pos);
+                    if (nextUse == -1 || nextUse == pos)
+                    {
+                        // If it is -1 then it MAY be live during a loop, so we opt to not spill it.
+                        // If it is pos, then it is used in this instruction, so we can't spill it.
+                        continue;
+                    }
+
+                    const int distance = nextUse - pos;
+
+                    if (distance > longestDistance)
+                    {
+                        longestDistance = distance;
+                        registerToSpill = i;
+                        variableToSpill = _variables[i];
+                    }
                 }
             }
-        }
 
-        if (registerToSpill != -1)
-        {
+            if (registerToSpill == -1)
+            {
+                // Fallback: spill any register of the correct type
+                for (int i = 0; i < _numRegisters; i++)
+                {
+                    if (_registerUsed[i] && _type[i] == type)
+                    {
+                        // We can't spill a register we are about to restore
+                        const int nextUse = uses.findNextUse(_variables[i], pos);
+                        if (nextUse == pos)
+                        {
+                            continue;
+                        }
+
+                        registerToSpill = i;
+                        variableToSpill = _variables[i];
+                        break;
+                    }
+                }
+            }
+
+            const poRegType spillType = _type[registerToSpill];
             _registerUsed[registerToSpill] = false;
-            _registersUsedByType[int(type)]--;
+            _registersUsedByType[int(spillType)]--;
 
-            const int stackSlot = _stackAlloc.allocateSlot(variable, 8);
-            _spills.insert(std::pair<int, poRegSpill>(pos, poRegSpill(registerToSpill, variableToSpill, stackSlot)));
-            _stackSlots.insert(std::pair<int, int>(pos, stackSlot));
+            int stackSlot = _stackAlloc.findSlot(variableToSpill);
+            if (stackSlot == -1)
+            {
+                stackSlot = _stackAlloc.allocateSlot(variableToSpill, 8); // FIXME: should be size of type
+            }
+
+            spill(pos, poRegSpill(registerToSpill, variableToSpill, stackSlot));
+            _stackSlots.insert(std::pair<int, poStackSlot>(stackSlot, poStackSlot(spillType, _registerExpiry[registerToSpill])));
         }
+    }
+
+    if (ins.left() != -1)
+    {
+        const int slot = _stackAlloc.findSlot(ins.left());
+        if (slot != -1 && _stackSlots.find(slot) != _stackSlots.end())
+        {
+            const auto& stackSlot = _stackSlots[slot];
+
+            allocateRegister(pos, stackSlot.type(), stackSlot.live() - pos, ins.left());
+            restore(pos, poRegRestore(
+                _registerMap[ins.left()],
+                ins.left(),
+                slot));
+            _stackSlots.erase(slot);
+        }
+    }
+
+    if (ins.right() != -1 &&
+        ins.left() != ins.right())
+    {
+        const int slot = _stackAlloc.findSlot(ins.right());
+        if (slot != -1 && _stackSlots.find(slot) != _stackSlots.end())
+        {
+            const auto& stackSlot = _stackSlots[slot];
+
+            allocateRegister(pos, stackSlot.type(), stackSlot.live() - pos, ins.right());
+            restore(pos, poRegRestore(
+                _registerMap[ins.right()],
+                ins.right(),
+                slot));
+            _stackSlots.erase(slot);
+        }
+    }
+}
+
+void poRegLinear::balanceRegisters(const int pos, poBasicBlock* bb)
+{
+    // We need to look at our basic block successors and see if we have visited them already,
+    // then we need to make sure that the variable stored in registers and stack slots
+    // match what is expected in the successor basic block.
+    //
+    // Example:
+    // Current basic block: [R1=A, R2=B, R3=C] [S1=D]
+    // Successor basic block: [R1=D, R2=B, R3=C] [S1=A]
+    // In this case we need to spill A to a stack slot and restore D from the stack slot.
+
+    if (bb->getBranch())
+    {
+        const auto& it = _entries.find(bb->getBranch());
+        if (it == _entries.end())
+        {
+            // We have not visited this basic block yet, so we can skip it.
+            return;
+        }
+
+        const poRegLinearEntry& entry = it->second;
+
+        // First we need to spill any registers which are not the same as the successor basic block
+        for (int i = 0; i < _numRegisters; i++)
+        {
+            // Skip volatile registers.
+            if (_volatile[i])
+            {
+                continue;
+            }
+
+            if (!_registerUsed[i])
+            {
+                continue;
+            }
+
+            if (entry.getRegister(i) == _variables[i])
+            {
+                continue;
+            }
+
+            // The register is not the same as the one we have in the successor basic block,
+            // so we need to spill it.
+
+            const int variable = _variables[i];
+            int slot = _stackAlloc.findSlot(variable);
+            if (slot == -1)
+            {
+                slot = _stackAlloc.allocateSlot(variable, 8);
+            }
+            spill(pos, poRegSpill(i, variable, slot));
+            _stackSlots.insert(std::pair<int, poStackSlot>(slot, poStackSlot(_type[i], _registerExpiry[i])));
+            _registerUsed[i] = false;
+            _registersUsedByType[int(_type[i])]--;
+        }
+
+        // Now we need to restore any registers which are not the same as the successor basic block
+        for (int i = 0; i < _numRegisters; i++)
+        {
+            // Skip volatile registers.
+            if (_volatile[i])
+            {
+                continue;
+            }
+
+            if (!entry.isUsed(i))
+            {
+                continue;
+            }
+
+            if (entry.getRegister(i) == _variables[i])
+            {
+                continue;
+            }
+
+            // Restore the register if it is not already set
+
+            const int variable = entry.getRegister(i);
+            const int slot = getStackSlotByVariable(variable);
+
+            if (slot != -1)
+            {
+                const poStackSlot& stackSlot = _stackSlots[slot];
+
+                assert(!_registerUsed[i]);
+
+                _registersUsedByType[(int)stackSlot.type()]++;
+                _registerUsed[i] = true;
+                _registersSet[i] = true;
+                _registerExpiry[i] = stackSlot.live();
+                _variables[i] = variable;
+                mapRegister(poRegLinearAssignment(pos, stackSlot.live(), variable, i));
+                _registerMap.insert(std::pair<int, int>(variable, i));
+
+                restore(pos, poRegRestore(
+                    _registerMap[variable],
+                    variable,
+                    slot));
+                _stackSlots.erase(slot);
+            }
+        }
+    }
+}
+
+void poRegLinear::spill(const int pos, const poRegSpill& spill)
+{
+    const auto& it = _spills.find(pos);
+    if (it != _spills.end())
+    {
+        _spills[pos].push_back(spill);
+    }
+    else
+    {
+        _spills.insert(std::pair<int, std::vector<poRegSpill>>(pos, std::vector<poRegSpill>(1, spill)));
+    }
+}
+
+void poRegLinear::restore(const int pos, const poRegRestore& restore)
+{
+    const auto& it = _restores.find(pos);
+    if (it != _restores.end())
+    {
+        _restores[pos].push_back(restore);
+    }
+    else
+    {
+        _restores.insert(std::pair<int, std::vector<poRegRestore>>(pos, std::vector<poRegRestore>(1, restore)));
+    }
+}
+
+void poRegLinear::mapRegister(const poRegLinearAssignment& assignment)
+{
+    const auto& it = _registers.find(assignment.variable());
+    if (it != _registers.end())
+    {
+        it->second.push_back(assignment);
+    }
+    else
+    {
+        _registers.insert(std::pair<int, std::vector<poRegLinearAssignment>>(assignment.variable(), std::vector<poRegLinearAssignment>(1, assignment)));
     }
 }
 
@@ -270,16 +528,24 @@ void poRegLinear::allocateRegister(const int pos, const poRegType type, const in
 {
     // If the variable already exists, extend the live range
     const auto& foundRegister = _registerMap.find(variable);
-    if (foundRegister != _registerMap.end())
+    if (foundRegister != _registerMap.end() &&
+        (!_registerUsed[foundRegister->second] || _variables[foundRegister->second] == variable))
     {
-        _registerUsed[foundRegister->second] = true;
+        if (!_registerUsed[foundRegister->second])
+        {
+            assert(_registersSet[foundRegister->second]);
+            _registerUsed[foundRegister->second] = true;
+            _variables[foundRegister->second] = variable;
+            _registersUsedByType[(int)type]++;
+        }
         _registerExpiry[foundRegister->second] = std::max(
             _registerExpiry[foundRegister->second],
             pos + live);
-        _registers.push_back(foundRegister->second);
+        mapRegister(poRegLinearAssignment(pos, pos + live, variable, foundRegister->second));
         return;
     }
 
+    bool allocated = false;
     for (int i = 0; i < _numRegisters; i++)
     {
         // Do not attempt to use volatile registers.
@@ -302,10 +568,21 @@ void poRegLinear::allocateRegister(const int pos, const poRegType type, const in
             _registersSet[i] = true;
             _registerExpiry[i] = pos + live;
             _variables[i] = variable;
-            _registers.push_back(i);
+            mapRegister(poRegLinearAssignment(pos, pos + live, variable, i));
+
+            if (foundRegister != _registerMap.end())
+            {
+                _registerMap.erase(foundRegister);
+            }
             _registerMap.insert(std::pair<int, int>(variable, i));
+            allocated = true;
             break;
         }
+    }
+
+    if (!allocated)
+    {
+        abort();
     }
 }
 
@@ -342,6 +619,10 @@ void poRegLinear::allocateRegisters(poFlowGraph& cfg)
     poBasicBlock* bb = cfg.getFirst();
     while (bb)
     {
+        _entries.insert(std::pair<poBasicBlock*, poRegLinearEntry>(
+            bb,
+            poRegLinearEntry(_variables, _registerUsed, _registersUsedByType)));
+
         auto& instructions = bb->instructions();
         for (int i = 0; i < int(instructions.size()); i++)
         {
@@ -352,11 +633,16 @@ void poRegLinear::allocateRegisters(poFlowGraph& cfg)
 
             switch (ins.code())
             {
-            case IR_RETURN:
-            case IR_ARG:
             case IR_BR:
+                balanceRegisters(pos, bb);
+                pos++;
+                continue;
+            case IR_ARG:
             case IR_CMP:
-                _registers.push_back(0);
+                spillRegisters(pos, poRegType::General, ins, uses);
+                pos++;
+                continue;
+            case IR_RETURN:
                 pos++;
                 continue;
             default:
@@ -365,7 +651,6 @@ void poRegLinear::allocateRegisters(poFlowGraph& cfg)
 
             if (ins.code() == IR_ALLOCA)
             {
-                _registers.push_back(0);
                 pos++;
 
                 const poType& type = _module.types()[ins.type()];
@@ -375,7 +660,7 @@ void poRegLinear::allocateRegisters(poFlowGraph& cfg)
 
                 const int elements = ins.left();
                 const int size = _module.types()[baseType.id()].size();
-                _stackSlots.insert(std::pair<int, int>(pos, _stackAlloc.allocateSlot(ins.name(), size * elements)));
+                _stackAlloc.allocateSlot(ins.name(), size * elements);
                 continue;
             }
 
@@ -385,9 +670,11 @@ void poRegLinear::allocateRegisters(poFlowGraph& cfg)
             case TYPE_BOOLEAN:
             case TYPE_I64:
             case TYPE_I32:
+            case TYPE_I16:
             case TYPE_I8:
             case TYPE_U64:
             case TYPE_U32:
+            case TYPE_U16:
             case TYPE_U8:
                 type = poRegType::General;
                 break;
@@ -398,7 +685,6 @@ void poRegLinear::allocateRegisters(poFlowGraph& cfg)
             default:
                 if (!_module.types()[ins.type()].isPointer())
                 {
-                    _registers.push_back(0);
                     pos++;
                     continue;
                 }
@@ -406,7 +692,7 @@ void poRegLinear::allocateRegisters(poFlowGraph& cfg)
                 break;
             }
 
-            //spillRegisters(pos, type, ins, uses);
+            spillRegisters(pos, type, ins, uses);
             allocateRegister(pos, type, live, ins.name());
 
             pos++;
@@ -416,22 +702,51 @@ void poRegLinear::allocateRegisters(poFlowGraph& cfg)
     }
 }
 
-int poRegLinear::getRegisterByVariable(const int variable) const
+int poRegLinear::getRegisterByVariable(const int variable, const int pos) const
 {
-    const auto& it = _registerMap.find(variable);
-    if (it != _registerMap.end())
+    const auto& it = _registers.find(variable);
+
+    if (it != _registers.end())
     {
-        return it->second;
+        for (int i = int(it->second.size()) - 1; i >= 0; i--)
+        {
+            const poRegLinearAssignment& assign = it->second[i];
+            if (pos >= assign.pos() && pos <= assign.live())
+            {
+                return assign.reg();
+            }
+        }
+
+        abort();
     }
+
     return -1;
 }
 
-const bool poRegLinear::spillAt(const int index, poRegSpill* spill) const
+int poRegLinear::getRegisterByVariable(const int variable) const
+{
+    return getRegisterByVariable(variable, _iterator.position());
+}
+
+const bool poRegLinear::spillAt(const int index, const int element, poRegSpill* spill) const
 {
     const auto& it = _spills.find(index);
-    if (it != _spills.end())
+    if (it != _spills.end() &&
+        it->second.size() > element)
     {
-        *spill = it->second;
+        *spill = it->second[element];
+        return true;
+    }
+    return false;
+}
+
+const bool poRegLinear::restoreAt(const int index, const int element, poRegRestore* spill) const
+{
+    const auto& it = _restores.find(index);
+    if (it != _restores.end() &&
+        it->second.size() > element)
+    {
+        *spill = it->second[element];
         return true;
     }
     return false;
@@ -440,16 +755,5 @@ const bool poRegLinear::spillAt(const int index, poRegSpill* spill) const
 const int poRegLinear::getStackSlotByVariable(const int variable) const
 {
     return _stackAlloc.findSlot(variable);
-}
-
-const int poRegLinear::getStackSlot(const int pos) const
-{
-    const auto& it = _stackSlots.find(pos);
-    if (it != _stackSlots.end())
-    {
-        return it->second;
-    }
-
-    return -1;
 }
 

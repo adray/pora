@@ -177,7 +177,7 @@ static constexpr vm_instruction gInstructions[VMI_MAX_INSTRUCTIONS] = {
     INS(0x0, 0x48, 0xB0, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRI, VMI_ENC_OI), //VMI_MOV8_SRC_IMM_DST_REG
     INS(0x0, 0x48, 0x88, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_MR), //VMI_MOV8_SRC_REG_DST_REG,
     INS(0x0, 0x48, 0x8A, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRM, VMI_ENC_RM), //VMI_MOV8_SRC_MEM_DST_REG,
-    INS(0x0, 0x48, 0x88, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BMR, VMI_ENC_MR), //VMI_MOV8_SRC_REG_DST_MEM,
+    INS(0x0, 0x48, 0x88, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BMRO, VMI_ENC_MR), //VMI_MOV8_SRC_REG_DST_MEM,
 
     INS(0x0, 0x48, 0x0F, 0xAF, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_RM), // VMI_IMUL64_SRC_REG_DST_REG /* signed */
     INS(0x0, 0x48, 0x0F, 0xAF, VM_INSTRUCTION_BINARY, CODE_BRMO, VMI_ENC_RM), // VMI_IMUL64_SRC_MEM_DST_REG /* signed */
@@ -813,7 +813,7 @@ void po_x86_64_Lower::mc_inc_memory_x64(int reg, int offset) { unaryop(reg, VMI_
 void po_x86_64_Lower::mc_dec_reg_x64(int reg) { unaryop(reg, VMI_DEC64_DST_REG); }
 void po_x86_64_Lower::mc_dec_memory_x64(int reg, int offset) { unaryop(reg, VMI_DEC64_DST_MEM, offset); }
 void po_x86_64_Lower::mc_neg_memory_x64(int reg, int offset) { unaryop(reg, VMI_NEG64_DST_MEM, offset); }
-void po_x86_64_Lower::mc_neg_reg_x64(int reg) { unaryop(reg, VMI_DEC64_DST_REG); }
+void po_x86_64_Lower::mc_neg_reg_x64(int reg) { unaryop(reg, VMI_NEG64_DST_REG); }
 
 /* Jump operations */
 
@@ -925,9 +925,19 @@ void po_x86_64_Lower::dump() const
                 {
                     std::cout << ins.opcode() << " " << (ins.dstReg() >= 0 ? sse_registers[ins.dstReg()] : "") << " " << (ins.srcReg() >= 0 ? sse_registers[ins.srcReg()] : "") << " " << std::endl;
                 }
-                else
+                else if (sse_ins.code == CODE_BRMO ||
+                    sse_ins.code == CODE_BRM)
                 {
                     std::cout << ins.opcode() << " " << (ins.dstReg() >= 0 ? sse_registers[ins.dstReg()] : "") << " " << (ins.srcReg() >= 0 ? registers[ins.srcReg()] : "") << " " << std::endl;
+                }
+                else if (sse_ins.code == CODE_BMRO ||
+                    sse_ins.code == CODE_BMR)
+                {
+                    std::cout << ins.opcode() << " "<< (ins.dstReg() >= 0 ? registers[ins.dstReg()] : "") << " "  << (ins.srcReg() >= 0 ? sse_registers[ins.srcReg()] : "") << " " << std::endl;
+                }
+                else
+                {
+                    std::cout << ins.opcode() << std::endl;
                 }
             }
             else
@@ -1097,37 +1107,21 @@ void po_x86_64::emit(const po_x86_64_instruction& instruction)
             case CODE_BRM:
                 emit_brm(ins, instruction.dstReg(), instruction.imm32());
                 break;
-            case CODE_BRI:
-                emit_bri(ins, instruction.dstReg(), instruction.imm32());
+            case CODE_BMR:
+                emit_bmr(ins, instruction.dstReg(), instruction.imm32());
                 break;
+            //case CODE_BRI:
+            //    emit_bri(ins, instruction.dstReg(), instruction.imm32());
+            //    break;
             case CODE_UR:
-                emit_ur(ins, instruction.srcReg());
+                assert(instruction.dstReg() >= 0);
+                emit_ur(ins, instruction.dstReg());
                 break;
             case CODE_UI:
                 emit_ui(ins, instruction.imm32());
                 break;
             default:
-                switch (instruction.opcode())
-                {
-                case VMI_CALL:
-                    mc_call(instruction.imm32());
-                    break;
-                case VMI_CALL_MEM:
-                    mc_call_memory(instruction.imm32());
-                    break;
-                case VMI_PUSH_REG:
-                    mc_push_reg(instruction.srcReg());
-                    break;
-                case VMI_POP_REG:
-                    mc_pop_reg(instruction.dstReg());
-                    break;
-                case VMI_NEAR_RETURN:
-                    mc_return();
-                    break;
-                default:
-                    abort();
-                    break;
-                }
+                abort();
                 break;
         }
     }

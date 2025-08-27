@@ -76,10 +76,17 @@ int main(const int numArgs, const char** const args)
     {
 #if WIN32
         // Link the Windows libraries
-        poCommonObjectFileFormat coff;
-        if (!openLibraryFile("kernel32.lib", coff))
+        poCommonObjectFileFormat kernel32;
+        if (!openLibraryFile("kernel32.lib", kernel32))
         {
             std::cout << "Failed to open kernel32.lib" << std::endl;
+            return 0;
+        }
+
+        poCommonObjectFileFormat user32;
+        if (!openLibraryFile("user32.lib", user32))
+        {
+            std::cout << "Failed to open user32.lib" << std::endl;
             return 0;
         }
 #endif
@@ -117,28 +124,50 @@ int main(const int numArgs, const char** const args)
 
         // Build the import tables
 #ifdef WIN32
-        poPortableExecutableImportTable& importTable = exe.addImportTable("Kernel32.dll");
-        for (const poImport& import : coff.imports())
+        const int kernel32ImportTable = exe.addImportTable("Kernel32.dll");
+        const int user32ImportTable = exe.addImportTable("User32.dll");
+
+        for (const poImport& import : kernel32.imports())
         {
             if (imports.find(import.importName()) != imports.end())
             {
                 // TODO: we adding duplicate entries?
-                importTable.addImport(import.importName(), import.importOrdinal());
+                poPortableExecutableImportTable& table = exe.importTable(kernel32ImportTable);
+                table.addImport(import.importName(), import.importOrdinal());
+            }
+        }
+
+        for (const poImport& import : user32.imports())
+        {
+            if (imports.find(import.importName()) != imports.end())
+            {
+                // TODO: we adding duplicate entries?
+                poPortableExecutableImportTable& table = exe.importTable(user32ImportTable);
+                table.addImport(import.importName(), import.importOrdinal());
             }
         }
 #endif
 
         // Create the data sections
         exe.setEntryPoint(compiler.assembler().entryPoint());
-        exe.addSection(poSectionType::TEXT, 1024*2);
+        exe.addSection(poSectionType::TEXT, 1024*4);
         exe.addSection(poSectionType::INITIALIZED, 1024);
         exe.addSection(poSectionType::UNINITIALIZED, 1024);
-        exe.addSection(poSectionType::IDATA, 1024);
+        exe.addSection(poSectionType::IDATA, 1024*2);
         exe.initializeSections();
         
         // Final linking..
 #ifdef WIN32
-        for (poImportEntry& importEntry : importTable.imports())
+        for (poImportEntry& importEntry : exe.importTable(kernel32ImportTable).imports())
+        {
+            const auto& it = imports.find(importEntry.name());
+            if (it != imports.end())
+            {
+                it->second = importEntry.addressRVA();
+            }
+        }
+
+        for (poImportEntry& importEntry : exe.importTable(user32ImportTable).imports())
         {
             const auto& it = imports.find(importEntry.name());
             if (it != imports.end())

@@ -1,0 +1,102 @@
+namespace std
+{
+    static void print(u8* str, u32 size)
+    {
+        u32 stdOut = (u32)4294967285;
+
+        u32 bytesWritten = (u32)0;
+        i64 handle = GetStdHandle(stdOut);
+        WriteFile(handle,
+            str,
+            size,
+            &bytesWritten,
+            null);
+    }
+    
+    static void println(u8* str, u32 size)
+    {
+        u32 stdOut = (u32)4294967285;
+
+        u32 bytesWritten = (u32)0;
+        i64 handle = GetStdHandle(stdOut);
+        WriteFile(handle,
+            str,
+            size,
+            &bytesWritten,
+            null);
+
+        u8[2] newline;
+        newline[0] = 10b;
+        newline[1] = 0b;
+
+        WriteFile(handle,
+            (u8*)newline,
+            (u32)2,
+            &bytesWritten,
+            null);
+    }
+
+    static void print_64(i64 value)
+    {
+        u8[128] buffer;
+        u32 size = toString(value, (u8*)buffer, (u32)128);
+        print((u8*)buffer, size);
+    }
+
+    static u32 toString(i64 value, u8* buffer, u32 size)
+    {
+        if (size == (u32)0)
+        {
+            return (u32)0; // Invalid buffer or size
+        }
+
+        u32 index = (u32)0;
+        boolean isNegative = false;
+        if (value < 0)
+        {
+            isNegative = true;
+            value = -value;
+        }
+
+        u8[] outputBuffer = (u8[128])buffer;
+
+        if (value == 0 && size > (u32)0)
+        {
+            outputBuffer[(i64)index] = '0';
+            index = index + (u32)1;
+        }
+
+        while (value > 0 && index < size)
+        {
+            i64 remainder = value - (value / 10) * 10; // workaround as we don't have a modulus operator
+
+            outputBuffer[(i64)index] = (u8)remainder + (u8)'0';
+            index = index + (u32)1;
+            value = value / 10;
+        } 
+
+        if (isNegative == true && index < size)
+        {
+            outputBuffer[(i64)index] = '-';
+            index = index + (u32)1;
+        }
+
+        // Reverse the string
+        u32 count = index / (u32)2;
+        for (u32 i = (u32)0; i < count; i = i + (u32)1)
+        {
+            u8 temp = outputBuffer[(i64)i];
+            i64 src = (i64)index - (i64)i - 1;
+            outputBuffer[(i64)i] = outputBuffer[src];
+            outputBuffer[src] = temp;
+        }
+
+        // Null-terminate the string
+        if (index < size)
+        {
+            outputBuffer[(i64)index] = 0b;
+            index = index + (u32)1;
+        }
+        return index;
+    }
+}

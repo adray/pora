@@ -631,20 +631,20 @@ int main(int numArgs, char** args)
     std::cout << "Running code gen test" << std::endl;
 
     po_x86_64 x86_64;
-    //generateAddInstructions1(x86_64);
-    //generateSubInstructions1(x86_64);
-    //generateMulInstructions1(x86_64);
-    //generateMulInstructions2(x86_64);
-    //generateMovInstructions1(x86_64);
-    //generateMovSXInstructions1(x86_64);
-    //generateMovSXInstructions2(x86_64);
-    //generateAddInstructions2(x86_64);
-    //generateAddInstructions3(x86_64);
-    //generateSubInstructions2(x86_64);
-    //generateMovInstructions2(x86_64);
-    //generateCmpInstructions1(x86_64);
-    //generateDivInstructions1(x86_64);
-    generateDivInstructions2(x86_64);
+    if (strcmp(args[1], "add") == 0) { generateAddInstructions1(x86_64); }
+    if (strcmp(args[1], "sub") == 0) { generateSubInstructions1(x86_64); }
+    if (strcmp(args[1], "mul") == 0) { generateMulInstructions1(x86_64); }
+    if (strcmp(args[1], "mul2") == 0) { generateMulInstructions2(x86_64); }
+    if (strcmp(args[1], "mov") == 0) {  generateMovInstructions1(x86_64); }
+    if (strcmp(args[1], "movsx") == 0) { generateMovSXInstructions1(x86_64);  }
+    if (strcmp(args[1], "movsx2") == 0) { generateMovSXInstructions2(x86_64);  }
+    if (strcmp(args[1], "add2") == 0) { generateAddInstructions2(x86_64); }
+    if (strcmp(args[1], "add3") == 0) { generateAddInstructions3(x86_64); }
+    if (strcmp(args[1], "sub2") == 0) { generateSubInstructions2(x86_64); }
+    if (strcmp(args[1], "mov2") == 0) { generateMovInstructions2(x86_64);   }
+    if (strcmp(args[1], "cmp") == 0) { generateCmpInstructions1(x86_64);   }
+    if (strcmp(args[1], "div") == 0) { generateDivInstructions1(x86_64);   }
+    if (strcmp(args[1], "div2") == 0) { generateDivInstructions2(x86_64);  }
 
     //generateMovZXInstructions1(x86_64);
     //generateMovZXInstructions2(x86_64);

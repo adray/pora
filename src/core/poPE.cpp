@@ -144,7 +144,8 @@ poImportEntry::poImportEntry(const std::string& name, int ordinal)
 poPortableExecutableImportTable::poPortableExecutableImportTable(const std::string& dllName)
     :
     _dllName(dllName),
-    _importPosition(0)
+    _importPosition(0),
+    _importLookupPosition(0)
 {
 }
 
@@ -204,7 +205,7 @@ poPortableExecutable::poPortableExecutable()
 void poPortableExecutable::addDataSections()
 {
     _dataSections.emplace_back(poSectionType::IDATA, poDataDirectoryType::EXPORT, 0, 0);
-    _dataSections.emplace_back(poSectionType::IDATA, poDataDirectoryType::IMPORT, 0, 512);
+    _dataSections.emplace_back(poSectionType::IDATA, poDataDirectoryType::IMPORT, 0, 2048);
     _dataSections.emplace_back(poSectionType::IDATA, poDataDirectoryType::RESOURCE, 0, 0);
     _dataSections.emplace_back(poSectionType::IDATA, poDataDirectoryType::EXCEPTION, 0, 0);
     _dataSections.emplace_back(poSectionType::IDATA, poDataDirectoryType::CERTIFICATE, 0, 0);
@@ -243,9 +244,10 @@ void poPortableExecutable::addSection(const poSectionType type, const int size)
     section.data().resize(size);
 }
 
-poPortableExecutableImportTable& poPortableExecutable::addImportTable(const std::string& name)
+const int poPortableExecutable::addImportTable(const std::string& name)
 {
-    return _imports.emplace_back(name);
+    _imports.emplace_back(name);
+    return int(_imports.size()) - 1;
 }
 
 void poPortableExecutable::buildImportNameTable(std::vector<unsigned char>& importNameTable)
@@ -305,6 +307,8 @@ void poPortableExecutable::buildImportLookupTable(std::vector<unsigned char>& im
 {
     for (poPortableExecutableImportTable& table : _imports)
     {
+        table.setImportLookupPosition(int(importLookupTable.size()));
+
         for (poImportEntry& import : table.imports())
         {
             import.setAddressRVA(int(importLookupTable.size()));
@@ -360,9 +364,11 @@ void poPortableExecutable::genImports(const int imagePos, poPortableExecutableSe
     PeImportDirectory* imports = reinterpret_cast<PeImportDirectory*>(section.data().data() + data.offset());
     for (int i = 0; i < numDLLs; i++)
     {
-        imports[i].mName = imagePos + importNameTablePos;
-        imports[i].mCharacteristics = imagePos + importLookupTablePos;
-        imports[i].mImportAddressTable = imagePos + importAddressTablePos;
+        poPortableExecutableImportTable& table = _imports[i];
+
+        imports[i].mName = imagePos + importNameTablePos + table.importPosition();
+        imports[i].mCharacteristics = imagePos + importLookupTablePos + table.importLookupPosition();
+        imports[i].mImportAddressTable = imagePos + importAddressTablePos + table.importLookupPosition();
     }
     /* last import is all NULLs */
 

@@ -3,5 +3,5 @@
 
 namespace po
 {
-    void runIntegrationTests(const std::string& testDir, const std::string& compiler);
+    void runIntegrationTests(const std::string& testDir, const std::string& compiler, const std::string& std);
 }

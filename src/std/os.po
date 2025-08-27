@@ -43,7 +43,7 @@ namespace std
     extern i32 GetCurrentProcessId();
     extern i32 GetCurrentThreadId();
     extern void ExitProcess(u32 exitCode);
-    extern void GetStartupInfoW(startupInfo* info);
+    extern void GetStartupInfoW(STARTUPINFO* info);
     extern i64 GetProcessHeap(); // returns HANDLE
     extern u8* HeapAlloc(
           i64 handle, // [in] HANDLE hHeap
@@ -77,4 +77,55 @@ namespace std
       i32                 dwMaximumSizeLow,
       u8*                lpName
     );
+
+    struct OVERLAPPED {
+        u32* Internal; // ULONG_PTR
+        u32* InternalHigh; // ULONG_PTR
+        u8* Pointer; // LPVOID
+        i64    hEvent; // HANDLE
+    }
+
+    extern boolean WriteFile(
+          i64       hFile, // [in] HANDLE
+          u8*       lpBuffer, // [in] LPCVOID
+          u32       nNumberOfBytesToWrite, // [in] DWORD
+          u32*      lpNumberOfBytesWritten, // [out, optional] LPDWORD
+          OVERLAPPED* lpOverlapped // [in, out, optional] LPOVERLAPPED
+        );
+
+    extern i64 GetStdHandle(
+        u32 nStdHandle //_In_ DWORD 
+    ); // returns HANDLE
+
+    extern i64 CreateWindowExA(
+        i32 dwExStyle, // DWORD
+        u8* lpClassName, // LPCSTR
+        u8* lpWindowName, // LPCSTR
+        i32 dwStyle, // DWORD
+        i32 X, // int
+        i32 Y, // int
+        i32 nWidth, // int
+        i32 nHeight, // int
+        i64 hWndParent, // HWND
+        i64 hMenu, // HMENU
+        i64 hInstance, // HINSTANCE
+        u8* lpParam // LPVOID
+    ); // returns HWND
+
+    struct WNDCLASSA {
+        u32      style; // UINT
+        u8*   lpfnWndProc; // WNDPROC
+        i32       cbClsExtra;
+        i32       cbWndExtra;
+        i64 hInstance; // HINSTANCE
+        i64     hIcon; // HICON
+        i64   hCursor; // HCURSOR
+        i64    hbrBackground; // HBRUSH
+        u8*    lpszMenuName; // LPCSTR
+        u8*    lpszClassName;  // LPCSTR
+  } // WNDCLASSA
+
+    extern i64 RegisterClassA(
+        WNDCLASSA* lpWndClass // WNDCLASSA*
+    ); // returns ATOM
 }

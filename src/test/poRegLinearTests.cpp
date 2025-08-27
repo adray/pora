@@ -40,9 +40,9 @@ static void regLinearTest1()
     linear.setNumRegisters(16);
     linear.allocateRegisters(cfg);
 
-    const int i4 = linear.getRegister(4);
-    const int i6 = linear.getRegister(6);
-    const int i8 = linear.getRegister(8);
+    const int i4 = linear.getRegisterByVariable(1003, 4);
+    const int i6 = linear.getRegisterByVariable(1004, 6);
+    const int i8 = linear.getRegisterByVariable(1004, 8);
 
     // Check the register allocated to instructions 1004
     // are all the same register and no other instruction
@@ -57,7 +57,7 @@ static void regLinearTest1()
             i != 8 && 
             i > 4)
         {
-            if (linear.getRegister(i) == i4)
+            if (linear.getRegisterByVariable(1000 + i, i) == i4) // FIXME
             {
                 ok = false;
                 break;
@@ -111,8 +111,8 @@ static void regLinearTest2()
     linear.setNumRegisters(16);
     linear.allocateRegisters(cfg);
 
-    const int i0 = linear.getRegister(0);
-    const int i5 = linear.getRegister(5);
+    const int i0 = linear.getRegisterByVariable(1000, 0);
+    const int i5 = linear.getRegisterByVariable(1000, 5);
  
     bool ok = true;
     for (int i = 0; i < 8; i++)
@@ -127,7 +127,7 @@ static void regLinearTest2()
             i != 6 &&
             i != 7)
         {
-            if (linear.getRegister(i) == i0)
+            if (linear.getRegisterByVariable(0, i) == i0) // FIXME
             {
                 ok = false;
                 break;
@@ -163,13 +163,95 @@ static void regLinearTest3()
 
     poModule mod;
     poRegLinear linear(mod);
-    linear.setNumRegisters(2);
+    linear.setNumRegisters(3);
     linear.allocateRegisters(cfg);
 
-    // TODO: check that the register has been spilled
+    poRegSpill spill;
+    if (linear.spillAt(3, 0, &spill) &&
+        spill.spillVariable() == 1000)
+    {
+        std::cout << "OK" << std::endl;
+    }
+    else
+    {
+        std::cout << "FAILED" << std::endl;
+    }
+}
 
-    std::cout << "OK" << std::endl;
-    //std::cout << "FAILED" << std::endl;
+static void stackAllocatorTest1()
+{
+    std::cout << "Stack Allocator Test #1 ";
+
+    poStackAllocator allocator;
+    allocator.allocateSlot(1, 16);
+    const int numSlots = allocator.numSlots(); // Should be 2 slots allocated
+
+    if (numSlots == 2)
+    {
+        std::cout << "OK" << std::endl;
+    }
+    else
+    {
+        std::cout << "FAILED" << std::endl;
+    }
+}
+
+static void stackAllocatorTest2()
+{
+    std::cout << "Stack Allocator Test #2 ";
+
+    poStackAllocator allocator;
+    allocator.allocateSlot(1, 16);
+    allocator.freeSlot(1);
+    const int numSlots = allocator.numSlots(); // Should be 2 slots allocated
+
+    if (numSlots == 2)
+    {
+        std::cout << "OK" << std::endl;
+    }
+    else
+    {
+        std::cout << "FAILED" << std::endl;
+    }
+}
+
+static void stackAllocatorTest3()
+{
+    std::cout << "Stack Allocator Test #3 ";
+
+    poStackAllocator allocator;
+    allocator.allocateSlot(1, 16);
+    allocator.allocateSlot(2, 8);
+    const int numSlots = allocator.numSlots(); // Should be 3 slots allocated
+
+    if (numSlots == 3)
+    {
+        std::cout << "OK" << std::endl;
+    }
+    else
+    {
+        std::cout << "FAILED" << std::endl;
+    }
+}
+
+static void stackAllocatorTest4()
+{
+    std::cout << "Stack Allocator Test #4 ";
+
+    poStackAllocator allocator;
+    allocator.allocateSlot(1, 16);
+    allocator.freeSlot(1);
+    allocator.allocateSlot(2, 8);
+    const int numSlots = allocator.numSlots(); // Should be 2 slots allocated
+
+    if (numSlots == 2)
+    {
+        std::cout << "OK" << std::endl;
+    }
+    else
+    {
+        std::cout << "FAILED" << std::endl;
+    }
 }
 
 void po::runRegLinearTests()
@@ -177,5 +259,10 @@ void po::runRegLinearTests()
     regLinearTest1();
     regLinearTest2();
     regLinearTest3();
+
+    stackAllocatorTest1();
+    stackAllocatorTest2();
+    stackAllocatorTest3();
+    stackAllocatorTest4();
 }
 

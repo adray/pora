@@ -84,20 +84,14 @@ void poAsm::ir_element_ptr(poModule& module, poRegLinear& linear, const poInstru
             _x86_64_lower.mc_mul_reg_to_reg_x64(dst, operand);
 
             _x86_64_lower.mc_add_reg_to_reg_x64(dst, VM_REGISTER_ESP);
-            if (offset > 0)
-            {
-                _x86_64_lower.mc_add_imm_to_reg_x64(dst, offset);
-            }
+            _x86_64_lower.mc_add_imm_to_reg_x64(dst, offset);
         }
         else
         {
             // ESP + offset
 
             _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_ESP);
-            if (offset > 0)
-            {
-                _x86_64_lower.mc_add_imm_to_reg_x64(dst, offset);
-            }
+            _x86_64_lower.mc_add_imm_to_reg_x64(dst, offset);
         }
     }
     else
@@ -135,10 +129,7 @@ void poAsm::ir_ptr(poModule& module, poRegLinear& linear, const poInstruction& i
 
         const int offset = slot * 8 + ins.memOffset();
         _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_ESP);
-        if (offset > 0)
-        {
-            _x86_64_lower.mc_add_imm_to_reg_x64(dst, offset);
-        }
+        _x86_64_lower.mc_add_imm_to_reg_x64(dst, offset);
     }
     else
     {
@@ -202,13 +193,19 @@ void poAsm::ir_store(poRegLinear& linear, const poInstruction& ins)
     {
     case TYPE_I64:
     case TYPE_U64:
+        _x86_64_lower.mc_mov_reg_to_memory_x64(dst, 0, src);
+        break;
     case TYPE_I32:
     case TYPE_U32:
+        _x86_64_lower.mc_mov_reg_to_mem_32(dst, src, 0);
+        break;
     case TYPE_I16:
     case TYPE_U16:
+        _x86_64_lower.mc_mov_reg_to_mem_16(dst, src, 0);
+        break;
     case TYPE_I8:
     case TYPE_U8:
-        _x86_64_lower.mc_mov_reg_to_memory_x64(dst, 0, src);
+        _x86_64_lower.mc_mov_reg_to_memory_8(dst, src, 0);
         break;
     case TYPE_F64:
         _x86_64_lower.mc_movsd_reg_to_memory_x64(dst, src_sse, 0);
@@ -220,7 +217,12 @@ void poAsm::ir_store(poRegLinear& linear, const poInstruction& ins)
         /* copy pointer value (stack) */
         if (src_slot != -1)
         {
-            _x86_64_lower.mc_mov_reg_to_memory_x64(dst, src_slot * 8, VM_REGISTER_ESP);
+            _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, VM_REGISTER_ESP);
+            _x86_64_lower.mc_add_imm_to_reg_x64(VM_REGISTER_EAX, src_slot * 8);
+            _x86_64_lower.mc_mov_reg_to_memory_x64(dst, 0, VM_REGISTER_EAX);
+
+            // originally was:
+            //_x86_64_lower.mc_mov_reg_to_memory_x64(dst, src_slot * 8, VM_REGISTER_ESP);
         }
         else
         {
@@ -283,9 +285,11 @@ void poAsm::ir_sign_extend(poRegLinear& linear, const poInstruction& ins)
     switch (srcType)
     {
     case TYPE_I32:
+    case TYPE_U32:
         _x86_64_lower.mc_movsx_32_to_64_reg_to_reg(dst, src);
         break;
     case TYPE_I16:
+    case TYPE_U16:
         switch (ins.type())
         {
         case TYPE_I64:
@@ -296,6 +300,7 @@ void poAsm::ir_sign_extend(poRegLinear& linear, const poInstruction& ins)
             break;
         }
         break;
+    case TYPE_U8:
     case TYPE_I8:
         switch (ins.type())
         {
@@ -310,6 +315,9 @@ void poAsm::ir_sign_extend(poRegLinear& linear, const poInstruction& ins)
             break;
         }
         break;
+    default:
+        setError("Internal Error: malformed sign extend instruction.");
+        break;
     }
 }
 
@@ -317,6 +325,12 @@ void poAsm::ir_bitwise_cast(poRegLinear& linear, const poInstruction& ins)
 {
     const int dst = linear.getRegisterByVariable(ins.name());
     const int src = linear.getRegisterByVariable(ins.left());
+
+    if (dst == -1 || src == -1)
+    {
+        setError("Internal Error: malformed bitwise cast instruction.");
+        return;
+    }
 
     if (src != dst)
     {
@@ -697,6 +711,7 @@ void poAsm::ir_cmp(poRegLinear& linear, const poInstruction& ins)
         _x86_64_lower.mc_ucmps_reg_to_reg_x64(sse_src1, sse_src2);
         break;
     default:
+        //_x86_64_lower.mc_cmp_reg_to_reg_x64(src1, src2);
         std::stringstream ss;
         ss << "Internal Error: Malformed compare instruction " << ins.name();
         setError(ss.str());
@@ -737,6 +752,14 @@ void poAsm::ir_copy(poRegLinear& linear, const poInstruction& ins)
     case TYPE_U8:
         if (dst != src)
         {
+            if (dst < 0 || src < 0)
+            {
+                std::stringstream ss;
+                ss << "Internal Error: Malformed copy instruction " << ins.name();
+                setError(ss.str());
+                return;
+            }
+
             _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
         }
         break;
@@ -918,10 +941,8 @@ void poAsm::ir_unary_minus(poRegLinear& linear, const poInstruction& ins)
     }
 }
 
-void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& ins, const std::vector<poInstruction>& args)
+void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& ins, const int pos, const std::vector<poInstruction>& args)
 {
-    /* TODO: handle calls with > VM_MAX_ARGS */
-
     static const int generalArgs[] = { VM_ARG1, VM_ARG2, VM_ARG3, VM_ARG4, VM_ARG5, VM_ARG6 };
     static const int sseArgs[] = { VM_SSE_ARG1, VM_SSE_ARG2, VM_SSE_ARG3, VM_SSE_ARG4, VM_SSE_ARG5, VM_SSE_ARG6, VM_SSE_ARG7, VM_SSE_ARG8 };
 
@@ -935,6 +956,11 @@ void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& 
         const int size = type.size();
         int src_slot = 0;
 
+        const int argPos = pos + i + 1;
+
+        spill(linear, argPos);
+        restore(linear, argPos);
+
         switch (args[i].type()) {
         case TYPE_I64:
         case TYPE_I32:
@@ -946,21 +972,31 @@ void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& 
         case TYPE_U8:
             if (i >= VM_MAX_ARGS)
             {
-                _x86_64_lower.mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, 0, linear.getRegisterByVariable(args[i].left()));
+                _x86_64_lower.mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, 0, linear.getRegisterByVariable(args[i].left(), argPos));
                 continue;
             }
-            _x86_64_lower.mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].left()));
+            _x86_64_lower.mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].left(), argPos));
             break;
         case TYPE_F64:
-            if (i >= VM_MAX_SSE_ARGS) continue;
-            _x86_64_lower.mc_movsd_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].left()) - VM_REGISTER_MAX);
+            if (i >= VM_MAX_SSE_ARGS) {
+                /*TODO*/
+                continue;
+            }
+            _x86_64_lower.mc_movsd_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].left(), argPos) - VM_REGISTER_MAX);
             break;
         case TYPE_F32:
-            if (i >= VM_MAX_SSE_ARGS) continue;
-            _x86_64_lower.mc_movss_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].left()) - VM_REGISTER_MAX);
+            if (i >= VM_MAX_SSE_ARGS)
+            {
+                /*TODO*/
+                continue;
+            }
+            _x86_64_lower.mc_movss_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].left(), argPos) - VM_REGISTER_MAX);
             break;
         default:
-            if (i >= VM_MAX_ARGS) continue;
+            if (i >= VM_MAX_ARGS) {
+                _x86_64_lower.mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, 0, linear.getRegisterByVariable(args[i].left(), argPos));
+                continue;
+            }
             src_slot = linear.getStackSlotByVariable(args[i].left());
             if (src_slot != -1)
             {
@@ -969,7 +1005,7 @@ void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& 
             }
             else
             {
-                _x86_64_lower.mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].left()));
+                _x86_64_lower.mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].left(), argPos));
             }
             break;
         }
@@ -1006,40 +1042,61 @@ void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& 
     }
 }
 
-void poAsm::ir_param(poModule& module, poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_param(poModule& module, poRegLinear& linear, const poInstruction& ins, const int numArgs)
 {
-    int slot = 0;
     const int dst = linear.getRegisterByVariable(ins.name());
     const int dst_sse = dst - VM_REGISTER_MAX;
     static const int generalArgs[] = { VM_ARG1, VM_ARG2, VM_ARG3, VM_ARG4, VM_ARG5, VM_ARG6 };
     static const int sseArgs[] = { VM_SSE_ARG1, VM_SSE_ARG2, VM_SSE_ARG3, VM_SSE_ARG4, VM_SSE_ARG5, VM_SSE_ARG6, VM_SSE_ARG7, VM_SSE_ARG8 };
     const int param = ins.left();
-    const poType& type = module.types()[ins.type()];
-    const int size = type.size();
     switch (ins.type())
     {
     case TYPE_I64:
     case TYPE_U64:
-    case TYPE_I16:
-    case TYPE_U16:
     case TYPE_I32:
     case TYPE_U32:
+    case TYPE_I16:
+    case TYPE_U16:
     case TYPE_I8:
     case TYPE_U8:
         if (param < VM_MAX_ARGS)
         {
-            const int src = generalArgs[param];
-            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, generalArgs[param]);
+        }
+        else
+        {
+            _x86_64_lower.mc_mov_memory_to_reg_x64(dst, VM_REGISTER_ESP, (numArgs - param) * 8 + _prologueSize);
         }
         break;
     case TYPE_F64:
-        _x86_64_lower.mc_movsd_reg_to_reg_x64(dst_sse, sseArgs[param]);
+        if (param < VM_MAX_SSE_ARGS)
+        {
+            _x86_64_lower.mc_movsd_reg_to_reg_x64(dst_sse, sseArgs[param]);
+        }
+        else
+        {
+            _x86_64_lower.mc_movsd_memory_to_reg_x64(dst_sse, VM_REGISTER_ESP, (numArgs - param) * 8 + _prologueSize);
+        }
         break;
     case TYPE_F32:
-        _x86_64_lower.mc_movss_reg_to_reg_x64(dst_sse, sseArgs[param]);
+        if (param < VM_MAX_SSE_ARGS)
+        {
+            _x86_64_lower.mc_movss_reg_to_reg_x64(dst_sse, sseArgs[param]);
+        }
+        else
+        {
+            _x86_64_lower.mc_movss_memory_to_reg_x64(dst_sse, VM_REGISTER_ESP, (numArgs - param) * 8 + _prologueSize);
+        }
         break;
     default:
-        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, generalArgs[param]);
+        if (param < VM_MAX_ARGS)
+        {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, generalArgs[param]);
+        }
+        else
+        {
+            _x86_64_lower.mc_mov_memory_to_reg_x64(dst, VM_REGISTER_ESP, (numArgs - param) * 8 + _prologueSize);
+        }
         break;
     }
 }
@@ -1193,7 +1250,7 @@ void poAsm::generatePrologue(poRegLinear& linear)
         }
     }
 
-    const int size = 8 * numPushed + 8 * linear.stackSize();
+    const int size = 8 * numPushed + 8 * linear.stackSize() + 32 /* register homes */;
     const int alignment = align(size);
     _prologueSize = alignment + size;
     const int resize = _prologueSize - 8 * numPushed;
@@ -1270,7 +1327,7 @@ void poAsm::generateEpilogue(poRegLinear& linear)
     }
 }
 
-void poAsm::dump(const poRegLinear& linear, poFlowGraph& cfg)
+void poAsm::dump(const poRegLinear& linear, poRegLinearIterator& iterator, poFlowGraph& cfg)
 {
     std::cout << "###############" << std::endl;
     std::cout << "Stack Size: " << linear.stackSize() << std::endl;
@@ -1285,14 +1342,31 @@ void poAsm::dump(const poRegLinear& linear, poFlowGraph& cfg)
        for (int i = 0; i < bb->numInstructions(); i++)
        {
            poRegSpill spill;
-           if (linear.spillAt(pos, &spill))
+           int spillPos = 0;
+           while (linear.spillAt(pos, spillPos++, &spill))
            {
-               std::cout << "SPILL " << spill.spillRegister() << std::endl;
+               std::cout << "SPILL r" << spill.spillRegister() << ":s" << spill.spillStackSlot() << " var:" << spill.spillVariable() << std::endl;
+           }
+
+           poRegRestore restore;
+           int restorePos = 0;
+           while (linear.restoreAt(pos, restorePos++, &restore))
+           {
+               std::cout << "RESTORE r" << restore.restoreRegister() << ":s" << restore.restoreStackSlot() << " var:" << restore.restoreVariable() << std::endl;
            }
 
            const poInstruction& ins = bb->getInstruction(i);
-           std::cout << ins.name() << " " << linear.getRegisterByVariable(ins.name()) << std::endl;
+           int reg = linear.getRegisterByVariable(ins.name());
+           if (reg != -1)
+           {
+               std::cout << ins.name() << " r" << reg << " var:" << ins.name() << std::endl;
+           }
+           else
+           {
+               std::cout << ins.name() << std::endl;
+           }
            pos++;
+           iterator.next();
        }
 
         bb = bb->getNext();
@@ -1305,42 +1379,31 @@ void poAsm::dump(const poRegLinear& linear, poFlowGraph& cfg)
 void poAsm::spill(poRegLinear& linear, const int pos)
 {
     poRegSpill spill;
-    if (linear.spillAt(pos, &spill))
+    int spillPos = 0;
+    while (linear.spillAt(pos, spillPos++, &spill))
     {
-        const int spillVariable = spill.spillVariable();
         const int slot = spill.spillStackSlot();
-        _x86_64_lower.mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, -8 * (slot + 1), spill.spillRegister());
+        _x86_64_lower.mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, 8 * slot, spill.spillRegister());
     }
 }
 
-void poAsm::restore(const poInstruction& ins, poRegLinear& linear, const int pos)
+void poAsm::restore(poRegLinear& linear, const int pos)
 {
-    switch (ins.type())
-    {
-    case IR_CALL: /* CALL, BR, PARAM, CONSTANT have special handling */
-    case IR_BR:
-    case IR_PARAM:
-    case IR_CONSTANT:
-    case IR_PHI: /* PHIs are not used at this point */
-        return;
-    }
-
     /* if a variable we want to use has been spilled, we need to restore it */
 
-    if (ins.left() != -1)
+    poRegRestore restore;
+    int restorePos = 0;
+    while (linear.restoreAt(pos, restorePos++, &restore))
     {
-        //const int spillSlot = _stackAlloc.findSlot(ins.left());
-        //_x86_64.mc_mov_memory_to_reg_x64(linear.)
-    }
-
-    if (ins.right() != -1)
-    {
-        //const int spillSlot = _stackAlloc.findSlot(ins.right());
-
+        const int restoreSlot = restore.restoreStackSlot();
+        if (restoreSlot != -1)
+        {
+            _x86_64_lower.mc_mov_memory_to_reg_x64(restore.restoreRegister(), VM_REGISTER_ESP, restoreSlot * 8);
+        }
     }
 }
 
-void poAsm::generate(poModule& module, poFlowGraph& cfg)
+void poAsm::generate(poModule& module, poFlowGraph& cfg, const int numArgs)
 {
     poRegLinear linear(module);
     linear.setNumRegisters(VM_REGISTER_MAX + VM_SSE_REGISTER_MAX);
@@ -1365,10 +1428,10 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
     linear.setVolatile(VM_SSE_ARG2 + VM_REGISTER_MAX, true);
     linear.setVolatile(VM_SSE_ARG3 + VM_REGISTER_MAX, true);
     linear.setVolatile(VM_SSE_ARG4 + VM_REGISTER_MAX, true);
-    linear.setVolatile(VM_SSE_ARG5 + VM_REGISTER_MAX, true);
-    linear.setVolatile(VM_SSE_ARG6 + VM_REGISTER_MAX, true);
 
 #if VM_MAX_SSE_ARGS == 8
+    linear.setVolatile(VM_SSE_ARG5 + VM_REGISTER_MAX, true);
+    linear.setVolatile(VM_SSE_ARG6 + VM_REGISTER_MAX, true);
     linear.setVolatile(VM_SSE_ARG7 + VM_REGISTER_MAX, true);
     linear.setVolatile(VM_SSE_ARG8 + VM_REGISTER_MAX, true);
 #endif
@@ -1382,7 +1445,10 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
     
     scanBasicBlocks(cfg);
     
-    dump(linear, cfg);
+    linear.iterator().reset();
+    dump(linear, linear.iterator(), cfg);
+
+    linear.iterator().reset();
 
     // Lower into machine code cfg
     // 
@@ -1393,6 +1459,7 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
     // Prologue
     generatePrologue(linear);
 
+    int pos = 0;
     poBasicBlock* bb = cfg.getFirst();
     while (bb)
     {
@@ -1407,8 +1474,10 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
         {
             auto& ins = instructions[i];
 
-            //spill(linear, pos);
-            //restore(ins, linear, pos);
+            assert(ins.code() != IR_ARG); // args are handled in the call
+            
+            spill(linear, pos);
+            restore(linear, pos);
 
             switch (ins.code())
             {
@@ -1441,7 +1510,7 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
                 break;
             case IR_ARG:
                 // do nothing
-                break;
+                continue;
             case IR_BR:
                 ir_br(linear, ins, bb);
                 break;
@@ -1453,8 +1522,10 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
                     args.push_back(instructions[i + j + 1]);
                 }
 
-                ir_call(module, linear, ins, args);
+                ir_call(module, linear, ins, pos, args);
                 i += ins.left();
+                pos += ins.left();
+                linear.iterator().advance(ins.left());
             }
                 break;
             case IR_CMP:
@@ -1473,7 +1544,7 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
                 ir_mul(linear, ins);
                 break;
             case IR_PARAM:
-                ir_param(module, linear, ins);
+                ir_param(module, linear, ins, numArgs);
                 break;
             case IR_PHI:
                 // do nothing
@@ -1488,6 +1559,9 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg)
                 ir_unary_minus(linear, ins);
                 break;
             }
+
+            pos++;
+            linear.iterator().next();
         }
 
         bb = bb->getNext();
@@ -1554,6 +1628,42 @@ void poAsm::generateMachineCode(poModule& module)
                     _x86_64.mc_movss_memory_to_reg_x64(ins.dstReg(), ins.srcReg(), ins.imm32());
                 }
                 break;
+            case VMI_PUSH_REG:
+                _x86_64.mc_push_reg(ins.dstReg());
+                break;
+            case VMI_POP_REG:
+                _x86_64.mc_pop_reg(ins.dstReg());
+                break;
+            case VMI_NEAR_RETURN:
+                _x86_64.mc_return();
+                break;
+            case VMI_ADD64_SRC_IMM_DST_REG:
+                _x86_64.mc_add_imm_to_reg_x64(ins.dstReg(), int(ins.imm64()));
+                break;
+            case VMI_MOV64_SRC_IMM_DST_REG:
+                _x86_64.mc_mov_imm_to_reg_x64(ins.dstReg(), ins.imm64());
+                break;
+            case VMI_SUB64_SRC_IMM_DST_REG:
+                _x86_64.mc_sub_imm_to_reg_x64(ins.dstReg(), int(ins.imm64()));
+                break;
+            case VMI_MOV32_SRC_IMM_DST_REG:
+                _x86_64.mc_mov_imm_to_reg_32(ins.dstReg(), ins.imm32());
+                break;
+            case VMI_MOV16_SRC_IMM_DST_REG:
+                _x86_64.mc_mov_imm_to_reg_16(ins.dstReg(), ins.imm16());
+                break;
+            case VMI_ADD8_SRC_IMM_DST_REG:
+                _x86_64.mc_add_imm_to_reg_8(ins.dstReg(), ins.imm8());
+                break;
+            case VMI_MOV8_SRC_IMM_DST_REG:
+                _x86_64.mc_mov_imm_to_reg_8(ins.dstReg(), ins.imm8());
+                break;
+            case VMI_SUB8_SRC_IMM_DST_REG:
+                _x86_64.mc_sub_imm_to_reg_8(ins.dstReg(), ins.imm8());
+                break;
+            case VMI_MOV8_SRC_REG_DST_MEM:
+                _x86_64.mc_mov_reg_to_memory_8(ins.dstReg(), ins.srcReg(), ins.imm32());
+                break;
             case VMI_J8:
             case VMI_JE8:
             case VMI_JG8:
@@ -1604,7 +1714,7 @@ void poAsm::generate(poModule& module)
             }
             else
             {
-                generate(module, function.cfg());
+                generate(module, function.cfg(), int(function.args().size()));
             }
         }
     }
