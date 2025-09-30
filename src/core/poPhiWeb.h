@@ -12,7 +12,7 @@ namespace po
         poPhiWeb();
         int add(const int name);
         void add(const int name, const int id);
-        int find(const int name);
+        int find(const int name) const;
         void update(const int name, const int id);
 
         void findPhiWebs(poFlowGraph& cfg);

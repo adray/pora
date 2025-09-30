@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <unordered_set>
 
 /*
 * A file to calculate dominators, dominance frontiers etc.
@@ -53,6 +54,7 @@ namespace po
         inline poDomNode& get(const int index) { return _nodes[index]; }
         inline const poDomNode& get(const int index) const { return _nodes[index]; }
         inline int num() const { return int(_nodes.size()); }
+        void iteratedDominanceFrontier(const std::vector<int>& id, std::unordered_set<int>& nodes) const;
 
     private:
         void computePredecessors();

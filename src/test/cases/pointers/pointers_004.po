@@ -7,5 +7,6 @@ namespace Example
         i64 z = 10;
         i64* y = &z;
         i64 x = *y;
+        print_64(x);
     }
 }

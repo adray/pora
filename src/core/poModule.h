@@ -132,14 +132,18 @@ namespace po
         int addConstant(const uint8_t u8);
         int addConstant(const double f64);
         int addConstant(const float f32);
+        int addConstant(const std::string& str);
         int getConstant(const uint64_t u64);
         int getConstant(const uint32_t u32);
+        int getConstant(const uint16_t u16);
         int getConstant(const uint8_t u8);
         int getConstant(const int64_t i64);
         int getConstant(const int32_t i32);
+        int getConstant(const int16_t i16);
         int getConstant(const int8_t i8);
         int getConstant(const double f64);
         int getConstant(const float f32);
+        int getConstant(const std::string& str);
         int64_t getI64(const int id);
         int32_t getI32(const int id);
         int16_t getI16(const int id);
@@ -150,6 +154,7 @@ namespace po
         uint8_t getU8(const int id);
         float getF32(const int id);
         double getF64(const int id);
+        const std::string& getString(const int id);
 
     private:
         std::unordered_map<uint64_t, int> _u64;
@@ -162,7 +167,9 @@ namespace po
         std::unordered_map<uint8_t, int> _u8;
         std::unordered_map<double, int> _f64;
         std::unordered_map<float, int> _f32;
+        std::unordered_map<std::string, int> _strings;
         std::vector<poConstant> _constants;
+        std::vector<std::string> _strConstants;
     };
 
     class poModule

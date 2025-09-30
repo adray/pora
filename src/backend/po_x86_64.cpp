@@ -309,6 +309,9 @@ static constexpr vm_instruction gInstructions[VMI_MAX_INSTRUCTIONS] = {
     INS(0x0, 0x48, 0xF, 0xB7, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_RM),//VMI_MOVZX_16_TO_64_SRC_REG_DST_REG,
     INS(0x0, 0x48, 0xF, 0xB7, VM_INSTRUCTION_BINARY, CODE_BRMO, VMI_ENC_RM),//VMI_MOVZX_16_TO_64_SRC_MEM_DST_REG,
 
+    INS(0x0, 0x48, 0x8D, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_RM),    // VMI_LEA64_SRC_REG_DST_REG,
+    INS(0x0, 0x48, 0x8D, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BMR, VMI_ENC_RM),    // VMI_LEA64_SRC_MEM_DST_REG,
+
     INS(0x0, 0x48, 0x98, 0x0, VM_INSTRUCTION_NONE, CODE_NONE, VMI_ENC_Z0),// VMI_CDQE
 
     INS(0x0, 0x0, 0x50, 0x0, VM_INSTRUCTION_NONE, CODE_NONE, VMI_ENC_C), // VMI_PUSH_REG, (not implemented)
@@ -341,6 +344,8 @@ static constexpr vm_sse_instruction gInstructions_SSE[VMI_SSE_MAX_INSTRUCTIONS] 
     SSE_INS(0x48, 0xF2, 0xF, 0x2A, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_A), // VMI_SSE_CVTSI2SD_SRC_REG_DST_REG
     SSE_INS(0x48, 0xF2, 0xF, 0x2A, VM_INSTRUCTION_BINARY, CODE_BMRO, VMI_ENC_A), // VMI_SSE_CVTSI2SD_SRC_MEM_DST_REG
 
+    SSE_INS(0x48, 0xF2, 0xF, 0x2D, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_A),   // VMI_SSE_CVTSD2SI_SRC_REG_DST_REG
+
     SSE_INS(0x0, 0x66, 0xF, 0x2E, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_A),   // VMI_SSE_UCOMISD_SRC_REG_DST_REG,
     SSE_INS(0x0, 0x66, 0xF, 0x2E, VM_INSTRUCTION_BINARY, CODE_BMRO, VMI_ENC_A),    // VMI_SSE_UCOMISD_SRC_MEM_DST_REG,
 
@@ -364,6 +369,8 @@ static constexpr vm_sse_instruction gInstructions_SSE[VMI_SSE_MAX_INSTRUCTIONS] 
 
     SSE_INS(0x0, 0xF3, 0xF, 0x2A, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_A), // VMI_SSE_CVTSI2SS_SRC_REG_DST_REG
     SSE_INS(0x0, 0xF3, 0xF, 0x2A, VM_INSTRUCTION_BINARY, CODE_BRMO, VMI_ENC_A), // VMI_SSE_CVTSI2SS_SRC_MEM_DST_REG
+
+    SSE_INS(0x48, 0xF3, 0xF, 0x2C, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_A),   // VMI_SSE_CVTSS2SI_SRC_REG_DST_REG,
 
     SSE_INS(0x0, VMI_UNUSED, 0xF, 0x2E, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_A), // VMI_SSE_UCOMISS_SRC_REG_DST_REG
     SSE_INS(0x0, VMI_UNUSED, 0xF, 0x2E, VM_INSTRUCTION_BINARY, CODE_BRMO, VMI_ENC_A), // VMI_SSE_UCOMISS_SRC_MEM_DST_REG
@@ -616,6 +623,29 @@ void po_x86_64::emit_bmro(const vm_instruction& ins, char dst, char src, int off
     }
 }
 
+void po_x86_64::emit_brr_disp(const vm_instruction& ins, int dst, int disp32)
+{
+    assert(ins.code == CODE_BRR);
+    assert(ins.enc == VMI_ENC_RM);
+
+    unsigned char rex = ins.rex;
+
+    if (dst >= VM_REGISTER_R8) { rex |= 0x4 | (1 << 6); }
+    if (rex > 0) { _programData.push_back(rex); }
+
+    if (ins.ins != VMI_UNUSED) {
+        _programData.push_back(ins.ins);
+    }
+
+    /* Relative RIP addressing (Displacement from end of instruction) */
+
+    _programData.push_back((((dst % 8) & 0x7) << 3) | 0x5 | (0x0 << 6));
+    _programData.push_back((unsigned char)(disp32 & 0xff));
+    _programData.push_back((unsigned char)((disp32 >> 8) & 0xff));
+    _programData.push_back((unsigned char)((disp32 >> 16) & 0xff));
+    _programData.push_back((unsigned char)((disp32 >> 24) & 0xff));
+}
+
 void po_x86_64::emit_ui(const vm_instruction& ins, char imm)
 {
     assert(ins.code == CODE_UI);
@@ -766,8 +796,8 @@ void po_x86_64_Lower::mc_add_reg_to_mem_32(char dst, char src, int dst_offset) {
 void po_x86_64_Lower::mc_sub_reg_to_reg_32(char dst, char src) { binop(src, dst, VMI_SUB32_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_sub_mem_to_reg_32(char dst, char src, int src_offset) { binop(src, dst, VMI_SUB32_SRC_MEM_DST_REG, src_offset); }
 void po_x86_64_Lower::mc_sub_reg_to_mem_32(char dst, char src, int dst_offset) { binop(src, dst, VMI_SUB32_SRC_REG_DST_MEM, dst_offset); }
-void po_x86_64_Lower::mc_mul_reg_to_reg_32(char dst, char src) { binop(src, dst, VMI_MUL32_SRC_REG_DST_REG); }
-void po_x86_64_Lower::mc_mul_memory_to_reg_32(char dst, char src, int src_offset) { binop(src, dst, VMI_MUL32_SRC_MEM_DST_REG, src_offset); }
+void po_x86_64_Lower::mc_mul_reg_to_reg_32(char dst, char src) { binop(src, dst, VMI_IMUL32_SRC_REG_DST_REG); }
+void po_x86_64_Lower::mc_mul_memory_to_reg_32(char dst, char src, int src_offset) { binop(src, dst, VMI_IMUL32_SRC_MEM_DST_REG, src_offset); }
 void po_x86_64_Lower::mc_umul_reg_to_reg_32(char reg) { unaryop(reg, VMI_MUL32_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_umul_memory_to_reg_32(char reg, int offset) { unaryop(reg, VMI_MUL32_SRC_MEM_DST_REG, offset); }
 void po_x86_64_Lower::mc_div_reg_32(char reg) { unaryop(reg, VMI_IDIV32_SRC_REG); }
@@ -814,6 +844,7 @@ void po_x86_64_Lower::mc_dec_reg_x64(int reg) { unaryop(reg, VMI_DEC64_DST_REG);
 void po_x86_64_Lower::mc_dec_memory_x64(int reg, int offset) { unaryop(reg, VMI_DEC64_DST_MEM, offset); }
 void po_x86_64_Lower::mc_neg_memory_x64(int reg, int offset) { unaryop(reg, VMI_NEG64_DST_MEM, offset); }
 void po_x86_64_Lower::mc_neg_reg_x64(int reg) { unaryop(reg, VMI_NEG64_DST_REG); }
+void po_x86_64_Lower::mc_lea_reg_to_reg_x64(char dst, int addr) { binop(-1, dst, VMI_LEA64_SRC_REG_DST_REG, addr); }
 
 /* Jump operations */
 
@@ -886,6 +917,7 @@ void po_x86_64_Lower::mc_divsd_reg_to_reg_x64(int dst, int src) { sse_binop(src,
 void po_x86_64_Lower::mc_divsd_memory_to_reg_x64(int dst, int src, int dst_offset) { sse_binop(src, dst, VMI_SSE_DIVSD_SRC_MEM_DST_REG, dst_offset); }
 void po_x86_64_Lower::mc_cvtitod_memory_to_reg_x64(int dst, int src, int src_offset) { sse_binop(src, dst, VMI_SSE_CVTSI2SD_SRC_MEM_DST_REG, src_offset); }
 void po_x86_64_Lower::mc_cvtitod_reg_to_reg_x64(int dst, int src) { sse_binop(src, dst, VMI_SSE_CVTSI2SD_SRC_REG_DST_REG); }
+void po_x86_64_Lower::mc_cvtsdsi_reg_to_reg_x64(int dst, int src) { sse_binop(src, dst, VMI_SSE_CVTSD2SI_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_ucmpd_reg_to_reg_x64(int dst, int src) { sse_binop(src, dst, VMI_SSE_UCOMISD_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_ucmpd_memory_to_reg_x64(int dst, int src, int src_offset) { sse_binop(src, dst, VMI_SSE_UCOMISD_SRC_MEM_DST_REG); }
 void po_x86_64_Lower::mc_xorpd_reg_to_reg_x64(int dst, int src) { sse_binop(src, dst, VMI_SSE_XORPD_SRC_REG_DST_REG); }
@@ -897,12 +929,13 @@ void po_x86_64_Lower::mc_addss_reg_to_reg_x64(int dst, int src) { sse_binop(src,
 void po_x86_64_Lower::mc_addss_memory_to_reg_x64(int dst, int src, int src_offset) { sse_binop(src, dst, VMI_SSE_ADDSS_SRC_MEM_DST_REG, src_offset); }
 void po_x86_64_Lower::mc_subss_reg_to_reg_x64(int dst, int src) { sse_binop(src, dst, VMI_SSE_SUBSS_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_subss_memory_to_reg_x64(int dst, int src, int src_offset) { sse_binop(src, dst, VMI_SSE_SUBSS_SRC_MEM_DST_REG, src_offset); }
-void po_x86_64_Lower::mc_mulss_reg_to_reg_x64(int dst, int src) { sse_binop(src, dst, VMI_SSE_SUBSS_SRC_REG_DST_REG); }
-void po_x86_64_Lower::mc_mulss_memory_to_reg_x64(int dst, int src, int dst_offset) { sse_binop(src, dst, VMI_SSE_MOVSS_SRC_MEM_DST_REG, dst_offset); }
+void po_x86_64_Lower::mc_mulss_reg_to_reg_x64(int dst, int src) { sse_binop(src, dst, VMI_SSE_MULSS_SRC_REG_DST_REG); }
+void po_x86_64_Lower::mc_mulss_memory_to_reg_x64(int dst, int src, int dst_offset) { sse_binop(src, dst, VMI_SSE_MULSS_SRC_MEM_DST_REG, dst_offset); }
 void po_x86_64_Lower::mc_divss_reg_to_reg_x64(int dst, int src) { sse_binop(src, dst, VMI_SSE_DIVSS_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_divss_memory_to_reg_x64(int dst, int src, int dst_offset) { sse_binop(src, dst, VMI_SSE_DIVSS_SRC_MEM_DST_REG, dst_offset); }
 void po_x86_64_Lower::mc_cvtitos_memory_to_reg_x64(int dst, int src, int src_offset) { sse_binop(src, dst, VMI_SSE_CVTSI2SD_SRC_MEM_DST_REG, src_offset); }
 void po_x86_64_Lower::mc_cvtitos_reg_to_reg_x64(int dst, int src) { sse_binop(src, dst, VMI_SSE_CVTSI2SS_SRC_REG_DST_REG); }
+void po_x86_64_Lower::mc_cvtsssi_reg_to_reg_x64(int dst, int src) { sse_binop(src, dst, VMI_SSE_CVTSS2SI_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_ucmps_reg_to_reg_x64(int dst, int src) { sse_binop(src, dst, VMI_SSE_UCOMISS_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_ucmps_memory_to_reg_x64(int dst, int src, int src_offset) { sse_binop(src, dst, VMI_SSE_UCOMISS_SRC_MEM_DST_REG); }
 void po_x86_64_Lower::mc_xorps_reg_to_reg_x64(int dst, int src) { sse_binop(src, dst, VMI_SSE_XORPS_SRC_REG_DST_REG); }
@@ -1764,6 +1797,10 @@ void po_x86_64::mc_neg_reg_x64(int reg)
 {
     emit_ur(gInstructions[VMI_NEG64_DST_REG], reg);
 }
+void po_x86_64::mc_lea_reg_to_reg_x64(char dst, int addr)
+{
+    emit_brr_disp(gInstructions[VMI_LEA64_SRC_REG_DST_REG], dst, addr);
+}
 void po_x86_64::mc_neg_reg_8(int reg)
 {
     emit_ur(gInstructions[VMI_NEG8_DST_REG], reg);
@@ -1920,6 +1957,10 @@ void po_x86_64::mc_cvtitod_reg_to_reg_x64(int dst, int src)
 {
     emit_sse_brr(gInstructions_SSE[VMI_SSE_CVTSI2SD_SRC_REG_DST_REG], src, dst);
 }
+void po_x86_64::mc_cvtsdsi_reg_to_reg_x64(int dst, int src)
+{
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_CVTSD2SI_SRC_REG_DST_REG], src, dst);
+}
 void po_x86_64::mc_ucmpd_reg_to_reg_x64(int dst, int src)
 {
     emit_sse_brr(gInstructions_SSE[VMI_SSE_UCOMISD_SRC_REG_DST_REG], src, dst);
@@ -1987,6 +2028,10 @@ void po_x86_64::mc_cvtitos_memory_to_reg_x64(int dst, int src, int src_offset)
 void po_x86_64::mc_cvtitos_reg_to_reg_x64(int dst, int src)
 {
     emit_sse_brr(gInstructions_SSE[VMI_SSE_CVTSI2SS_SRC_REG_DST_REG], src, dst);
+}
+void po_x86_64::mc_cvtsssi_reg_to_reg_x64(int dst, int src)
+{
+    emit_sse_brr(gInstructions_SSE[VMI_SSE_CVTSS2SI_SRC_REG_DST_REG], src, dst);
 }
 void po_x86_64::mc_ucmps_reg_to_reg_x64(int dst, int src)
 {

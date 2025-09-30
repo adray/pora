@@ -586,31 +586,34 @@ void poSSA_Reconstruct::reconstructUse(poDom& dom, const int node, poInstruction
             }
         }
 
-        /* Here we should check if there is a phi in our basic block
-        * that was inserted with a name equal to the name of our use. */
-        const auto& it = _phis.find(var);
-        if (it != _phis.end())
+        if (name == -1)
         {
-            for (poSSA_Phi& ssaPhi : it->second) /* get the basic block which contain a def */
+            /* Here we should check if there is a phi in our basic block
+            * that was inserted with a name equal to the name of our use. */
+            const auto& it = _phis.find(var);
+            if (it != _phis.end())
             {
-                if (ssaPhi.getBasicBlock() != block)
+                for (poSSA_Phi& ssaPhi : it->second) /* get the basic block which contain a def */
                 {
-                    continue;
-                }
-
-                for (poPhi& phi : ssaPhi.getBasicBlock()->phis()) /* look for a phi which name matches the name of the def */
-                {
-                    if (phi.name() == ssaPhi.name())
+                    if (ssaPhi.getBasicBlock() != block)
                     {
-                        name = phi.name();
-                        outBB = ssaPhi.getBasicBlock();
+                        continue;
+                    }
+
+                    for (poPhi& phi : ssaPhi.getBasicBlock()->phis()) /* look for a phi which name matches the name of the def */
+                    {
+                        if (phi.name() == ssaPhi.name())
+                        {
+                            name = phi.name();
+                            outBB = ssaPhi.getBasicBlock();
+                            break;
+                        }
+                    }
+
+                    if (name != -1)
+                    {
                         break;
                     }
-                }
-
-                if (name != -1)
-                {
-                    break;
                 }
             }
         }
@@ -680,39 +683,34 @@ int poSSA_Reconstruct::findDefFromTop(poDom& dom, poDomNode& node, const std::ve
 {
     /* There wasn't a def in the basic block we were evaluating - therefore we may need to insert a phi node */
 
-    /* TODO: this should be iterated dominance frontier; I'm not sure this matches the definition right now */
     /* TODO: we may need to check the inserted phi defs as well */
 
     int id = -1;
     bool insertPhi = false;
+
+    std::vector<int> defNodes;
     for (int i = 0; i < int(defs.size()); i++)
     {
         const poInstructionRef& def = defs[i];
-        
-        std::vector<int> domFrontier;
-        poBasicBlock* bb = def.getBasicBlock();
         for (int j = dom.start(); j < dom.num(); j++)
         {
-            poDomNode& domNode = dom.get(j);
-            if (domNode.getBasicBlock() == bb)
+            const poDomNode& domNode = dom.get(j);
+            if (domNode.getBasicBlock() == def.getBasicBlock())
             {
-                domFrontier = domNode.dominanceFrontier();
+                defNodes.push_back(j);
                 break;
             }
         }
+    }
 
-        for (int j = 0; j < int(domFrontier.size()); j++)
+    std::unordered_set<int> idf;
+    dom.iteratedDominanceFrontier(defNodes, idf);
+    for (int item : idf)
+    {
+        const poDomNode& dfNode = dom.get(item);
+        if (dfNode.getBasicBlock() == node.getBasicBlock())
         {
-            poDomNode& dfNode = dom.get(domFrontier[j]);
-            if (dfNode.getBasicBlock() == node.getBasicBlock())
-            {
-                insertPhi = true;
-                break;
-            }
-        }
-
-        if (insertPhi)
-        {
+            insertPhi = true;
             break;
         }
     }

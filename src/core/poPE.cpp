@@ -244,6 +244,11 @@ void poPortableExecutable::addSection(const poSectionType type, const int size)
     section.data().resize(size);
 }
 
+const int  poPortableExecutable::initializedDataImagePos() const
+{
+    return _peImage->sectionData[_initializedSection]._imagePos;
+}
+
 const int poPortableExecutable::addImportTable(const std::string& name)
 {
     _imports.emplace_back(name);

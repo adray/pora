@@ -4,6 +4,7 @@ namespace Example
 {
     static void main()
     {
-        u8[] data = "Hello, World!";
+        u8* data = "Hello, World!";
+        println(data, (u32)14);
     }
 }

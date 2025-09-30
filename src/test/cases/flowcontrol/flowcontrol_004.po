@@ -4,6 +4,8 @@ namespace Example
 {
     static void main()
     {
+        u8* str = "";
+    
         i64 x = 0;
         for (i64 i = 0; i < 100; i = i + 1)
         {
@@ -13,6 +15,8 @@ namespace Example
             }
             
             x = x + 1;
+            print_64(x);
+            println(str, (u32)1);
         }        
     }
 }

@@ -38,6 +38,11 @@ void poAnalyzer:: checkCallSites(poModule& module, po_x86_64_flow_graph& cfg)
         for (size_t j = 0; j < ins.size(); j++)
         {
             po_x86_64_instruction& instr = ins[j];
+            if (instr.isSSE())
+            {
+                continue;
+            }
+
             if (instr.opcode() != VMI_CALL)
             {
                 continue;
@@ -59,6 +64,11 @@ void poAnalyzer:: checkCallSites(poModule& module, po_x86_64_flow_graph& cfg)
         {
             po_x86_64_instruction& instr = ins[i];
 
+            if (instr.isSSE())
+            {
+                continue;
+            }
+
             if (instr.opcode() == VMI_PUSH_REG)
             {
                 pushStackSize += 8;
@@ -69,6 +79,11 @@ void poAnalyzer:: checkCallSites(poModule& module, po_x86_64_flow_graph& cfg)
         for (size_t i = 0; i < ins.size(); i++)
         {
             po_x86_64_instruction& instr = ins[i];
+
+            if (instr.isSSE())
+            {
+                continue;
+            }
 
             if (instr.opcode() != VMI_SUB64_SRC_IMM_DST_REG)
             {
@@ -97,6 +112,11 @@ void poAnalyzer:: checkCallSites(poModule& module, po_x86_64_flow_graph& cfg)
             {
                 po_x86_64_instruction& instr = ins[j];
 
+                if (instr.isSSE())
+                {
+                    continue;
+                }
+
                 if (instr.opcode() != VMI_ADD64_SRC_IMM_DST_REG)
                 {
                     continue;
@@ -120,6 +140,11 @@ void poAnalyzer:: checkCallSites(poModule& module, po_x86_64_flow_graph& cfg)
         for (size_t j = 0; j < ins.size(); j++)
         {
             po_x86_64_instruction& instr = ins[j];
+            if (instr.isSSE())
+            {
+                continue;
+            }
+
             if (instr.opcode() == VMI_MOV64_SRC_MEM_DST_REG)
             {
                 if (instr.srcReg() != VM_REGISTER_ESP)
@@ -139,6 +164,53 @@ void poAnalyzer:: checkCallSites(poModule& module, po_x86_64_flow_graph& cfg)
                 instr.setImm32(instr.imm32() + stackAdjustment);
             }
         }
+
+        // Fixup SSE instructions
+        for (size_t j = 0; j < ins.size(); j++)
+        {
+            po_x86_64_instruction& instr = ins[j];
+            if (!instr.isSSE())
+            {
+                continue;
+            }
+
+            if (instr.opcode() == VMI_SSE_MOVSD_SRC_REG_DST_MEM)
+            {
+                if (instr.dstReg() != VM_REGISTER_ESP)
+                {
+                    continue;
+                }
+
+                instr.setImm32(instr.imm32() + stackAdjustment);
+            }
+            else if (instr.opcode() == VMI_SSE_MOVSD_SRC_MEM_DST_REG)
+            {
+                if (instr.srcReg() != VM_REGISTER_ESP)
+                {
+                    continue;
+                }
+
+                instr.setImm32(instr.imm32() + stackAdjustment);
+            }
+            else if (instr.opcode() == VMI_SSE_MOVSS_SRC_REG_DST_MEM)
+            {
+                if (instr.dstReg() != VM_REGISTER_ESP)
+                {
+                    continue;
+                }
+
+                instr.setImm32(instr.imm32() + stackAdjustment);
+            }
+            else if (instr.opcode() == VMI_SSE_MOVSS_SRC_MEM_DST_REG)
+            {
+                if (instr.srcReg() != VM_REGISTER_ESP)
+                {
+                    continue;
+                }
+
+                instr.setImm32(instr.imm32() + stackAdjustment);
+            }
+        }
     }
 
     // Fixup array/struct loads, which use an add instruction to add an immediate value to the stack pointer
@@ -149,6 +221,11 @@ void poAnalyzer:: checkCallSites(poModule& module, po_x86_64_flow_graph& cfg)
         for (size_t j = 0; j < ins.size(); j++)
         {
             po_x86_64_instruction& instr = ins[j];
+            if (instr.isSSE())
+            {
+                continue;
+            }
+
             if (instr.opcode() != VMI_ADD64_SRC_REG_DST_REG &&
                 instr.opcode() != VMI_MOV64_SRC_REG_DST_REG)
             {
@@ -195,6 +272,11 @@ void poAnalyzer::fixFunctionCalls(poModule& module, po_x86_64_flow_graph& cfg)
         for (size_t k = 0; k < ins.size(); k++)
         {
             po_x86_64_instruction& instr = ins[k];
+            if (instr.isSSE())
+            {
+                continue;
+            }
+
             if (instr.opcode() != VMI_CALL)
             {
                 continue;

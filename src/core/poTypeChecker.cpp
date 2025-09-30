@@ -788,6 +788,9 @@ int poTypeChecker::checkExpr(poNode* node)
         case poTokenType::CHAR:
             type = TYPE_U8;
             break;
+        case poTokenType::STRING:
+            type = getPointerType(TYPE_U8, 1);
+            break;
         }
         break;
     case poNodeType::CALL:

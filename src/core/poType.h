@@ -16,8 +16,9 @@ namespace po
     constexpr int TYPE_U16 = 9;
     constexpr int TYPE_U8 = 10;
     constexpr int TYPE_BOOLEAN = 11;
-    constexpr int TYPE_NULLPTR = 12;
-    constexpr int TYPE_OBJECT = 13; /* values above this are user defined (non primitive) */
+    constexpr int TYPE_STRING = 12;
+    constexpr int TYPE_NULLPTR = 13;
+    constexpr int TYPE_OBJECT = 14; /* values above this are user defined (non primitive) */
 
     enum class poOperatorType
     {

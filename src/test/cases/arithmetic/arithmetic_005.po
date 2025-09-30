@@ -8,5 +8,10 @@ namespace Example
         u16 y = (u16)6 / (u16)3;
         u32 z = (u32)6 / (u32)3;
         u64 w = (u64)6 / (u64)z;
+        
+        print_64((i64)x);
+        print_64((i64)y);
+        print_64((i64)z);
+        print_64((i64)w);
     }
 }

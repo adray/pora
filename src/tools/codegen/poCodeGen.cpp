@@ -228,6 +228,13 @@ static void generateMulInstructions2(po_x86_64& x86_64)
     }
 
     generatePadding(x86_64);
+
+    for (int i = VM_REGISTER_EAX; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_mul_reg_to_reg_32(VM_REGISTER_ESI, i);
+    }
+
+    generatePadding(x86_64);
 }
 
 static void generateMovInstructions1(po_x86_64& x86_64)
@@ -626,6 +633,16 @@ static void generateDivInstructions2(po_x86_64& x86_64)
     generatePadding(x86_64);
 }
 
+static void generateLeaInstructions(po_x86_64& x86_64)
+{
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_lea_reg_to_reg_x64(i, 0x4);
+    }
+
+    generatePadding(x86_64);
+}
+
 int main(int numArgs, char** args)
 {
     std::cout << "Running code gen test" << std::endl;
@@ -644,7 +661,8 @@ int main(int numArgs, char** args)
     if (strcmp(args[1], "mov2") == 0) { generateMovInstructions2(x86_64);   }
     if (strcmp(args[1], "cmp") == 0) { generateCmpInstructions1(x86_64);   }
     if (strcmp(args[1], "div") == 0) { generateDivInstructions1(x86_64);   }
-    if (strcmp(args[1], "div2") == 0) { generateDivInstructions2(x86_64);  }
+    if (strcmp(args[1], "div2") == 0) { generateDivInstructions2(x86_64); }
+    if (strcmp(args[1], "lea") == 0) { generateLeaInstructions(x86_64);  }
 
     //generateMovZXInstructions1(x86_64);
     //generateMovZXInstructions2(x86_64);

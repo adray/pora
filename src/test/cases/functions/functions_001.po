@@ -12,5 +12,8 @@ namespace Example
     {
         i64 y = test(10, 5);
         i64 p = test(20, 6);
+        
+        print_64(y);
+        print_64(p);
     }
 }

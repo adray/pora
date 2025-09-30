@@ -85,7 +85,7 @@ int poCompiler:: compile()
         _errors.push_back(ss.str());
         return 0;
     }
-    //module.dump();
+    module.dump();
 
     // Convert to SSA form and insert PHI nodes
     poSSA ssa;
@@ -96,7 +96,7 @@ int poCompiler:: compile()
     // Convert unnecessary memory accesses to registers
     poOptMemToReg regToMem;
     regToMem.optimize(module);
-    module.dump();
+    //module.dump();
 
     // Eliminate any dead code
     poOptDCE dce;

@@ -14,5 +14,18 @@ namespace Example
         i64 heap = GetProcessHeap();
         i32 flags;
         u8[] data = (u8[16]) HeapAlloc(heap, flags, 16u);
+        
+        for (i64 i = 0; i < 16; i = i + 1)
+        {
+            data[i] = (u8)i;
+        }
+        
+        u8* str = "";
+        
+        for (i64 i = 0; i < 16; i = i + 1)
+        {
+            print_64((i64)data[i]);
+            println(str, (u32)1);
+        }
     }
 }

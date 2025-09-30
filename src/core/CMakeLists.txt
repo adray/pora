@@ -31,6 +31,8 @@ set (PORACORE_SOURCES
     "poModule.cpp"
     "poSSA.h"
     "poSSA.cpp"
+    "poRegGraph.h"
+    "poRegGraph.cpp"
     "poRegLinear.h"
     "poRegLinear.cpp"
     "poUses.h"

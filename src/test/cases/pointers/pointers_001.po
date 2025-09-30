@@ -4,12 +4,15 @@ namespace Example
 {
     static void test(i64* x)
     {
-        
+        i64 b = *x;
+        print_64(b);
     }
 
     static void main()
     {
+        i64 a = 100;
         i64* z;
+        z = &a;
         test(z);
     }
 }

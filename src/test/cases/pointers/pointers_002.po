@@ -9,7 +9,7 @@ namespace Example
 
     static void main()
     {
-        i64 z;
-        test(&z);
+        i64 z = 10;        
+        print_64(test(&z));
     }
 }

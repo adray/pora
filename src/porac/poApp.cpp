@@ -60,6 +60,20 @@ static bool openLibraryFile(const std::string& fileName, poCommonObjectFileForma
 }
 #endif
 
+static int align(const int size, const int alignment)
+{
+    if (size == 0)
+    {
+        return alignment;
+    }
+
+    const int remainder = size % alignment;
+    if (remainder == 0)
+    {
+        return size;
+    }
+    return size + (alignment - remainder);
+}
 
 int main(const int numArgs, const char** const args)
 {
@@ -150,8 +164,8 @@ int main(const int numArgs, const char** const args)
 
         // Create the data sections
         exe.setEntryPoint(compiler.assembler().entryPoint());
-        exe.addSection(poSectionType::TEXT, 1024*4);
-        exe.addSection(poSectionType::INITIALIZED, 1024);
+        exe.addSection(poSectionType::TEXT, align(int(programData.size()), 1024));
+        exe.addSection(poSectionType::INITIALIZED, align(int(initializedData.size()), 1024));
         exe.addSection(poSectionType::UNINITIALIZED, 1024);
         exe.addSection(poSectionType::IDATA, 1024*2);
         exe.initializeSections();
@@ -176,7 +190,7 @@ int main(const int numArgs, const char** const args)
             }
         }
 #endif
-        compiler.assembler().link(0x1000, 0x2000 /* image alignment? */);
+        compiler.assembler().link(0x1000, exe.initializedDataImagePos());
 
         // Write program data
         std::memcpy(exe.textSection().data().data(), programData.data(), programData.size());

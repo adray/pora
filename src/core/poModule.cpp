@@ -203,6 +203,21 @@ int poConstantPool::addConstant(const float f32)
     return -1;
 }
 
+int poConstantPool::addConstant(const std::string& str)
+{
+    const auto& it = _strings.find(str);
+    if (it == _strings.end())
+    {
+        //const int id = int(_constants.size());
+        //_constants.push_back(poConstant(0)); // Dummy constant, string is stored separately
+        const int id = int(_strConstants.size());
+        _strConstants.push_back(str);
+        _strings.insert(std::pair<std::string, int>(str, id));
+        return id;
+    }
+    return -1;
+}
+
 int poConstantPool::getConstant(const uint64_t u64)
 {
     const auto& it = _u64.find(u64);
@@ -222,6 +237,16 @@ int poConstantPool::getConstant(const uint32_t u32)
         return it->second;
     }
 
+    return -1;
+}
+
+int poConstantPool::getConstant(const uint16_t u16)
+{
+    const auto& it = _u16.find(u16);
+    if (it != _u16.end())
+    {
+        return it->second;
+    }
     return -1;
 }
 
@@ -251,6 +276,17 @@ int poConstantPool::getConstant(const int32_t i32)
 {
     const auto& it = _i32.find(i32);
     if (it != _i32.end())
+    {
+        return it->second;
+    }
+
+    return -1;
+}
+
+int poConstantPool::getConstant(const int16_t i16)
+{
+    const auto& it = _i16.find(i16);
+    if (it != _i16.end())
     {
         return it->second;
     }
@@ -288,6 +324,16 @@ int poConstantPool::getConstant(const float f32)
         return it->second;
     }
 
+    return -1;
+}
+
+int poConstantPool::getConstant(const std::string& str)
+{
+    const auto& it = _strings.find(str);
+    if (it != _strings.end())
+    {
+        return it->second;
+    }
     return -1;
 }
 
@@ -341,6 +387,11 @@ double poConstantPool::getF64(const int id)
     return _constants[id].f64();
 }
 
+const std::string& poConstantPool::getString(const int id)
+{
+    return _strConstants[id];
+}
+
 //=================
 // Function
 //================
@@ -391,6 +442,7 @@ void poModule::addPrimitives()
     addType(poType(TYPE_U16, -1, "U16"));
     addType(poType(TYPE_U8, -1, "U8"));
     addType(poType(TYPE_BOOLEAN, -1, "BOOLEAN"));
+    addType(poType(TYPE_STRING, -1, "STRING"));
     addType(poType(TYPE_NULLPTR, -1, "NULLPTR"));
     addType(poType(TYPE_OBJECT, -1, "OBJECT"));
 
@@ -406,6 +458,7 @@ void poModule::addPrimitives()
     types[TYPE_U16].setSize(2);
     types[TYPE_U8].setSize(1);
     types[TYPE_BOOLEAN].setSize(1);
+    types[TYPE_STRING].setSize(8);
 
     for (auto& type : types)
     {

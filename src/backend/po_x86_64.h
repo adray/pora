@@ -244,6 +244,9 @@ namespace po
         VMI_MOVZX_16_TO_64_SRC_REG_DST_REG,
         VMI_MOVZX_16_TO_64_SRC_MEM_DST_REG,
 
+        VMI_LEA64_SRC_REG_DST_REG,
+        VMI_LEA64_SRC_MEM_DST_REG,
+
         VMI_CDQE,
 
         VMI_PUSH_REG,
@@ -279,6 +282,8 @@ namespace po
         VMI_SSE_CVTSI2SD_SRC_REG_DST_REG,
         VMI_SSE_CVTSI2SD_SRC_MEM_DST_REG,
 
+        VMI_SSE_CVTSD2SI_SRC_REG_DST_REG,
+
         VMI_SSE_UCOMISD_SRC_REG_DST_REG,
         VMI_SSE_UCOMISD_SRC_MEM_DST_REG,
 
@@ -302,6 +307,8 @@ namespace po
 
         VMI_SSE_CVTSI2SS_SRC_REG_DST_REG,
         VMI_SSE_CVTSI2SS_SRC_MEM_DST_REG,
+
+        VMI_SSE_CVTSS2SI_SRC_REG_DST_REG,
 
         VMI_SSE_UCOMISS_SRC_REG_DST_REG,
         VMI_SSE_UCOMISS_SRC_MEM_DST_REG,
@@ -609,6 +616,7 @@ namespace po
         void mc_dec_memory_x64(int reg, int offset);
         void mc_neg_memory_x64(int reg, int offset);
         void mc_neg_reg_x64(int reg);
+        void mc_lea_reg_to_reg_x64(char dst, int addr);
 
         /* Jump operations */
 
@@ -681,6 +689,7 @@ namespace po
         void mc_divsd_memory_to_reg_x64(int dst, int src, int dst_offset);
         void mc_cvtitod_memory_to_reg_x64(int dst, int src, int src_offset);
         void mc_cvtitod_reg_to_reg_x64(int dst, int src);
+        void mc_cvtsdsi_reg_to_reg_x64(int dst, int src);
         void mc_ucmpd_reg_to_reg_x64(int dst, int src);
         void mc_ucmpd_memory_to_reg_x64(int dst, int src, int src_offset);
         void mc_xorpd_reg_to_reg_x64(int dst, int src);
@@ -698,6 +707,7 @@ namespace po
         void mc_divss_memory_to_reg_x64(int dst, int src, int dst_offset);
         void mc_cvtitos_memory_to_reg_x64(int dst, int src, int src_offset);
         void mc_cvtitos_reg_to_reg_x64(int dst, int src);
+        void mc_cvtsssi_reg_to_reg_x64(int dst, int src);
         void mc_ucmps_reg_to_reg_x64(int dst, int src);
         void mc_ucmps_memory_to_reg_x64(int dst, int src, int src_offset);
         void mc_xorps_reg_to_reg_x64(int dst, int src);
@@ -853,6 +863,7 @@ namespace po
         void mc_dec_memory_x64(int reg, int offset);
         void mc_neg_memory_x64(int reg, int offset);
         void mc_neg_reg_x64(int reg);
+        void mc_lea_reg_to_reg_x64(char dst, int addr);
 
         /* Jump operations */
 
@@ -925,6 +936,7 @@ namespace po
         void mc_divsd_memory_to_reg_x64(int dst, int src, int dst_offset);
         void mc_cvtitod_memory_to_reg_x64(int dst, int src, int src_offset);
         void mc_cvtitod_reg_to_reg_x64(int dst, int src);
+        void mc_cvtsdsi_reg_to_reg_x64(int dst, int src);
         void mc_ucmpd_reg_to_reg_x64(int dst, int src);
         void mc_ucmpd_memory_to_reg_x64(int dst, int src, int src_offset);
         void mc_xorpd_reg_to_reg_x64(int dst, int src);
@@ -942,6 +954,7 @@ namespace po
         void mc_divss_memory_to_reg_x64(int dst, int src, int dst_offset);
         void mc_cvtitos_memory_to_reg_x64(int dst, int src, int src_offset);
         void mc_cvtitos_reg_to_reg_x64(int dst, int src);
+        void mc_cvtsssi_reg_to_reg_x64(int dst, int src);
         void mc_ucmps_reg_to_reg_x64(int dst, int src);
         void mc_ucmps_memory_to_reg_x64(int dst, int src, int src_offset);
         void mc_xorps_reg_to_reg_x64(int dst, int src);
@@ -961,6 +974,7 @@ namespace po
         void emit_bmr(const vm_instruction& ins, char dst, char src);
         void emit_brmo(const vm_instruction& ins, char dst, char src, int offset);
         void emit_bmro(const vm_instruction& ins, char dst, char src, int offset);
+        void emit_brr_disp(const vm_instruction& ins, int dst, int disp32);
         void emit_ui(const vm_instruction& ins, char imm);
         void emit_ui(const vm_instruction& ins, int imm);
 

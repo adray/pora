@@ -52,7 +52,7 @@ poConstantNode::poConstantNode(poNodeType type, const poToken& token)
         break;
     case poTokenType::STRING:
         _str = token.string();
-        //_type = TYPE_;
+        _type = TYPE_STRING;
         break;
     case poTokenType::TRUE:
         _u8 = 1;

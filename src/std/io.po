@@ -12,7 +12,7 @@ namespace std
             &bytesWritten,
             null);
     }
-    
+
     static void println(u8* str, u32 size)
     {
         u32 stdOut = (u32)4294967285;

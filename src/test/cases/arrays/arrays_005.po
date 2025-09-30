@@ -4,6 +4,8 @@ namespace Example
 {
     static void main()
     {
+        u8* str = "";
+        
         f32[16] x;
         for (i64 i = 0; i < 16; i = i + 1)
         {
@@ -12,5 +14,11 @@ namespace Example
 
         f32[16] y;
         y = x;
+        
+        for (i64 i = 0; i < 16; i = i + 1)
+        {
+            print_64((i64)y[i]);
+            println(str, (u32)1);
+        }
     }
 }

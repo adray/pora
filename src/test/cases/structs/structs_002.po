@@ -12,12 +12,16 @@ namespace Example
     
     static void test(foo f)
     {
+        print_64(f.x);
         f.x = 10;
+        print_64(f.x);
     }
 
     static void main()
     {
         foo f;
+        f.x = 55;
         test(f);
+        print_64(f.x);
     }
 }

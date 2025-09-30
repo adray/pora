@@ -11,5 +11,8 @@ namespace Example
     {
         boolean x;
         x = test();
+        if (x) {
+            println("true", (u32)5);
+        }
     }
 }

@@ -9,12 +9,15 @@ namespace Example
     
     static void test(foo* x)
     {
+        print_64(x.x);
         return;
     }
 
     static void main()
     {
-        foo* z;
+        foo p;    
+        foo* z = &p;
+        z.x = 100;
         test(z);
     }
 }

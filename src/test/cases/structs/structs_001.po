@@ -14,5 +14,6 @@ namespace Example
     {
         foo f;
         f.x = 100;
+        print_64(f.x);
     }
 }

@@ -1,6 +1,7 @@
 #include "poAsm.h"
 #include "poModule.h"
 #include "poRegLinear.h"
+#include "poRegGraph.h"
 #include "poType.h"
 
 #include "poLive.h"
@@ -60,22 +61,25 @@ poAsmExternCall::poAsmExternCall(const std::string& name, const int programPos)
 
 //================
 
-void poAsm::ir_element_ptr(poModule& module, poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_element_ptr(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
     // We need to get the pointer to the variable (left) optionally adding the variable (right) and a memory offset.
 
-    const int dst = linear.getRegisterByVariable(ins.name());
-    const int slot = linear.getStackSlotByVariable(ins.left()); /* assume the pointer is the stack position */
+    const int dst = allocator.getRegisterByVariable(ins.name());
+    const int slot = allocator.getStackSlotByVariable(ins.left()); /* assume the pointer is the stack position */
 
     const poType& type = module.types()[ins.type()];
-    const int size = type.size();
+    assert(type.isPointer());
+
+    const poType& baseType = module.types()[type.baseType()];
+    const int size = baseType.size();
 
     if (slot != -1)
     {
         const int offset = slot * 8;
         if (ins.right() != -1)
         {
-            const int operand = linear.getRegisterByVariable(ins.right());
+            const int operand = allocator.getRegisterByVariable(ins.right());
 
             // TODO: change to LEA? (load effective address)
             // ESP + offset + operand * size
@@ -98,8 +102,8 @@ void poAsm::ir_element_ptr(poModule& module, poRegLinear& linear, const poInstru
     {
         if (ins.right() != -1)
         {
-            const int operand = linear.getRegisterByVariable(ins.right());
-            const int left = linear.getRegisterByVariable(ins.left());
+            const int operand = allocator.getRegisterByVariable(ins.right());
+            const int left = allocator.getRegisterByVariable(ins.left());
 
             // TODO: change to LEA? (load effective address)
             // left + operand * size
@@ -111,19 +115,31 @@ void poAsm::ir_element_ptr(poModule& module, poRegLinear& linear, const poInstru
         }
         else
         {
-            const int left = linear.getRegisterByVariable(ins.left());
+            const int left = allocator.getRegisterByVariable(ins.left());
             _x86_64_lower.mc_mov_imm_to_reg_x64(dst, size);
             _x86_64_lower.mc_add_reg_to_reg_x64(dst, left);
         }
     }
 }
 
-void poAsm::ir_ptr(poModule& module, poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_ptr(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
-    const int dst = linear.getRegisterByVariable(ins.name());
+    const int dst = allocator.getRegisterByVariable(ins.name());
     const poType& type = module.types()[ins.type()];
-    const int slot = linear.getStackSlotByVariable(ins.left()); /* assume the pointer is the stack position */
-    if (slot != -1)
+    const int slot = allocator.getStackSlotByVariable(ins.left()); /* assume the pointer is the stack position */
+    const int src = allocator.getRegisterByVariable(ins.left());
+    if (src != -1)
+    {
+        //
+        // We are just adding a memory offset to the existing pointer
+
+        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
+        if (ins.memOffset() > 0)
+        {
+            _x86_64_lower.mc_add_imm_to_reg_x64(dst, ins.memOffset());
+        }
+    }
+    else if (slot != -1)
     {
         // We need to get the pointer to the variable (left) optionally adding the variable (right) and the memory offset.
 
@@ -131,28 +147,16 @@ void poAsm::ir_ptr(poModule& module, poRegLinear& linear, const poInstruction& i
         _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_ESP);
         _x86_64_lower.mc_add_imm_to_reg_x64(dst, offset);
     }
-    else
-    {
-        //
-        // We are just adding a memory offset to the existing pointer
-
-        const int src = linear.getRegisterByVariable(ins.left());
-        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
-        if (ins.memOffset() > 0)
-        {
-            _x86_64_lower.mc_add_imm_to_reg_x64(dst, ins.memOffset());
-        }
-    }
 }
 
-void poAsm::ir_load(poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_load(PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
     // We need to mov data from the ptr address to the destination register
 
-    const int dst = linear.getRegisterByVariable(ins.name());
-    const int dst_sse = linear.getRegisterByVariable(ins.name()) - VM_REGISTER_MAX;
+    const int dst = allocator.getRegisterByVariable(ins.name());
+    const int dst_sse = allocator.getRegisterByVariable(ins.name()) - VM_REGISTER_MAX;
 
-    const int src = linear.getRegisterByVariable(ins.left());
+    const int src = allocator.getRegisterByVariable(ins.left());
 
     switch (ins.type())
     {
@@ -174,20 +178,21 @@ void poAsm::ir_load(poRegLinear& linear, const poInstruction& ins)
         break;
     default:
         /* copy pointer value */
+        assert(dst != -1 && src != -1);
         _x86_64_lower.mc_mov_memory_to_reg_x64(dst, src, 0);
         break;
     }
 }
 
-void poAsm::ir_store(poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_store(PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
     // We need to mov data from the source register to the destination address
 
-    const int src = linear.getRegisterByVariable(ins.right());
+    const int src = allocator.getRegisterByVariable(ins.right());
     const int src_sse = src - VM_REGISTER_MAX;
 
-    const int dst = linear.getRegisterByVariable(ins.left());
-    const int src_slot = linear.getStackSlotByVariable(ins.right());
+    const int dst = allocator.getRegisterByVariable(ins.left());
+    const int src_slot = allocator.getStackSlotByVariable(ins.right());
 
     switch (ins.type())
     {
@@ -217,6 +222,7 @@ void poAsm::ir_store(poRegLinear& linear, const poInstruction& ins)
         /* copy pointer value (stack) */
         if (src_slot != -1)
         {
+            assert(dst != -1);
             _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, VM_REGISTER_ESP);
             _x86_64_lower.mc_add_imm_to_reg_x64(VM_REGISTER_EAX, src_slot * 8);
             _x86_64_lower.mc_mov_reg_to_memory_x64(dst, 0, VM_REGISTER_EAX);
@@ -226,6 +232,7 @@ void poAsm::ir_store(poRegLinear& linear, const poInstruction& ins)
         }
         else
         {
+            assert(src != -1 && dst != -1);
             _x86_64_lower.mc_mov_reg_to_memory_x64(dst, 0, src);
         }
         break;
@@ -233,10 +240,10 @@ void poAsm::ir_store(poRegLinear& linear, const poInstruction& ins)
 
 }
 
-void poAsm::ir_zero_extend(poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_zero_extend(PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
-    const int dst = linear.getRegisterByVariable(ins.name());
-    const int src = linear.getRegisterByVariable(ins.left());
+    const int dst = allocator.getRegisterByVariable(ins.name());
+    const int src = allocator.getRegisterByVariable(ins.left());
 
     const int srcType = ins.memOffset(); // Using memOffset to store source type for sign extension
 
@@ -275,10 +282,10 @@ void poAsm::ir_zero_extend(poRegLinear& linear, const poInstruction& ins)
     }
 }
 
-void poAsm::ir_sign_extend(poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_sign_extend(PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
-    const int dst = linear.getRegisterByVariable(ins.name());
-    const int src = linear.getRegisterByVariable(ins.left());
+    const int dst = allocator.getRegisterByVariable(ins.name());
+    const int src = allocator.getRegisterByVariable(ins.left());
 
     const int srcType = ins.memOffset(); // Using memOffset to store source type for sign extension
 
@@ -321,10 +328,10 @@ void poAsm::ir_sign_extend(poRegLinear& linear, const poInstruction& ins)
     }
 }
 
-void poAsm::ir_bitwise_cast(poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_bitwise_cast(PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
-    const int dst = linear.getRegisterByVariable(ins.name());
-    const int src = linear.getRegisterByVariable(ins.left());
+    const int dst = allocator.getRegisterByVariable(ins.name());
+    const int src = allocator.getRegisterByVariable(ins.left());
 
     if (dst == -1 || src == -1)
     {
@@ -338,71 +345,103 @@ void poAsm::ir_bitwise_cast(poRegLinear& linear, const poInstruction& ins)
     }
 }
 
-void poAsm::ir_convert(poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_convert(PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
-    const int dst = linear.getRegisterByVariable(ins.name());
-    const int src = linear.getRegisterByVariable(ins.left());
-    const int dst_sse = dst - VM_REGISTER_MAX;
-
     const int srcType = ins.memOffset(); // Using memOffset to store source type for sign extension
-
-    /* First, perform sign extension on signed source types */
-
-    switch (srcType)
+    
+    if (srcType == TYPE_F32 ||
+        srcType == TYPE_F64)
     {
-    case TYPE_I32:
-        _x86_64_lower.mc_movsx_32_to_64_reg_to_reg(src, src);
-        break;
-    case TYPE_I16:
-        _x86_64_lower.mc_movsx_16_to_64_reg_to_reg(src, src);
-        break;
-    case TYPE_I8:
-        _x86_64_lower.mc_movsx_8_to_64_reg_to_reg(src, src);
-        break;
-    default:
-        break;
-    }
+        const int dst = allocator.getRegisterByVariable(ins.name());
+        const int src = allocator.getRegisterByVariable(ins.left());
+        const int src_sse = src - VM_REGISTER_MAX;
 
-    /* Then convert to the desired type */
-
-    switch (srcType)
-    {
-    case TYPE_I64:
-    case TYPE_I32:
-    case TYPE_I16:
-    case TYPE_I8:
         switch (ins.type())
         {
-        case TYPE_F64:
-            _x86_64_lower.mc_cvtitod_reg_to_reg_x64(dst_sse, src);
-            break;
-        case TYPE_F32:
-            _x86_64_lower.mc_cvtitos_reg_to_reg_x64(dst_sse, src);
+        case TYPE_I64:
+        case TYPE_I32:
+        case TYPE_I16:
+        case TYPE_I8:
+            switch (srcType)
+            {
+            case TYPE_F64:
+                _x86_64_lower.mc_cvtsdsi_reg_to_reg_x64(dst, src_sse);
+                break;
+            case TYPE_F32:
+                _x86_64_lower.mc_cvtsssi_reg_to_reg_x64(dst, src_sse);
+                break;
+            }
             break;
         }
-        break;
-    //case TYPE_U64: // TODO: needs special handling
-    //case TYPE_U32:
-    //case TYPE_U16:
-    //case TYPE_U8:
-    //    switch (ins.type())
-    //    {
-    //        case TYPE_F64:
-    //            _x86_64.mc_cvtitod_reg_to_reg_x64(dst_sse, src);
-    //            break;
-    //        case TYPE_F32:
-    //            _x86_64.mc_cvtitos_reg_to_reg_x64(dst_sse, src);
-    //            break;
-    //    }
-    //    break;
+
+        // TODO: handle unsigned conversion from float (needs special handling)
+        // TODO: handle float to float conversions (f32 to f64 and f64 to f32)?
+    }
+    else
+    {
+        const int dst = allocator.getRegisterByVariable(ins.name());
+        const int src = allocator.getRegisterByVariable(ins.left());
+        const int dst_sse = dst - VM_REGISTER_MAX;
+
+
+        /* First, perform sign extension on signed source types */
+
+        switch (srcType)
+        {
+        case TYPE_I32:
+            _x86_64_lower.mc_movsx_32_to_64_reg_to_reg(src, src);
+            break;
+        case TYPE_I16:
+            _x86_64_lower.mc_movsx_16_to_64_reg_to_reg(src, src);
+            break;
+        case TYPE_I8:
+            _x86_64_lower.mc_movsx_8_to_64_reg_to_reg(src, src);
+            break;
+        default:
+            break;
+        }
+
+        /* Then convert to the desired type */
+
+        switch (srcType)
+        {
+        case TYPE_I64:
+        case TYPE_I32:
+        case TYPE_I16:
+        case TYPE_I8:
+            switch (ins.type())
+            {
+            case TYPE_F64:
+                _x86_64_lower.mc_cvtitod_reg_to_reg_x64(dst_sse, src);
+                break;
+            case TYPE_F32:
+                _x86_64_lower.mc_cvtitos_reg_to_reg_x64(dst_sse, src);
+                break;
+            }
+            break;
+            //case TYPE_U64: // TODO: needs special handling
+            //case TYPE_U32:
+            //case TYPE_U16:
+            //case TYPE_U8:
+            //    switch (ins.type())
+            //    {
+            //        case TYPE_F64:
+            //            _x86_64.mc_cvtitod_reg_to_reg_x64(dst_sse, src);
+            //            break;
+            //        case TYPE_F32:
+            //            _x86_64.mc_cvtitos_reg_to_reg_x64(dst_sse, src);
+            //            break;
+            //    }
+            //    break;
+        }
     }
 }
 
-void poAsm::ir_add(poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_add(PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
-    const int dst = linear.getRegisterByVariable(ins.name());
-    const int src1 = linear.getRegisterByVariable(ins.left());
-    const int src2 = linear.getRegisterByVariable(ins.right());
+    const int dst = allocator.getRegisterByVariable(ins.name());
+    const int src1 = allocator.getRegisterByVariable(ins.left());
+    const int src2 = allocator.getRegisterByVariable(ins.right());
 
     const int sse_dst = dst - VM_REGISTER_MAX;
     const int sse_src1 = src1 - VM_REGISTER_MAX;
@@ -458,11 +497,11 @@ void poAsm::ir_add(poRegLinear& linear, const poInstruction& ins)
     }
 }
 
-void poAsm::ir_sub(poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_sub(PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
-    const int dst = linear.getRegisterByVariable(ins.name());
-    const int src1 = linear.getRegisterByVariable(ins.left());
-    const int src2 = linear.getRegisterByVariable(ins.right());
+    const int dst = allocator.getRegisterByVariable(ins.name());
+    const int src1 = allocator.getRegisterByVariable(ins.left());
+    const int src2 = allocator.getRegisterByVariable(ins.right());
 
     const int sse_dst = dst - VM_REGISTER_MAX;
     const int sse_src1 = src1 - VM_REGISTER_MAX;
@@ -515,11 +554,11 @@ void poAsm::ir_sub(poRegLinear& linear, const poInstruction& ins)
     }
 }
 
-void poAsm::ir_mul(poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_mul(PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
-    const int dst = linear.getRegisterByVariable(ins.name());
-    const int src1 = linear.getRegisterByVariable(ins.left());
-    const int src2 = linear.getRegisterByVariable(ins.right());
+    const int dst = allocator.getRegisterByVariable(ins.name());
+    const int src1 = allocator.getRegisterByVariable(ins.left());
+    const int src2 = allocator.getRegisterByVariable(ins.right());
 
     const int sse_dst = dst - VM_REGISTER_MAX;
     const int sse_src1 = src1 - VM_REGISTER_MAX;
@@ -602,11 +641,11 @@ void poAsm::ir_mul(poRegLinear& linear, const poInstruction& ins)
     }
 }
 
-void poAsm::ir_div(poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_div(PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
-    const int dst = linear.getRegisterByVariable(ins.name());
-    const int src1 = linear.getRegisterByVariable(ins.left());
-    const int src2 = linear.getRegisterByVariable(ins.right());
+    const int dst = allocator.getRegisterByVariable(ins.name());
+    const int src1 = allocator.getRegisterByVariable(ins.left());
+    const int src2 = allocator.getRegisterByVariable(ins.right());
 
     const int sse_dst = dst - VM_REGISTER_MAX;
     const int sse_src1 = src1 - VM_REGISTER_MAX;
@@ -678,10 +717,10 @@ void poAsm::ir_div(poRegLinear& linear, const poInstruction& ins)
     }
 }
 
-void poAsm::ir_cmp(poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_cmp(PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
-    const int src1 = linear.getRegisterByVariable(ins.left());
-    const int src2 = linear.getRegisterByVariable(ins.right());
+    const int src1 = allocator.getRegisterByVariable(ins.left());
+    const int src2 = allocator.getRegisterByVariable(ins.right());
 
     const int sse_src1 = src1 - VM_REGISTER_MAX;
     const int sse_src2 = src2 - VM_REGISTER_MAX;
@@ -719,7 +758,7 @@ void poAsm::ir_cmp(poRegLinear& linear, const poInstruction& ins)
     }
 }
 
-void poAsm::ir_br(poRegLinear& linear, const poInstruction& ins, poBasicBlock* bb)
+void poAsm::ir_br(PO_ALLOCATOR& allocator, const poInstruction& ins, poBasicBlock* bb)
 {
     po_x86_64_basic_block* abb = _basicBlockMap[bb];
     if (bb->getBranch())
@@ -732,13 +771,21 @@ void poAsm::ir_br(poRegLinear& linear, const poInstruction& ins, poBasicBlock* b
     ir_jump(ins.left(), 0, ins.type());
 }
 
-void poAsm::ir_copy(poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_copy(PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
-    const int dst = linear.getRegisterByVariable(ins.name());
-    const int src = linear.getRegisterByVariable(ins.left());
+    const int dst = allocator.getRegisterByVariable(ins.name());
+    const int src = allocator.getRegisterByVariable(ins.left());
 
     const int sse_dst = dst - VM_REGISTER_MAX;
     const int sse_src = src - VM_REGISTER_MAX;
+    
+    if (dst < 0 || src < 0)
+    {
+        std::stringstream ss;
+        ss << "Internal Error: Malformed copy instruction " << ins.name();
+        setError(ss.str());
+        return;
+    }
 
     switch (ins.type())
     {
@@ -752,14 +799,6 @@ void poAsm::ir_copy(poRegLinear& linear, const poInstruction& ins)
     case TYPE_U8:
         if (dst != src)
         {
-            if (dst < 0 || src < 0)
-            {
-                std::stringstream ss;
-                ss << "Internal Error: Malformed copy instruction " << ins.name();
-                setError(ss.str());
-                return;
-            }
-
             _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
         }
         break;
@@ -783,9 +822,9 @@ void poAsm::ir_copy(poRegLinear& linear, const poInstruction& ins)
     }
 }
 
-void poAsm::ir_constant(poConstantPool& constants, poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_constant(poModule& module, poConstantPool& constants, PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
-    const int dst = linear.getRegisterByVariable(ins.name());
+    const int dst = allocator.getRegisterByVariable(ins.name());
     const int dstSSE = dst - VM_REGISTER_MAX;
 
     if (ins.constant() == -1)
@@ -831,6 +870,16 @@ void poAsm::ir_constant(poConstantPool& constants, poRegLinear& linear, const po
         _x86_64_lower.cfg().getLast()->instructions().back().setId(ins.constant());
         break;
     default:
+        {
+            poType& type = module.types()[ins.type()];
+            if (type.isPointer())
+            {
+                _x86_64_lower.mc_lea_reg_to_reg_x64(dst, 0);
+                _x86_64_lower.cfg().getLast()->instructions().back().setId(ins.constant());
+                return;
+            }
+        }
+
         std::stringstream ss;
         ss << "Internal Error: Malformed constant instruction " << ins.name();
         setError(ss.str());
@@ -838,7 +887,7 @@ void poAsm::ir_constant(poConstantPool& constants, poRegLinear& linear, const po
     }
 }
 
-void poAsm::ir_ret(poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_ret(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
     const int left = ins.left();
     if (left != -1)
@@ -853,15 +902,24 @@ void poAsm::ir_ret(poRegLinear& linear, const poInstruction& ins)
         case TYPE_U16:
         case TYPE_I8:
         case TYPE_U8:
-            _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, linear.getRegisterByVariable(left));
+            _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, allocator.getRegisterByVariable(left));
             break;
         case TYPE_F64:
-            _x86_64_lower.mc_movsd_reg_to_reg_x64(VM_REGISTER_EAX, linear.getRegisterByVariable(left) - VM_REGISTER_MAX);
+            _x86_64_lower.mc_movsd_reg_to_reg_x64(VM_REGISTER_EAX, allocator.getRegisterByVariable(left) - VM_REGISTER_MAX);
             break;
         case TYPE_F32:
-            _x86_64_lower.mc_movss_reg_to_reg_x64(VM_REGISTER_EAX, linear.getRegisterByVariable(left) - VM_REGISTER_MAX);
+            _x86_64_lower.mc_movss_reg_to_reg_x64(VM_REGISTER_EAX, allocator.getRegisterByVariable(left) - VM_REGISTER_MAX);
             break;
         default:
+            if (left != -1)
+            {
+                poType& type = module.types()[ins.type()];
+                if (type.isPointer())
+                {
+                    _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, allocator.getRegisterByVariable(left));
+                    break;
+                }
+            }
             std::stringstream ss;
             ss << "Internal Error: Malformed return instruction " << ins.name();
             setError(ss.str());
@@ -870,15 +928,15 @@ void poAsm::ir_ret(poRegLinear& linear, const poInstruction& ins)
     }
 
     // Epilogue
-    generateEpilogue(linear);
+    generateEpilogue(allocator);
 
     _x86_64_lower.mc_return();
 }
 
-void poAsm::ir_unary_minus(poRegLinear& linear, const poInstruction& ins)
+void poAsm::ir_unary_minus(PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
-    const int src = linear.getRegisterByVariable(ins.left());
-    const int dst = linear.getRegisterByVariable(ins.name());
+    const int src = allocator.getRegisterByVariable(ins.left());
+    const int dst = allocator.getRegisterByVariable(ins.name());
 
     const int src_sse = src - VM_REGISTER_MAX;
     const int dst_sse = dst - VM_REGISTER_MAX;
@@ -941,7 +999,7 @@ void poAsm::ir_unary_minus(poRegLinear& linear, const poInstruction& ins)
     }
 }
 
-void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& ins, const int pos, const std::vector<poInstruction>& args)
+void poAsm::ir_call(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins, const int pos, const std::vector<poInstruction>& args)
 {
     static const int generalArgs[] = { VM_ARG1, VM_ARG2, VM_ARG3, VM_ARG4, VM_ARG5, VM_ARG6 };
     static const int sseArgs[] = { VM_SSE_ARG1, VM_SSE_ARG2, VM_SSE_ARG3, VM_SSE_ARG4, VM_SSE_ARG5, VM_SSE_ARG6, VM_SSE_ARG7, VM_SSE_ARG8 };
@@ -955,11 +1013,14 @@ void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& 
         const int baseType = type.baseType();
         const int size = type.size();
         int src_slot = 0;
+        int reg = -1;
 
         const int argPos = pos + i + 1;
 
-        spill(linear, argPos);
-        restore(linear, argPos);
+#ifdef REG_LINEAR
+        spill(allocator, argPos);
+#endif
+        restore(allocator, argPos);
 
         switch (args[i].type()) {
         case TYPE_I64:
@@ -972,43 +1033,51 @@ void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& 
         case TYPE_U8:
             if (i >= VM_MAX_ARGS)
             {
-                _x86_64_lower.mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, 0, linear.getRegisterByVariable(args[i].left(), argPos));
+                _x86_64_lower.mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, 0, allocator.getRegisterByVariable(args[i].left(), argPos));
                 continue;
             }
-            _x86_64_lower.mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].left(), argPos));
+            _x86_64_lower.mc_mov_reg_to_reg_x64(generalArgs[i], allocator.getRegisterByVariable(args[i].left(), argPos));
             break;
         case TYPE_F64:
             if (i >= VM_MAX_SSE_ARGS) {
-                /*TODO*/
+                _x86_64_lower.mc_movsd_reg_to_memory_x64(VM_REGISTER_ESP, allocator.getRegisterByVariable(args[i].left(), argPos) - VM_REGISTER_MAX, 0);
                 continue;
             }
-            _x86_64_lower.mc_movsd_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].left(), argPos) - VM_REGISTER_MAX);
+            _x86_64_lower.mc_movsd_reg_to_reg_x64(sseArgs[i], allocator.getRegisterByVariable(args[i].left(), argPos) - VM_REGISTER_MAX);
             break;
         case TYPE_F32:
             if (i >= VM_MAX_SSE_ARGS)
             {
-                /*TODO*/
+                _x86_64_lower.mc_movss_reg_to_memory_x64(VM_REGISTER_ESP, allocator.getRegisterByVariable(args[i].left(), argPos) - VM_REGISTER_MAX, 0);
                 continue;
             }
-            _x86_64_lower.mc_movss_reg_to_reg_x64(sseArgs[i], linear.getRegisterByVariable(args[i].left(), argPos) - VM_REGISTER_MAX);
+            _x86_64_lower.mc_movss_reg_to_reg_x64(sseArgs[i], allocator.getRegisterByVariable(args[i].left(), argPos) - VM_REGISTER_MAX);
             break;
         default:
             if (i >= VM_MAX_ARGS) {
-                _x86_64_lower.mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, 0, linear.getRegisterByVariable(args[i].left(), argPos));
+                _x86_64_lower.mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, 0, allocator.getRegisterByVariable(args[i].left(), argPos));
                 continue;
             }
-            src_slot = linear.getStackSlotByVariable(args[i].left());
-            if (src_slot != -1)
+
+            reg = allocator.getRegisterByVariable(args[i].left(), argPos);
+            if (reg != -1)
             {
-                _x86_64_lower.mc_mov_reg_to_reg_x64(generalArgs[i], VM_REGISTER_ESP);
-                _x86_64_lower.mc_add_imm_to_reg_x64(generalArgs[i], src_slot * 8);
+                _x86_64_lower.mc_mov_reg_to_reg_x64(generalArgs[i], reg);
             }
             else
             {
-                _x86_64_lower.mc_mov_reg_to_reg_x64(generalArgs[i], linear.getRegisterByVariable(args[i].left(), argPos));
+                src_slot = allocator.getStackSlotByVariable(args[i].left());
+                assert(src_slot != -1);
+                _x86_64_lower.mc_mov_reg_to_reg_x64(generalArgs[i], VM_REGISTER_ESP);
+                _x86_64_lower.mc_add_imm_to_reg_x64(generalArgs[i], src_slot * 8);
             }
+
             break;
         }
+
+#ifdef REG_GRAPH
+        spill(allocator, argPos);
+#endif
     }
 
     const int symbol = ins.right();
@@ -1026,25 +1095,32 @@ void poAsm::ir_call(poModule& module, poRegLinear& linear, const poInstruction& 
     case TYPE_U32:
     case TYPE_I64:
     case TYPE_U64:
-        _x86_64_lower.mc_mov_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()), VM_REGISTER_EAX);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(allocator.getRegisterByVariable(ins.name()), VM_REGISTER_EAX);
         break;
     case TYPE_F64:
-        _x86_64_lower.mc_movsd_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()) - VM_REGISTER_MAX, VM_SSE_REGISTER_XMM0);
+        _x86_64_lower.mc_movsd_reg_to_reg_x64(allocator.getRegisterByVariable(ins.name()) - VM_REGISTER_MAX, VM_SSE_REGISTER_XMM0);
         break;
     case TYPE_F32:
-        _x86_64_lower.mc_movss_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()) - VM_REGISTER_MAX, VM_SSE_REGISTER_XMM0);
+        _x86_64_lower.mc_movss_reg_to_reg_x64(allocator.getRegisterByVariable(ins.name()) - VM_REGISTER_MAX, VM_SSE_REGISTER_XMM0);
         break;
     case TYPE_VOID:
         break;
     default:
-        _x86_64_lower.mc_mov_reg_to_reg_x64(linear.getRegisterByVariable(ins.name()), VM_REGISTER_EAX);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(allocator.getRegisterByVariable(ins.name()), VM_REGISTER_EAX);
         break;
     }
 }
 
-void poAsm::ir_param(poModule& module, poRegLinear& linear, const poInstruction& ins, const int numArgs)
+static int inline getArgOffset(const int argIndex, const int prologueSize)
 {
-    const int dst = linear.getRegisterByVariable(ins.name());
+    // Note the size of the register homes of the previous stack frame will be added later by the call site analyzer
+
+    return 8 /*return address*/ + (argIndex - VM_MAX_ARGS) * 8 + prologueSize;
+}
+
+void poAsm::ir_param(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins, const int numArgs)
+{
+    const int dst = allocator.getRegisterByVariable(ins.name());
     const int dst_sse = dst - VM_REGISTER_MAX;
     static const int generalArgs[] = { VM_ARG1, VM_ARG2, VM_ARG3, VM_ARG4, VM_ARG5, VM_ARG6 };
     static const int sseArgs[] = { VM_SSE_ARG1, VM_SSE_ARG2, VM_SSE_ARG3, VM_SSE_ARG4, VM_SSE_ARG5, VM_SSE_ARG6, VM_SSE_ARG7, VM_SSE_ARG8 };
@@ -1065,7 +1141,7 @@ void poAsm::ir_param(poModule& module, poRegLinear& linear, const poInstruction&
         }
         else
         {
-            _x86_64_lower.mc_mov_memory_to_reg_x64(dst, VM_REGISTER_ESP, (numArgs - param) * 8 + _prologueSize);
+            _x86_64_lower.mc_mov_memory_to_reg_x64(dst, VM_REGISTER_ESP, getArgOffset(param, _prologueSize));
         }
         break;
     case TYPE_F64:
@@ -1075,7 +1151,7 @@ void poAsm::ir_param(poModule& module, poRegLinear& linear, const poInstruction&
         }
         else
         {
-            _x86_64_lower.mc_movsd_memory_to_reg_x64(dst_sse, VM_REGISTER_ESP, (numArgs - param) * 8 + _prologueSize);
+            _x86_64_lower.mc_movsd_memory_to_reg_x64(dst_sse, VM_REGISTER_ESP, getArgOffset(param, _prologueSize));
         }
         break;
     case TYPE_F32:
@@ -1085,7 +1161,7 @@ void poAsm::ir_param(poModule& module, poRegLinear& linear, const poInstruction&
         }
         else
         {
-            _x86_64_lower.mc_movss_memory_to_reg_x64(dst_sse, VM_REGISTER_ESP, (numArgs - param) * 8 + _prologueSize);
+            _x86_64_lower.mc_movss_memory_to_reg_x64(dst_sse, VM_REGISTER_ESP, getArgOffset(param, _prologueSize));
         }
         break;
     default:
@@ -1095,7 +1171,7 @@ void poAsm::ir_param(poModule& module, poRegLinear& linear, const poInstruction&
         }
         else
         {
-            _x86_64_lower.mc_mov_memory_to_reg_x64(dst, VM_REGISTER_ESP, (numArgs - param) * 8 + _prologueSize);
+            _x86_64_lower.mc_mov_memory_to_reg_x64(dst, VM_REGISTER_ESP, getArgOffset(param, _prologueSize));
         }
         break;
     }
@@ -1237,20 +1313,29 @@ static const int align(const int size)
     return 8;
 }
 
-void poAsm::generatePrologue(poRegLinear& linear)
+void poAsm::generatePrologue(PO_ALLOCATOR& allocator)
 {
     // Push all non-volatile general purpose registers which are used
     int numPushed = 0;
     for (int i = 0; i < VM_REGISTER_MAX; i++)
     {
-        if (!linear.isVolatile(i) && linear.isRegisterSet(i))
+        if (!allocator.isVolatile(i) && allocator.isRegisterSet(i))
         {
             _x86_64_lower.mc_push_reg(i);
             numPushed++;
         }
     }
 
-    const int size = 8 * numPushed + 8 * linear.stackSize() + 32 /* register homes */;
+    int sseRegisters = 0;
+    for (int i = VM_REGISTER_MAX; i < VM_REGISTER_MAX + VM_SSE_REGISTER_MAX; i++)
+    {
+        if (!allocator.isVolatile(i) && allocator.isRegisterSet(i))
+        {
+            sseRegisters++;
+        }
+    }
+
+    const int size = 8 * numPushed + 8 * allocator.stackSize() + 32 /* register homes */ + sseRegisters * 8;
     const int alignment = align(size);
     _prologueSize = alignment + size;
     const int resize = _prologueSize - 8 * numPushed;
@@ -1258,6 +1343,16 @@ void poAsm::generatePrologue(poRegLinear& linear)
     if (resize > 0)
     {
         _x86_64_lower.mc_sub_imm_to_reg_x64(VM_REGISTER_ESP, resize);
+    }
+
+    int count = 0;
+    for (int i = VM_REGISTER_MAX; i < VM_REGISTER_MAX + VM_SSE_REGISTER_MAX; i++)
+    {
+        if (!allocator.isVolatile(i) && allocator.isRegisterSet(i))
+        {
+            _x86_64_lower.mc_movsd_reg_to_memory_x64(VM_REGISTER_ESP, i - VM_REGISTER_MAX, resize - 8 * count - 8 - 32/*register homes*/);
+            count++;
+        }
     }
 }
 
@@ -1281,7 +1376,7 @@ void poAsm::emitJump(po_x86_64_basic_block* bb)
         const int jumpType = bb->instructions().back().opcode();
 
         /* Insert after we have got the position */
-        if (jumpType == IR_JUMP_UNCONDITIONAL)
+        if (jumpType == VMI_J32)
         {
             _x86_64.mc_jump_unconditional(0);
         }
@@ -1300,37 +1395,49 @@ void poAsm::emitJump(po_x86_64_basic_block* bb)
     }
 }
 
-void poAsm::generateEpilogue(poRegLinear& linear)
+void poAsm::generateEpilogue(PO_ALLOCATOR& allocator)
 {
-    // Pop all non-volatile general purpose registers which are used (in backwards order)
+    // Calculate how many non-volatile registers we need to pop
     int numToPop = 0;
     for (int i = VM_REGISTER_MAX - 1; i >= 0; i--)
     {
-        if (!linear.isVolatile(i) && linear.isRegisterSet(i))
+        if (!allocator.isVolatile(i) && allocator.isRegisterSet(i))
         {
             numToPop++;
         }
     }
 
     const int size = _prologueSize - 8 * numToPop;
+
+    int count = 0;
+    for (int i = VM_REGISTER_MAX; i < VM_REGISTER_MAX + VM_SSE_REGISTER_MAX; i++)
+    {
+        if (!allocator.isVolatile(i) && allocator.isRegisterSet(i))
+        {
+            _x86_64_lower.mc_movsd_memory_to_reg_x64(i - VM_REGISTER_MAX, VM_REGISTER_ESP, size - 8 * count - 8 - 32/*register homes*/);
+            count++;
+        }
+    }
+
     if (size > 0)
     {
         _x86_64_lower.mc_add_imm_to_reg_x64(VM_REGISTER_ESP, size);
     }
 
+    // Pop all non-volatile general purpose registers which are used (in backwards order)
     for (int i = VM_REGISTER_MAX - 1; i >= 0; i--)
     {
-        if (!linear.isVolatile(i) && linear.isRegisterSet(i))
+        if (!allocator.isVolatile(i) && allocator.isRegisterSet(i))
         {
             _x86_64_lower.mc_pop_reg(i);
         }
     }
 }
 
-void poAsm::dump(const poRegLinear& linear, poRegLinearIterator& iterator, poFlowGraph& cfg)
+void poAsm::dump(const PO_ALLOCATOR& allocator, poRegLinearIterator& iterator, poFlowGraph& cfg)
 {
     std::cout << "###############" << std::endl;
-    std::cout << "Stack Size: " << linear.stackSize() << std::endl;
+    std::cout << "Stack Size: " << allocator.stackSize() << std::endl;
 
     poBasicBlock* bb = cfg.getFirst();
     int index = 0;
@@ -1343,20 +1450,20 @@ void poAsm::dump(const poRegLinear& linear, poRegLinearIterator& iterator, poFlo
        {
            poRegSpill spill;
            int spillPos = 0;
-           while (linear.spillAt(pos, spillPos++, &spill))
+           while (allocator.spillAt(pos, spillPos++, &spill))
            {
                std::cout << "SPILL r" << spill.spillRegister() << ":s" << spill.spillStackSlot() << " var:" << spill.spillVariable() << std::endl;
            }
 
            poRegRestore restore;
            int restorePos = 0;
-           while (linear.restoreAt(pos, restorePos++, &restore))
+           while (allocator.restoreAt(pos, restorePos++, &restore))
            {
                std::cout << "RESTORE r" << restore.restoreRegister() << ":s" << restore.restoreStackSlot() << " var:" << restore.restoreVariable() << std::endl;
            }
 
            const poInstruction& ins = bb->getInstruction(i);
-           int reg = linear.getRegisterByVariable(ins.name());
+           int reg = allocator.getRegisterByVariable(ins.name());
            if (reg != -1)
            {
                std::cout << ins.name() << " r" << reg << " var:" << ins.name() << std::endl;
@@ -1376,79 +1483,98 @@ void poAsm::dump(const poRegLinear& linear, poRegLinearIterator& iterator, poFlo
     std::cout << "###############" << std::endl;
 }
 
-void poAsm::spill(poRegLinear& linear, const int pos)
+void poAsm::spill(PO_ALLOCATOR& allocator, const int pos)
 {
     poRegSpill spill;
     int spillPos = 0;
-    while (linear.spillAt(pos, spillPos++, &spill))
+    while (allocator.spillAt(pos, spillPos++, &spill))
     {
         const int slot = spill.spillStackSlot();
-        _x86_64_lower.mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, 8 * slot, spill.spillRegister());
+        if (spill.spillRegister() < VM_REGISTER_MAX)
+        {
+            _x86_64_lower.mc_mov_reg_to_memory_x64(VM_REGISTER_ESP, 8 * slot, spill.spillRegister());
+        }
+        else
+        {
+            _x86_64_lower.mc_movsd_reg_to_memory_x64(VM_REGISTER_ESP, spill.spillRegister() - VM_REGISTER_MAX, slot * 8);
+        }
     }
 }
 
-void poAsm::restore(poRegLinear& linear, const int pos)
+void poAsm::restore(PO_ALLOCATOR& allocator, const int pos)
 {
     /* if a variable we want to use has been spilled, we need to restore it */
 
     poRegRestore restore;
     int restorePos = 0;
-    while (linear.restoreAt(pos, restorePos++, &restore))
+    while (allocator.restoreAt(pos, restorePos++, &restore))
     {
         const int restoreSlot = restore.restoreStackSlot();
         if (restoreSlot != -1)
         {
-            _x86_64_lower.mc_mov_memory_to_reg_x64(restore.restoreRegister(), VM_REGISTER_ESP, restoreSlot * 8);
+            if (restore.restoreRegister() < VM_REGISTER_MAX)
+            {
+                _x86_64_lower.mc_mov_memory_to_reg_x64(restore.restoreRegister(), VM_REGISTER_ESP, restoreSlot * 8);
+            }
+            else
+            {
+                _x86_64_lower.mc_movsd_memory_to_reg_x64(restore.restoreRegister() - VM_REGISTER_MAX, VM_REGISTER_ESP, restoreSlot * 8);
+            }
         }
     }
 }
 
 void poAsm::generate(poModule& module, poFlowGraph& cfg, const int numArgs)
 {
-    poRegLinear linear(module);
-    linear.setNumRegisters(VM_REGISTER_MAX + VM_SSE_REGISTER_MAX);
+    PO_ALLOCATOR allocator(module);
+    allocator.setNumRegisters(VM_REGISTER_MAX + VM_SSE_REGISTER_MAX);
     
-    linear.setVolatile(VM_REGISTER_ESP, true);
-    linear.setVolatile(VM_REGISTER_EBP, true);
-    linear.setVolatile(VM_REGISTER_EAX, true);
-    linear.setVolatile(VM_REGISTER_R10, true);
-    linear.setVolatile(VM_REGISTER_R11, true);
+    allocator.setVolatile(VM_REGISTER_ESP, true);
+    allocator.setVolatile(VM_REGISTER_EBP, true);
+    allocator.setVolatile(VM_REGISTER_EAX, true);
+    allocator.setVolatile(VM_REGISTER_R10, true);
+    allocator.setVolatile(VM_REGISTER_R11, true);
 
-    linear.setVolatile(VM_ARG1, true);
-    linear.setVolatile(VM_ARG2, true);
-    linear.setVolatile(VM_ARG3, true);
-    linear.setVolatile(VM_ARG4, true);
+    allocator.setVolatile(VM_ARG1, true);
+    allocator.setVolatile(VM_ARG2, true);
+    allocator.setVolatile(VM_ARG3, true);
+    allocator.setVolatile(VM_ARG4, true);
 
 #if VM_MAX_ARGS == 6
-    linear.setVolatile(VM_ARG5, true);
-    linear.setVolatile(VM_ARG6, true);
+    allocator.setVolatile(VM_ARG5, true);
+    allocator.setVolatile(VM_ARG6, true);
 #endif
 
-    linear.setVolatile(VM_SSE_ARG1 + VM_REGISTER_MAX, true);
-    linear.setVolatile(VM_SSE_ARG2 + VM_REGISTER_MAX, true);
-    linear.setVolatile(VM_SSE_ARG3 + VM_REGISTER_MAX, true);
-    linear.setVolatile(VM_SSE_ARG4 + VM_REGISTER_MAX, true);
+    allocator.setVolatile(VM_SSE_ARG1 + VM_REGISTER_MAX, true);
+    allocator.setVolatile(VM_SSE_ARG2 + VM_REGISTER_MAX, true);
+    allocator.setVolatile(VM_SSE_ARG3 + VM_REGISTER_MAX, true);
+    allocator.setVolatile(VM_SSE_ARG4 + VM_REGISTER_MAX, true);
+
+#ifdef _WIN32
+    allocator.setVolatile(VM_SSE_REGISTER_XMM4 + VM_REGISTER_MAX, true);
+    allocator.setVolatile(VM_SSE_REGISTER_XMM5 + VM_REGISTER_MAX, true);
+#endif
 
 #if VM_MAX_SSE_ARGS == 8
-    linear.setVolatile(VM_SSE_ARG5 + VM_REGISTER_MAX, true);
-    linear.setVolatile(VM_SSE_ARG6 + VM_REGISTER_MAX, true);
-    linear.setVolatile(VM_SSE_ARG7 + VM_REGISTER_MAX, true);
-    linear.setVolatile(VM_SSE_ARG8 + VM_REGISTER_MAX, true);
+    allocator.setVolatile(VM_SSE_ARG5 + VM_REGISTER_MAX, true);
+    allocator.setVolatile(VM_SSE_ARG6 + VM_REGISTER_MAX, true);
+    allocator.setVolatile(VM_SSE_ARG7 + VM_REGISTER_MAX, true);
+    allocator.setVolatile(VM_SSE_ARG8 + VM_REGISTER_MAX, true);
 #endif
 
     for (int i = 0; i < VM_REGISTER_MAX + VM_SSE_REGISTER_MAX; i++)
     {
-        linear.setType(i, i < VM_REGISTER_MAX ? poRegType::General : poRegType::SSE);
+        allocator.setType(i, i < VM_REGISTER_MAX ? poRegType::General : poRegType::SSE);
     }
 
-    linear.allocateRegisters(cfg);
+    allocator.allocateRegisters(cfg);
     
     scanBasicBlocks(cfg);
     
-    linear.iterator().reset();
-    dump(linear, linear.iterator(), cfg);
+    allocator.iterator().reset();
+    dump(allocator, allocator.iterator(), cfg);
 
-    linear.iterator().reset();
+    allocator.iterator().reset();
 
     // Lower into machine code cfg
     // 
@@ -1457,7 +1583,7 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg, const int numArgs)
     _x86_64_lower.cfg().addBasicBlock(asmBB);
 
     // Prologue
-    generatePrologue(linear);
+    generatePrologue(allocator);
 
     int pos = 0;
     poBasicBlock* bb = cfg.getFirst();
@@ -1476,43 +1602,45 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg, const int numArgs)
 
             assert(ins.code() != IR_ARG); // args are handled in the call
             
-            spill(linear, pos);
-            restore(linear, pos);
+#ifdef REG_LINEAR
+            spill(allocator, pos);
+#endif
+            restore(allocator, pos);
 
             switch (ins.code())
             {
             case IR_ELEMENT_PTR:
-                ir_element_ptr(module, linear, ins);
+                ir_element_ptr(module, allocator, ins);
                 break;
             case IR_PTR:
-                ir_ptr(module, linear, ins);
+                ir_ptr(module, allocator, ins);
                 break;
             case IR_LOAD:
-                ir_load(linear, ins);
+                ir_load(allocator, ins);
                 break;
             case IR_STORE:
-                ir_store(linear, ins);
+                ir_store(allocator, ins);
                 break;
             case IR_SIGN_EXTEND:
-                ir_sign_extend(linear, ins);
+                ir_sign_extend(allocator, ins);
                 break;
             case IR_ZERO_EXTEND:
-                ir_zero_extend(linear, ins);
+                ir_zero_extend(allocator, ins);
                 break;
             case IR_BITWISE_CAST:
-                ir_bitwise_cast(linear, ins);
+                ir_bitwise_cast(allocator, ins);
                 break;
             case IR_CONVERT:
-                ir_convert(linear, ins);
+                ir_convert(allocator, ins);
                 break;
             case IR_ADD:
-                ir_add(linear, ins);
+                ir_add(allocator, ins);
                 break;
             case IR_ARG:
                 // do nothing
                 continue;
             case IR_BR:
-                ir_br(linear, ins, bb);
+                ir_br(allocator, ins, bb);
                 break;
             case IR_CALL:
             {
@@ -1522,48 +1650,55 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg, const int numArgs)
                     args.push_back(instructions[i + j + 1]);
                 }
 
-                ir_call(module, linear, ins, pos, args);
+                ir_call(module, allocator, ins, pos, args);
+#ifdef REG_GRAPH
+                spill(allocator, pos); // do the spill for the call
+#endif
                 i += ins.left();
                 pos += ins.left();
-                linear.iterator().advance(ins.left());
+                allocator.iterator().advance(ins.left());
             }
                 break;
             case IR_CMP:
-                ir_cmp(linear, ins);
+                ir_cmp(allocator, ins);
                 break;
             case IR_CONSTANT:
-                ir_constant(module.constants(), linear, ins);
+                ir_constant(module, module.constants(), allocator, ins);
                 break;
             case IR_COPY:
-                ir_copy(linear, ins);
+                ir_copy(allocator, ins);
                 break;
             case IR_DIV:
-                ir_div(linear, ins);
+                ir_div(allocator, ins);
                 break;
             case IR_MUL:
-                ir_mul(linear, ins);
+                ir_mul(allocator, ins);
                 break;
             case IR_PARAM:
-                ir_param(module, linear, ins, numArgs);
+                ir_param(module, allocator, ins, numArgs);
                 break;
             case IR_PHI:
                 // do nothing
                 break;
             case IR_RETURN:
-                ir_ret(linear, ins);
+                ir_ret(module, allocator, ins);
                 break;
             case IR_SUB:
-                ir_sub(linear, ins);
+                ir_sub(allocator, ins);
                 break;
             case IR_UNARY_MINUS:
-                ir_unary_minus(linear, ins);
+                ir_unary_minus(allocator, ins);
                 break;
             }
 
-            pos++;
-            linear.iterator().next();
-        }
+#ifdef REG_GRAPH
+            spill(allocator, pos);
+#endif
 
+            pos++;
+            allocator.iterator().next();
+        }
+        
         bb = bb->getNext();
     }
 
@@ -1591,101 +1726,117 @@ void poAsm::generateMachineCode(poModule& module)
         for (auto& ins : asmBB->instructions())
         {
             const int pos = int(_x86_64.programData().size());
-            switch (ins.opcode())
+            if (ins.isSSE())
             {
-            case VMI_CALL:
-            case VMI_CALL_MEM:
-            {
-                const int symbol = ins.id();
-                std::string symbolName;
-                module.getSymbol(symbol, symbolName);
-
-                // Add patch for this call
-
-                _calls.push_back(poAsmCall(int(_x86_64.programData().size()), 0/*numArgs*/, symbolName));
-                _x86_64.mc_call(0); // Placeholder for the call
+                switch (ins.opcode())
+                {
+                case VMI_SSE_MOVSD_SRC_MEM_DST_REG:
+                    if (ins.id() != -1)
+                    {
+                        _x86_64.mc_movsd_memory_to_reg_x64(ins.dstReg(), 0);
+                        addInitializedData(constants.getF64(ins.id()), -int(sizeof(int32_t))); // insert patch
+                    }
+                    else
+                    {
+                        _x86_64.mc_movsd_memory_to_reg_x64(ins.dstReg(), ins.srcReg(), ins.imm32());
+                    }
+                    break;
+                case VMI_SSE_MOVSS_SRC_MEM_DST_REG:
+                    if (ins.id() != -1)
+                    {
+                        _x86_64.mc_movss_memory_to_reg_x64(ins.dstReg(), 0);
+                        addInitializedData(constants.getF32(ins.id()), -int(sizeof(int32_t))); // insert patch
+                    }
+                    else
+                    {
+                        _x86_64.mc_movss_memory_to_reg_x64(ins.dstReg(), ins.srcReg(), ins.imm32());
+                    }
+                    break;
+                default:
+                    _x86_64.emit(ins);
+                    break;
+                }
             }
-                break;
-            case VMI_SSE_MOVSD_SRC_MEM_DST_REG:
-                if (ins.id() != -1)
+            else
+            {
+                switch (ins.opcode())
                 {
-                    _x86_64.mc_movsd_memory_to_reg_x64(ins.dstReg(), 0);
-                    addInitializedData(constants.getF64(ins.id()), -int(sizeof(int32_t))); // insert patch
-                }
-                else
+                case VMI_CALL:
+                case VMI_CALL_MEM:
                 {
-                    _x86_64.mc_movsd_memory_to_reg_x64(ins.dstReg(), ins.srcReg(), ins.imm32());
-                }
-                break;
-            case VMI_SSE_MOVSS_SRC_MEM_DST_REG:
-                if (ins.id() != -1)
-                {
-                    _x86_64.mc_movss_memory_to_reg_x64(ins.dstReg(), 0);
-                    addInitializedData(constants.getF32(ins.id()), -int(sizeof(int32_t))); // insert patch
-                }
-                else
-                {
-                    _x86_64.mc_movss_memory_to_reg_x64(ins.dstReg(), ins.srcReg(), ins.imm32());
+                    const int symbol = ins.id();
+                    std::string symbolName;
+                    module.getSymbol(symbol, symbolName);
+
+                    // Add patch for this call
+
+                    _calls.push_back(poAsmCall(int(_x86_64.programData().size()), 0/*numArgs*/, symbolName));
+                    _x86_64.mc_call(0); // Placeholder for the call
                 }
                 break;
-            case VMI_PUSH_REG:
-                _x86_64.mc_push_reg(ins.dstReg());
-                break;
-            case VMI_POP_REG:
-                _x86_64.mc_pop_reg(ins.dstReg());
-                break;
-            case VMI_NEAR_RETURN:
-                _x86_64.mc_return();
-                break;
-            case VMI_ADD64_SRC_IMM_DST_REG:
-                _x86_64.mc_add_imm_to_reg_x64(ins.dstReg(), int(ins.imm64()));
-                break;
-            case VMI_MOV64_SRC_IMM_DST_REG:
-                _x86_64.mc_mov_imm_to_reg_x64(ins.dstReg(), ins.imm64());
-                break;
-            case VMI_SUB64_SRC_IMM_DST_REG:
-                _x86_64.mc_sub_imm_to_reg_x64(ins.dstReg(), int(ins.imm64()));
-                break;
-            case VMI_MOV32_SRC_IMM_DST_REG:
-                _x86_64.mc_mov_imm_to_reg_32(ins.dstReg(), ins.imm32());
-                break;
-            case VMI_MOV16_SRC_IMM_DST_REG:
-                _x86_64.mc_mov_imm_to_reg_16(ins.dstReg(), ins.imm16());
-                break;
-            case VMI_ADD8_SRC_IMM_DST_REG:
-                _x86_64.mc_add_imm_to_reg_8(ins.dstReg(), ins.imm8());
-                break;
-            case VMI_MOV8_SRC_IMM_DST_REG:
-                _x86_64.mc_mov_imm_to_reg_8(ins.dstReg(), ins.imm8());
-                break;
-            case VMI_SUB8_SRC_IMM_DST_REG:
-                _x86_64.mc_sub_imm_to_reg_8(ins.dstReg(), ins.imm8());
-                break;
-            case VMI_MOV8_SRC_REG_DST_MEM:
-                _x86_64.mc_mov_reg_to_memory_8(ins.dstReg(), ins.srcReg(), ins.imm32());
-                break;
-            case VMI_J8:
-            case VMI_JE8:
-            case VMI_JG8:
-            case VMI_JGE8:
-            case VMI_JL8:
-            case VMI_JLE8:
-            case VMI_J32:
-            case VMI_JE32:
-            case VMI_JG32:
-            case VMI_JGE32:
-            case VMI_JL32:
-            case VMI_JLE32:
-            case VMI_JNA32:
-            case VMI_JNB32:
-            case VMI_JNBE32:
-            case VMI_JNE32:
-            case VMI_JNAE32:
-                emitJump(asmBB);
-                break;
-            default:
-                _x86_64.emit(ins);
-                break;
+                case VMI_PUSH_REG:
+                    _x86_64.mc_push_reg(ins.dstReg());
+                    break;
+                case VMI_POP_REG:
+                    _x86_64.mc_pop_reg(ins.dstReg());
+                    break;
+                case VMI_NEAR_RETURN:
+                    _x86_64.mc_return();
+                    break;
+                case VMI_ADD64_SRC_IMM_DST_REG:
+                    _x86_64.mc_add_imm_to_reg_x64(ins.dstReg(), int(ins.imm64()));
+                    break;
+                case VMI_MOV64_SRC_IMM_DST_REG:
+                    _x86_64.mc_mov_imm_to_reg_x64(ins.dstReg(), ins.imm64());
+                    break;
+                case VMI_SUB64_SRC_IMM_DST_REG:
+                    _x86_64.mc_sub_imm_to_reg_x64(ins.dstReg(), int(ins.imm64()));
+                    break;
+                case VMI_MOV32_SRC_IMM_DST_REG:
+                    _x86_64.mc_mov_imm_to_reg_32(ins.dstReg(), ins.imm32());
+                    break;
+                case VMI_MOV16_SRC_IMM_DST_REG:
+                    _x86_64.mc_mov_imm_to_reg_16(ins.dstReg(), ins.imm16());
+                    break;
+                case VMI_ADD8_SRC_IMM_DST_REG:
+                    _x86_64.mc_add_imm_to_reg_8(ins.dstReg(), ins.imm8());
+                    break;
+                case VMI_MOV8_SRC_IMM_DST_REG:
+                    _x86_64.mc_mov_imm_to_reg_8(ins.dstReg(), ins.imm8());
+                    break;
+                case VMI_SUB8_SRC_IMM_DST_REG:
+                    _x86_64.mc_sub_imm_to_reg_8(ins.dstReg(), ins.imm8());
+                    break;
+                case VMI_MOV8_SRC_REG_DST_MEM:
+                    _x86_64.mc_mov_reg_to_memory_8(ins.dstReg(), ins.srcReg(), ins.imm32());
+                    break;
+                case VMI_LEA64_SRC_REG_DST_REG:
+                    _x86_64.mc_lea_reg_to_reg_x64(ins.dstReg(), 0);
+                    addInitializedData(constants.getString(ins.id()), -int(sizeof(int32_t))); // insert patch
+                    break;
+                case VMI_J8:
+                case VMI_JE8:
+                case VMI_JG8:
+                case VMI_JGE8:
+                case VMI_JL8:
+                case VMI_JLE8:
+                case VMI_J32:
+                case VMI_JE32:
+                case VMI_JG32:
+                case VMI_JGE32:
+                case VMI_JL32:
+                case VMI_JLE32:
+                case VMI_JNA32:
+                case VMI_JNB32:
+                case VMI_JNBE32:
+                case VMI_JNE32:
+                case VMI_JNAE32:
+                    emitJump(asmBB);
+                    break;
+                default:
+                    _x86_64.emit(ins);
+                    break;
+                }
             }
         }
     }
@@ -1770,6 +1921,17 @@ void poAsm::addInitializedData(const double f64, const int programDataOffset)
     _initializedData.push_back((data >> 40) & 0xFF);
     _initializedData.push_back((data >> 48) & 0xFF);
     _initializedData.push_back((data >> 56) & 0xFF);
+}
+
+void poAsm::addInitializedData(const std::string& str, const int programDataOffset)
+{
+    _constants.push_back(poAsmConstant(int(_initializedData.size()), int(_x86_64.programData().size() + programDataOffset)));
+
+    for (char c : str)
+    {
+        _initializedData.push_back(c);
+    }
+    _initializedData.push_back(0); // null terminator
 }
 
 void poAsm::patchCalls()

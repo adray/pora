@@ -12,6 +12,7 @@ namespace Example
     
     static foo test(foo f)
     {
+        print_64((i64)f.x);
         return f;
     }
 
@@ -20,5 +21,6 @@ namespace Example
         foo f;
         f.x = 10b;
         foo p = test(f);
+        print_64((i64)p.x);
     }
 }

@@ -1,0 +1,43 @@
+import std;
+
+namespace Example {
+
+    static f64 stress_fp(i64 cond1, i64 cond2, i64 cond3) {
+        // Lots of live FP variables to exceed the available FP registers
+        f64 a = 1.1; f64 b = 2.2; f64 c = 3.3; f64 d = 4.4; f64 e = 5.5;
+        f64 f = 6.6; f64 g = 7.7; f64 h = 8.8; f64 i = 9.9; f64 j = 10.1;
+        f64 result = 0.0;
+
+        if (cond1==1) {
+            a = b * c;
+            d = e + f;
+            if (cond2==1) {
+                g = a / d;
+                h = b - e;
+            } else {
+                g = c + f;
+                h = d * a;
+            }
+            result = result + g + h;
+        } else {
+            b = a + j;
+            if (cond3==1) {
+                c = b * i;
+                e = d - f;
+            } else {
+                c = g / (h + 1.0);  // reuse g,h to stretch live ranges
+                e = i * j;
+            }
+            result = result + c + e;
+        }
+
+        // All FP variables are still live here ? big join point
+        result = result + a + b + c + d + e + f + g + h + i + j;
+        return result; // 252.452000
+    }
+
+    static void main() {
+        print_64((i64)stress_fp(1, 0, 1));
+    }
+
+}

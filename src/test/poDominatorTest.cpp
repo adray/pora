@@ -246,10 +246,52 @@ static void dominatorTest4()
     }
 }
 
+static void dominatorTest5()
+{
+    // Test the iterated dominance frontier is correct
+    std::cout << "Dominator Test #5";
+    
+    poBasicBlock* bb_a = new poBasicBlock();
+    poBasicBlock* bb_b = new poBasicBlock();
+    poBasicBlock* bb_c = new poBasicBlock();
+    poBasicBlock* bb_d = new poBasicBlock();
+
+    bb_a->setBranch(bb_c, true);
+    bb_b->setBranch(bb_d, false);
+    bb_c->setBranch(bb_b, false);
+
+    poFlowGraph cfg;
+    cfg.addBasicBlock(bb_a);
+    cfg.addBasicBlock(bb_b);
+    cfg.addBasicBlock(bb_c);
+    cfg.addBasicBlock(bb_d);
+
+    poDom dom;
+    dom.compute(cfg);
+    
+    std::unordered_set<int> idf;
+    dom.iteratedDominanceFrontier({ 1 }, idf);
+    
+    const bool success =
+        idf.size() == 2 &&
+        idf.find(2) != idf.end() &&
+        idf.find(3) != idf.end();
+
+    if (success)
+    {
+        std::cout << " OK" << std::endl;
+    }
+    else
+    {
+        std::cout << " FAILED " << std::endl;
+    }
+}
+
 void po::runDominatorTests()
 {
     dominatorTest1();
     dominatorTest2();
     dominatorTest3();
     dominatorTest4();
+    dominatorTest5();
 }

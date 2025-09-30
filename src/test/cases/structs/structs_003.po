@@ -20,5 +20,6 @@ namespace Example
         foo f;
         f.x = 10b;
         f.y = test(f);
+        print_64((i64)f.y);
     }
 }

@@ -60,6 +60,9 @@ namespace po
         poNode* parseStatement();
         poNode* parseExpressionStatement();
 
+        void fixupExpression(poNode* node);
+        poNode* insertCompare(poNode* node);
+
         poParser& _parser;
     };
 

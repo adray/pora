@@ -8,8 +8,11 @@ namespace Example
         {
             if (i == 50)
             {
+                print_64(i);
                 break;
             }
-        }        
+        }
+        
+        println("The end", (u32)8);
     }
 }

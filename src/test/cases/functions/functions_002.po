@@ -10,7 +10,10 @@ namespace Example
 
     static void main()
     {
-        f64 y = test(10.2, 5.3);
+        f64 y = test(10.2, 5.2);
         f64 p = test(20.1, 6.2);
+        
+        print_64((i64)y);
+        print_64((i64)p);
     }
 }

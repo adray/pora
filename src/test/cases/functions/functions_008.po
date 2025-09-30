@@ -1,0 +1,25 @@
+import std;
+
+namespace Example
+{
+    static f32 test(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g)
+    {
+        return e;
+    }
+
+    static f32 test2(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g)
+    {
+        return f;
+    }
+
+    static void main()
+    {
+        f32 x = test(0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f);
+        
+        print_64((i64)x);
+        
+        x = test2(0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f);
+        
+        print_64((i64)x);
+    }
+}

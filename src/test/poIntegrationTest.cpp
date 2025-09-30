@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <fstream>
 
 #ifdef WIN32
 #include <Windows.h>
@@ -15,25 +16,49 @@ static void safeClose(HANDLE handle)
     }
 }
 
-static bool executeCommand(const std::string& args)
+static bool executeCommand(const std::string& args, bool redirectOutput)
 {
+    HANDLE hStdOut = nullptr;
+    if (redirectOutput)
+    {
+        SECURITY_ATTRIBUTES sa = {};
+        sa.bInheritHandle = TRUE;
+        sa.lpSecurityDescriptor = nullptr;
+        sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+
+        hStdOut = CreateFileA(
+            "output.txt",
+            GENERIC_WRITE,
+            FILE_SHARE_WRITE,
+            &sa,
+            CREATE_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL,
+            nullptr);
+        if (hStdOut == INVALID_HANDLE_VALUE)
+        {
+            return false;
+        }
+    }
+
     STARTUPINFOA si = {};
     PROCESS_INFORMATION pi = {};
 
     si.cb = sizeof(si);
-
-    HRESULT res = CreateProcess(
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdOutput = hStdOut;
+    
+    BOOL res = CreateProcess(
         nullptr,
         const_cast<char*>(args.c_str()),
         nullptr,
         nullptr,
-        FALSE,
-        CREATE_NO_WINDOW,
+        TRUE,
+        0,//CREATE_NO_WINDOW,
         nullptr,
         nullptr,
         &si,
         &pi);
-    if (FAILED(res))
+    if (!res)
     {
         return false;
     }
@@ -48,11 +73,12 @@ static bool executeCommand(const std::string& args)
 
     safeClose(pi.hProcess);
     safeClose(pi.hThread);
+    safeClose(hStdOut);
 
     return WAIT_TIMEOUT != result;
 }
 #else
-static bool executeCommand(const std::string& args)
+static bool executeCommand(const std::string& args, bool redirectOutput)
 {
     // TODO
 }
@@ -61,7 +87,86 @@ static bool executeCommand(const std::string& args)
 
 using namespace po;
 
-static void runIntegrationTest(const std::string& name, const std::string& path, const std::string& compiler, const std::string& std)
+static bool compareOutput(const std::string& sourceFile, const std::string& actualFile, const bool interactive)
+{
+    std::ifstream sourceStream(sourceFile);
+    std::ifstream actualStream(actualFile);
+
+    if (!actualStream.is_open())
+    {
+        if (interactive)
+        {
+            std::cout << "Unable to open " << actualFile << std::endl;
+        }
+        return false;
+    }
+
+    bool failed = false;
+    if (!sourceStream.is_open())
+    {
+        if (interactive)
+        {
+            std::cout << "Unable to open " << sourceFile << std::endl;
+        }
+        failed = true;
+    }
+
+    std::string expected;
+    std::string actual;
+    while (!failed)
+    {
+        if (sourceStream.eof() && actualStream.eof())
+        {
+            break;
+        }
+        else if (sourceStream.eof() != actualStream.eof())
+        {
+            failed = true;
+            break;
+        }
+
+        std::getline(sourceStream, expected);
+        std::getline(actualStream, actual);
+        
+        if (expected != actual)
+        {
+            failed = true;
+
+            if (interactive)
+            {
+                std::cout << "Output mismatch:" << std::endl;
+                std::cout << "Expected: " << expected << std::endl;
+                std::cout << "Actual:   " << actual << std::endl;
+            }
+        }
+    }
+
+    if (failed)
+    {
+        if (interactive)
+        {
+            std::cout << "Accept output? (y/n): ";
+
+            std::string line;
+            do
+            {
+                std::getline(std::cin, line);
+            } while (line != "y" && line != "n");
+
+            if (line == "y")
+            {
+                std::filesystem::copy(actualFile, sourceFile, std::filesystem::copy_options::overwrite_existing);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    return true;
+}
+
+static void runIntegrationTest(const std::string& name, const std::string& path, const std::string& compiler, const std::string& std, const bool interactive)
 {
     std::cout << "Integration Test " << name;
 
@@ -75,7 +180,7 @@ static void runIntegrationTest(const std::string& name, const std::string& path,
         " \"" << std << "\\os.po" << "\""
         " \"" << std << "\\io.po" << "\""
         ;
-    if (!executeCommand(ss.str()))
+    if (!executeCommand(ss.str(), false))
     {
         std::cout << " FAILED: compiler timed out or failed to start." << std::endl;
         return;
@@ -83,11 +188,18 @@ static void runIntegrationTest(const std::string& name, const std::string& path,
 
     if (std::filesystem::exists("app.exe"))
     {
-        if (executeCommand("app.exe"))
+        if (executeCommand("app.exe", true))
         {
-            /* TODO: Test that the application output is what is expected... */
+            /* Test that the application output is what is expected... */
 
-            std::cout << " SUCCESS" << std::endl;
+            if (compareOutput(path + ".out", "output.txt", interactive))
+            {
+                std::cout << " SUCCESS" << std::endl;
+            }
+            else
+            {
+                std::cout << " FAILED: output mismatch." << std::endl;
+            }
         }
         else
         {
@@ -100,7 +212,7 @@ static void runIntegrationTest(const std::string& name, const std::string& path,
     }
 }
 
-void po::runIntegrationTests(const std::string& testDir, const std::string& compiler, const std::string& std)
+void po::runIntegrationTests(const std::string& testDir, const std::string& compiler, const std::string& std, const bool interactive)
 {
     std::filesystem::path rootDir(testDir);
     if (std::filesystem::exists(rootDir))
@@ -116,7 +228,7 @@ void po::runIntegrationTests(const std::string& testDir, const std::string& comp
                     const auto& path = test.path();
                     if (path.extension() == ".po")
                     {
-                        runIntegrationTest(path.filename().string(), path.string(), compiler, std);
+                        runIntegrationTest(path.filename().string(), path.string(), compiler, std, interactive);
                     }
                 }
             }

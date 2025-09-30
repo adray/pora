@@ -1,0 +1,41 @@
+import std;
+
+namespace Example {
+    static i64 stress_test(boolean cond1, boolean cond2, boolean cond3) {
+        // Force many live variables
+        i64 a = 1; i64 b = 2; i64 c = 3; i64 d = 4; i64 e = 5;
+        i64 f = 6; i64 g = 7; i64 h = 8; i64 i = 9; i64 j = 10;
+        i64 result = 0;
+
+        if (cond1) {
+            a = b + c; // 5
+            d = e + f; // 11
+            if (cond2) {
+                g = a + d;
+                h = b + e;
+            } else {
+                g = c + f; // 9
+                h = d + a; // 16
+            }
+            result = result + g + h; // 25
+        } else {
+            b = a + j;
+            if (cond3) {
+                c = b + i;
+                e = d + f;
+            } else {
+                c = g + h;
+                e = i + j;
+            }
+            result = result + c + e;
+        }
+
+        // Many of the above variables are live here -> join point stress
+        result = result + a + b + c + d + e + f + g + h + i + j; // 25 + 5 + 2 + 3 + 11 + 5 + 6 + 9 + 16 + 9 + 10 = 101
+        return result;
+    }
+
+    static void main() {
+        print_64(stress_test(true, false, true));
+    }
+}

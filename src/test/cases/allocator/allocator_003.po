@@ -1,0 +1,62 @@
+import std;
+
+namespace Example {
+    static i64 loop_stress(i64 n, boolean c1, boolean c2) {
+        // Force lots of live variables
+        i64 a=1; i64 b=2; i64 c=3; i64 d=4; i64 e=5;
+        i64 f=6; i64 g=7; i64 h=8; i64 i=9; i64 j=10;
+        i64 k=11; i64 l=12; i64 m=13; i64 n1=14; i64 o=15;
+        i64 p=16; i64 q=17; i64 r=18; i64 s=19; i64 t=20;
+        i64 u=21; i64 v=22; i64 w=23; i64 x=24; i64 y=25;
+
+        i64 result = 0;
+
+        for (i64 iter = 0; iter < n; iter = iter + 1) {
+            // Heavy nested conditionals inside loop
+            if ((iter / 2)*2 != iter && c1) {
+                a = b + c + d;
+                e = f + g;
+                if (c2==true) {
+                    h = a + e + i;
+                    j = h + k;
+                    l = j + m;
+                } else {
+                    h = d + g + l;
+                    j = e + f;
+                    l = h + j;
+                }
+                result = result + h + j + l;
+            } else {
+                m = n1 + o + p;
+                q = r + s;
+                if ((iter / 3) *3== iter) {
+                    t = m + q;
+                    u = t + v;
+                    w = u + x;
+                } else {
+                    t = o + p;
+                    u = r + s;
+                    w = t + u;
+                }
+                result = result + m + q + t + u + w;
+            }
+
+            // Use many variables in the loop body to keep them live
+            result =result+ a+b+c+d+e+f+g+h+i+j;
+            result =result+ k+l+m+n1+o+p+q+r+s+t;
+            result =result+ u+v+w+x+y;
+        }
+
+        // Final join point — all variables still live
+        result =result+ a+b+c+d+e+f+g+h+i+j;
+        result =result+ k+l+m+n1+o+p+q+r+s+t;
+        result =result+ u+v+w+x+y;
+
+        return result; // 10017
+    }
+
+    static void main() {
+        print_64(loop_stress(10, true, false));
+    }
+
+}

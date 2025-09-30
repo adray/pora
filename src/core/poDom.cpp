@@ -233,6 +233,59 @@ void poDom::computeImmediateDominators()
     }
 }
 
+void poDom::iteratedDominanceFrontier(const std::vector<int>& id, std::unordered_set<int>& nodes) const
+{
+    for (const int i : id)
+    {
+        const poDomNode& node = _nodes[i];
+
+        for (const int df : node.dominanceFrontier())
+        {
+            nodes.insert(df);
+        }
+    }
+
+    bool changes = true;
+    while (changes)
+    {
+        std::vector<int> copy(nodes.begin(), nodes.end());
+
+        for (const int i : id)
+        {
+            nodes.insert(i);
+        }
+
+        std::vector<int> currentNodes(nodes.begin(), nodes.end());
+        nodes.clear();
+        for (const int n : currentNodes)
+        {
+            const poDomNode& node = _nodes[n];
+            for (const int df : node.dominanceFrontier())
+            {
+                nodes.insert(df);
+            }
+        }
+        
+        if (copy.size() == nodes.size())
+        {
+            bool allFound = true;
+            for (int i = 0; i < copy.size(); i++)
+            {
+                if (nodes.find(copy[i]) == nodes.end())
+                {
+                    allFound = false;
+                    break;
+                }
+            }
+            
+            if (allFound)
+            {
+                changes = false;
+            }
+        }
+    }
+}
+
 void poDom::compute(poFlowGraph& cfg)
 {
     _nodes.clear();

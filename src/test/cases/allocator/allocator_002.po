@@ -1,0 +1,66 @@
+import std;
+
+namespace Example {
+    static i64 mega_stress(boolean c1, boolean c2, boolean c3, boolean c4, boolean c5) {
+        // Force high register pressure
+        i64 a=1; i64 b=2; i64 c=3; i64 d=4; i64 e=5;
+        i64 f=6; i64 g=7; i64 h=8; i64 i=9; i64 j=10;
+        i64 k=11; i64 l=12; i64 m=13; i64 n=14; i64 o=15;
+        i64 p=16; i64 q=17; i64 r=18; i64 s=19; i64 t=20;
+        i64 u=21; i64 v=22; i64 w=23; i64 x=24; i64 y=25;
+
+        i64 result = 0;
+
+        if (c1) {
+            a = b + c + d; // a=9
+            e = f + g; // e=13
+            if (c2) {
+                h = a + e;
+                i = h + j;
+                k = i + l;
+            } else {
+                h = d + g; // h=11
+                i = e + f; // i=11
+                k = h + i; // k=17
+            }
+            result = result + h + i + k; // result=11+11+17=39
+        } else if (c3) {
+            l = m + n;
+            o = p + q;
+            if (c4) {
+                r = l + o;
+                s = r + t;
+                u = s + v;
+            } else {
+                r = n + q;
+                s = o + p;
+                u = r + s;
+            }
+            result = result + l + o + r + s + u;
+        } else {
+            v = w + x;
+            y = v + a;
+            if (c5) {
+                b = y + c;
+                d = b + f;
+                g = d + h;
+            } else {
+                b = x + y;
+                d = g + i;
+                g = j + k;
+            }
+            result = result + b + d + g + y;
+        }
+
+        // Big join poi64: all variables live here
+        result = result + a+b+c+d+e+f+g+h+i+j;
+        result = result + k+l+m+n+o+p+q+r+s+t;
+        result = result + u+v+w+x+y;
+
+        return result; // 433
+    }
+
+    static void main() {
+        print_64(mega_stress(true,false,true,false,true));
+    }
+}

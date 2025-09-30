@@ -664,6 +664,40 @@ poNode* poFunctionParser::parseFor()
     return new poUnaryNode(poNodeType::STATEMENT, new poListNode(poNodeType::BODY, children, forStatement), forStatement);
 }
 
+poNode* poFunctionParser::insertCompare(poNode* node)
+{
+    poToken expr = node->token();
+    poNode* compare = new poBinaryNode(poNodeType::CMP_EQUALS,
+        node,
+        new poConstantNode(poNodeType::CONSTANT, poToken(poTokenType::TRUE, expr.string(), expr.line(), expr.column())),
+        expr);
+    return compare;
+}
+
+void poFunctionParser::fixupExpression(poNode* node)
+{
+    if (node->type() == poNodeType::AND ||
+        node->type() == poNodeType::OR)
+    {
+        poBinaryNode* binary = static_cast<poBinaryNode*>(node);
+        if (binary->left()->type() == poNodeType::VARIABLE ||
+            binary->left()->type() == poNodeType::CONSTANT)
+        {
+            poNode* compare = insertCompare(binary->left());
+            binary->setLeft(compare);
+        }
+        if (binary->right()->type() == poNodeType::VARIABLE ||
+            binary->left()->type() == poNodeType::CONSTANT)
+        {
+            poNode* compare = insertCompare(binary->right());
+            binary->setRight(compare);
+        }
+
+        fixupExpression(binary->left());
+        fixupExpression(binary->right());
+    }
+}
+
 poNode* poFunctionParser::parseIfStatement(const bool isLoop)
 {
     std::vector<poNode*> children;
@@ -677,7 +711,26 @@ poNode* poFunctionParser::parseIfStatement(const bool isLoop)
         {
             _parser.advance();
 
-            children.push_back(new poUnaryNode(poNodeType::STATEMENT, parseExpression(), expr));
+            if ((_parser.match(poTokenType::IDENTIFIER) ||
+                _parser.match(poTokenType::TRUE) ||
+                _parser.match(poTokenType::FALSE)) &&
+                _parser.lookahead(poTokenType::CLOSE_PARAN, 0))
+            {
+                poNode* expression = parseExpression();
+                poNode* compare = new poBinaryNode(poNodeType::CMP_EQUALS,
+                    expression,
+                    new poConstantNode(poNodeType::CONSTANT, poToken(poTokenType::TRUE, expr.string(), expr.line(), expr.column())),
+                    expr);
+
+                children.push_back(new poUnaryNode(poNodeType::STATEMENT, compare, expr));
+            }
+            else
+            {
+                poNode* expression = parseExpression();
+                fixupExpression(expression);
+
+                children.push_back(new poUnaryNode(poNodeType::STATEMENT, expression, expr));
+            }
 
             if (_parser.match(poTokenType::CLOSE_PARAN))
             {

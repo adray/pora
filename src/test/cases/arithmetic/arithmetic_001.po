@@ -6,5 +6,8 @@ namespace Example
     {
         i32 x = (i32)6;
         i32 y = x + (i32)10 * -(i32)7;
+        
+        print_64((i64)x);
+        print_64((i64)y);
     }
 }

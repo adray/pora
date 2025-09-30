@@ -7,15 +7,30 @@
 #include <unordered_map>
 #include <unordered_set>
 
+// Choose the register allocator to use here
+
+#define REG_GRAPH
+//#define REG_LINEAR
+
+#ifdef REG_LINEAR
+#define PO_ALLOCATOR poRegLinear
+#endif
+#ifdef REG_GRAPH
+#define PO_ALLOCATOR poRegGraph
+#endif
+#ifndef PO_ALLOCATOR
+#error "No register allocator defined"
+#endif
+
 namespace po
 {
     class poFlowGraph;
     class poModule;
     class poInstruction;
-    class poRegLinear;
     class poRegLinearIterator;
     class poConstantPool;
     class poBasicBlock;
+    class PO_ALLOCATOR;
 
     class poAsmCopy
     {
@@ -101,10 +116,10 @@ namespace po
         inline const std::string& errorText() const { return _errorText; }
 
     private:
-        void dump(const poRegLinear& linear, poRegLinearIterator& iterator, poFlowGraph& cfg);
+        void dump(const PO_ALLOCATOR& linear, poRegLinearIterator& iterator, poFlowGraph& cfg);
 
-        void spill(poRegLinear& linear, const int pos);
-        void restore(poRegLinear& linear, const int pos);
+        void spill(PO_ALLOCATOR& linear, const int pos);
+        void restore(PO_ALLOCATOR& linear, const int pos);
 
         void generate(poModule& module, poFlowGraph& cfg, const int numArgs);
         void generateMachineCode(poModule& module);
@@ -113,11 +128,12 @@ namespace po
         void scanBasicBlocks(poFlowGraph& cfg);
         void patchJump(po_x86_64_basic_block* jump);
         void patchCalls();
-        void generatePrologue(poRegLinear& linear);
-        void generateEpilogue(poRegLinear& linear);
+        void generatePrologue(PO_ALLOCATOR& linear);
+        void generateEpilogue(PO_ALLOCATOR& linear);
         void setError(const std::string& errorText);
         void addInitializedData(const float f32, const int programDataOffset);
         void addInitializedData(const double f64, const int programDataOffset);
+        void addInitializedData(const std::string& str, const int programDataOffset);
 
         void emitJump(po_x86_64_basic_block* bb);
 
@@ -125,26 +141,26 @@ namespace po
         // IR to machine code routines
         //=====================================
 
-        void ir_element_ptr(poModule& module, poRegLinear& linear, const poInstruction& ins);
-        void ir_ptr(poModule& module, poRegLinear& linear, const poInstruction& ins);
-        void ir_store(poRegLinear& linear, const poInstruction& ins);
-        void ir_load(poRegLinear& linear, const poInstruction& ins);
-        void ir_zero_extend(poRegLinear& linear, const poInstruction& ins);
-        void ir_sign_extend(poRegLinear& linear, const poInstruction& ins);
-        void ir_bitwise_cast(poRegLinear& linear, const poInstruction& ins);
-        void ir_convert(poRegLinear& linear, const poInstruction& ins);
-        void ir_add(poRegLinear& linear, const poInstruction& ins);
-        void ir_sub(poRegLinear& linear, const poInstruction& ins);
-        void ir_mul(poRegLinear& linear, const poInstruction& ins);
-        void ir_div(poRegLinear& linear, const poInstruction& ins);
-        void ir_cmp(poRegLinear& linear, const poInstruction& ins);
-        void ir_br(poRegLinear& linear, const poInstruction& ins, poBasicBlock* bb);
-        void ir_constant(poConstantPool& constants, poRegLinear& linear, const poInstruction& ins);
-        void ir_copy(poRegLinear& linear, const poInstruction& ins);
-        void ir_ret(poRegLinear& linear, const poInstruction& ins);
-        void ir_unary_minus(poRegLinear& linear, const poInstruction& ins);
-        void ir_call(poModule& module, poRegLinear& linear, const poInstruction& ins, const int pos, const std::vector<poInstruction>& args);
-        void ir_param(poModule& module, poRegLinear& linear, const poInstruction& ins, const int numArgs);
+        void ir_element_ptr(poModule& module, PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_ptr(poModule& module, PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_store(PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_load(PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_zero_extend(PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_sign_extend(PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_bitwise_cast(PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_convert(PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_add(PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_sub(PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_mul(PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_div(PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_cmp(PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_br(PO_ALLOCATOR& linear, const poInstruction& ins, poBasicBlock* bb);
+        void ir_constant(poModule& module, poConstantPool& constants, PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_copy(PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_ret(poModule& module, PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_unary_minus(PO_ALLOCATOR& linear, const poInstruction& ins);
+        void ir_call(poModule& module, PO_ALLOCATOR& linear, const poInstruction& ins, const int pos, const std::vector<poInstruction>& args);
+        void ir_param(poModule& module, PO_ALLOCATOR& linear, const poInstruction& ins, const int numArgs);
         bool ir_jump(const int jump, const int imm, const int type);
 
         std::unordered_map<std::string, int> _mapping;

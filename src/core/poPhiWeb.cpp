@@ -33,7 +33,7 @@ void poPhiWeb::add(const int name, const int id)
     _items[id].push_back(name);
 }
 
-int poPhiWeb::find(const int name)
+int poPhiWeb::find(const int name) const
 {
     const auto& it = _webs.find(name);
     if (it != _webs.end())
@@ -71,10 +71,10 @@ void poPhiWeb::merge(const int left, const int right)
         auto& leftItems = _items[leftId];
         auto& rightItems = _items[rightId];
 
-        for (int item : rightItems)
+        for (const int item : rightItems)
         {
             leftItems.push_back(item);
-            update(item, leftId);
+            _webs[item] = leftId;
         }
         rightItems.clear();
     }

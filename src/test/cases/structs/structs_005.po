@@ -1,0 +1,29 @@
+import std;
+
+namespace Example
+{
+    struct foo
+    {
+        i64 x;
+        i64 y;
+        i64 z;
+        i64 w;
+    }
+    
+    static foo test(foo f)
+    {
+        f.w = 99;
+        return f;
+    }
+
+    static void main()
+    {
+        foo f;
+        f.x = 10;
+        f.y = 26;
+        foo p = test(f);
+        print_64(p.x);
+        print_64(p.y);
+        print_64(p.w);
+    }
+}

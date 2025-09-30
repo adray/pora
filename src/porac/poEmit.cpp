@@ -428,7 +428,7 @@ void poCodeGenerator::emitCopy(const int src, const int dst, poBasicBlock* bb)
     assert(srcType.isPointer());
 
     const poType& baseType = _module.types()[srcType.baseType()];
-    const int numCopies = baseType.size() / 8;
+    const int numCopies = std::max(1, baseType.size() / 8);
     for (int i = 0; i < numCopies; i++)
     {
         const int ptrSrc = _instructionCount++;
@@ -702,7 +702,10 @@ void poCodeGenerator::emitStatement(poNode* node, poFlowGraph& cfg)
     }
     else if (child->type() == poNodeType::CALL)
     {
-        emitCall(child, cfg);
+        if (emitCall(child, cfg) == EMIT_ERROR)
+        {
+            setError("Error emitting call.");
+        }
     }
     else if (child->type() == poNodeType::BODY)
     {
@@ -851,7 +854,7 @@ void poCodeGenerator::emitIfExpression(poConditionGraphNode& cgn, poFlowGraph& c
         auto& node = _graph.at(id);
         auto& fail = _graph.at(node.fail());
         auto& success = _graph.at(node.success());
-        int expr = emitExpr(node.node(), cfg);
+        const int expr = emitExpr(node.node(), cfg);
         node.setEmitted(true);
         id = -1;
         const int type = cfg.getLast()->instructions()[cfg.getLast()->numInstructions() - 1].type();
@@ -1203,7 +1206,14 @@ void poCodeGenerator::emitReturn(poNode* node, poFlowGraph& cfg)
         }
         else
         {
+            bool isObject = false;
             if (typeData.isPointer())
+            {
+                const poType& baseType = _module.types()[typeData.baseType()];
+                isObject = (baseType.baseType() == TYPE_OBJECT);
+            }
+
+            if (isObject)
             {
                 // We need to pack the struct data into a I64 and return this.
 
@@ -1285,7 +1295,9 @@ void poCodeGenerator::emitDecl(poNode* node, poFlowGraph& cfg)
 
         const std::string name = variable->token().string();
         const int pointerType = getPointerType(type); /* tODO: we need to get the pointer type with respect to the pointer count.. */
-        addVariable(name, pointerType, QUALIFIER_NONE, 1);
+        const int storeType = getPointerType(pointerType);
+        const int var = addVariable(name, storeType, QUALIFIER_NONE, 1);
+        emitAlloca(pointerType, var, cfg.getLast());
     }
     else if (declNode->child()->type() == poNodeType::ARRAY)
     {
@@ -1651,10 +1663,10 @@ void poCodeGenerator::emitStoreArray(poNode* node, poFlowGraph& cfg, const int i
     if (type.isArray())
     {
         const int accessor = emitExpr(array->accessor(), cfg);
-        const int pointerType = getPointerType(arrayType);
+        const int pointerType = getPointerType(type.baseType());
 
         const int ptr = _instructionCount; /* result of IR_PTR */
-        emitInstruction(poInstruction(_instructionCount++, type.baseType(), expr, accessor, IR_ELEMENT_PTR), cfg.getLast());
+        emitInstruction(poInstruction(_instructionCount++, pointerType, expr, accessor, IR_ELEMENT_PTR), cfg.getLast());
 
         emitInstruction(poInstruction(_instructionCount++, type.baseType(), ptr, id, IR_STORE), cfg.getLast());
     }
@@ -1663,7 +1675,7 @@ void poCodeGenerator::emitStoreArray(poNode* node, poFlowGraph& cfg, const int i
         const int accessor = emitExpr(array->accessor(), cfg);
 
         const int ptr = _instructionCount; /* result of IR_PTR */
-        emitInstruction(poInstruction(_instructionCount++, type.baseType(), expr, accessor, IR_ELEMENT_PTR), cfg.getLast());
+        emitInstruction(poInstruction(_instructionCount++, type.id(), expr, accessor, IR_ELEMENT_PTR), cfg.getLast());
 
         emitInstruction(poInstruction(_instructionCount++, type.baseType(), ptr, id, IR_STORE), cfg.getLast());
     }
@@ -1681,13 +1693,13 @@ int poCodeGenerator::emitLoadArray(poNode* node, poFlowGraph& cfg)
     if (type.isArray())
     {
         const int accessor = emitExpr(array->accessor(), cfg);
-        const int pointerType = getPointerType(arrayType);
+        const int pointerType = getPointerType(type.baseType());
 
         const int ptr = _instructionCount; /* result of IR_ELEMENT_PTR */
         emitInstruction(poInstruction(_instructionCount++, pointerType, expr, accessor, IR_ELEMENT_PTR), cfg.getLast());
 
         const int load = _instructionCount;
-        emitInstruction(poInstruction(_instructionCount++, arrayType, ptr, -1, IR_LOAD), cfg.getLast());
+        emitInstruction(poInstruction(_instructionCount++, type.baseType(), ptr, -1, IR_LOAD), cfg.getLast());
 
         return load;
     }
@@ -1696,7 +1708,7 @@ int poCodeGenerator::emitLoadArray(poNode* node, poFlowGraph& cfg)
         const int accessor = emitExpr(array->accessor(), cfg);
 
         const int ptr = _instructionCount; /* result of IR_ELEMENT_PTR */
-        emitInstruction(poInstruction(_instructionCount++, type.baseType(), expr, accessor, IR_ELEMENT_PTR), cfg.getLast());
+        emitInstruction(poInstruction(_instructionCount++, type.id(), expr, accessor, IR_ELEMENT_PTR), cfg.getLast());
 
         const int load = _instructionCount;
         emitInstruction(poInstruction(_instructionCount++, type.baseType(), ptr, -1, IR_LOAD), cfg.getLast());
@@ -1886,6 +1898,12 @@ int poCodeGenerator::emitConstantExpr(poNode* node, poFlowGraph& cfg)
         if (id == -1) { id = constants.addConstant(constant->u64()); }
         instructionId = _instructionCount;
         emitInstruction(poInstruction(_instructionCount++, TYPE_U64, id, IR_CONSTANT), cfg.getLast());
+        break;
+    case TYPE_STRING:
+        constants.getConstant(constant->token().string());
+        if (id == -1) { id = constants.addConstant(constant->token().string()); }
+        instructionId = _instructionCount;
+        emitInstruction(poInstruction(_instructionCount++, getPointerType(TYPE_U8), id, IR_CONSTANT), cfg.getLast());
         break;
     }
     return instructionId;

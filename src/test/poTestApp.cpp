@@ -8,6 +8,7 @@
 #include "poIntegrationTest.h"
 #include "poOptMemoryToRegTests.h"
 #include "poOptDCETests.h"
+#include "poRegGraphTests.h"
 
 #include <iostream>
 
@@ -24,10 +25,14 @@ int main(int numArgs, const char** const args)
     runNestedLoopForestsTests();
     runOptMemoryToRegTests();
     runOptDCETests();
+    runRegGraphTests();
 
     if (numArgs >= 4)
     {
-        runIntegrationTests(args[1], args[2], args[3]);
+        bool interactive = numArgs >= 5 &&
+            std::strcmp(args[4], "-i") == 0;
+
+        runIntegrationTests(args[1], args[2], args[3], interactive);
     }
 
     return 0;

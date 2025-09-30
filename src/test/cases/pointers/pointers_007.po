@@ -12,11 +12,20 @@ namespace Example
         z.z = 7;
         z.w = 8;
         test* y = &z;
+        print_64(y.x);
+        print_64(y.y);
+        print_64(y.z);
+        print_64(y.w);
+        
         test w;
         w.x = 100;
         w.y = 101;
         w.z = 102;
         w.w = 103;
         *y = w;
+        print_64(y.x);
+        print_64(y.y);
+        print_64(y.z);
+        print_64(y.w);
     }
 }

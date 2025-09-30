@@ -94,18 +94,34 @@ namespace po
         int _live;
     };
 
+    class poRegLinearExit
+    {
+    public:
+        poRegLinearExit(const std::unordered_map<int, poStackSlot>& stackSlots) : _stackSlots(stackSlots) {}
+        void addStackSlot(const int slot, const poStackSlot& stackSlot) { _stackSlots.insert(std::pair<int, poStackSlot>(slot, stackSlot)); }
+        inline const std::unordered_map<int, poStackSlot>& stackSlots() const { return _stackSlots; }
+
+    private:
+        std::unordered_map<int, poStackSlot> _stackSlots; /* slot -> stack slot */
+    };
+
     class poRegLinearEntry
     {
     public:
-        poRegLinearEntry(const std::vector<int> variables, const std::vector<bool> registerUsed, const std::vector<int> registersUsedByType);
+        poRegLinearEntry(const std::vector<int>& variables,
+            const std::vector<bool>& registerUsed,
+            const std::vector<int>& registersUsedByType,
+            const int pos);
         inline const int getRegister(const int index) const { return _variables[index]; }
         inline const int getRegisterType(const int index) const { return _registersUsedByType[index]; }
         inline const int isUsed(const int index) const { return _registerUsed[index]; }
+        inline const int position() const { return _pos; }
 
     private:
         std::vector<int> _variables; /* a list indicating which register is used by which variable (register -> variable) */
         std::vector<int> _registersUsedByType;
         std::vector<bool> _registerUsed;
+        int _pos;
     };
 
     class poRegLinearIterator
@@ -170,9 +186,11 @@ namespace po
         void freeRegisters(const int pos);
         void spillRegisters(const int pos, const poRegType type, const poInstruction& ins, poUses& uses);
         void balanceRegisters(const int pos, poBasicBlock* bb);
+        void repairSpills(poBasicBlock* bb);
         void spill(const int pos, const poRegSpill& spill);
         void restore(const int pos, const poRegRestore& restore);
         void mapRegister(const poRegLinearAssignment& assignment);
+        void freeStackSlots(const int pos);
 
         poStackAllocator _stackAlloc;
         poModule& _module;
@@ -189,6 +207,7 @@ namespace po
         std::vector<bool> _registersSet; /* the registers which have been used at any point */
         std::unordered_map<int, std::vector<poRegLinearAssignment>> _registers; /* a mapping from variable -> (last) instruction index */
         std::unordered_map<poBasicBlock*, poRegLinearEntry> _entries; /* a list of entries associated with basic blocks */
+        std::unordered_map<poBasicBlock*, poRegLinearExit> _exits; /* a list of entries associated with basic blocks */
         std::unordered_map<int, std::vector<poRegSpill>> _spills; /* a mapping from instruction index -> spill */
         std::unordered_map<int, std::vector<poRegRestore>> _restores; /* a mapping from instruction index -> restore */
         std::unordered_map<int, int> _registerMap; /* mapping from variable -> register  */

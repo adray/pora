@@ -14,5 +14,7 @@ namespace Example
         test x;
         x.x = 8;
         i64 p = test(x);
+        
+        print_64(p);
     }
 }

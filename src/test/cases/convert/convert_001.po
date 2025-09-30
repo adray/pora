@@ -1,0 +1,24 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        i64 a = (i64)55.0;
+        i64 b = (i64)22.0f;
+        i64 c = (i64)7u;
+        i64 d = (i64)10b;
+        
+        print_64(a);
+        print_64(b);
+        print_64(c);
+        print_64(d);
+        
+        i32 e = (i32)10;
+        i64 f = (i64)e;
+        i16 g = (i16)98;
+        i64 h = (i64)g;
+        print_64(f);
+        print_64(h);
+    }
+}

@@ -6,5 +6,8 @@ namespace Example
     {
         u16 x = (u16)6;
         u16 y = x + (u16)10 * -(u16)7;
+        
+        print_64((i64)x);
+        print_64((i64)y);
     }
 }
