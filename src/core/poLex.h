@@ -43,6 +43,8 @@ namespace po
         CLOSE_BRACE,
         INCREMENT,
         DECREMENT,
+        LEFT_SHIFT,
+        RIGHT_SHIFT,
         PLUS,
         MINUS,
         STAR,

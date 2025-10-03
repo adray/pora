@@ -411,11 +411,13 @@ void poLexer::scanLine(const std::string& line)
         case '<':
             advance();
             if (peek() == '=') { advance(); addToken(poTokenType::LESS_EQUALS); }
+            else if (peek() == '<') { advance(); addToken(poTokenType::LEFT_SHIFT); }
             else { addToken(poTokenType::LESS); }
             break;
         case '>':
             advance();
             if (peek() == '=') { advance(); addToken(poTokenType::GREATER_EQUALS); }
+            else if (peek() == '>') { advance(); addToken(poTokenType::RIGHT_SHIFT); }
             else { addToken(poTokenType::GREATER); }
             break;
         case ':':

@@ -1384,6 +1384,8 @@ int poCodeGenerator::emitExpr(poNode* node, poFlowGraph& cfg)
     case poNodeType::SUB:
     case poNodeType::MUL:
     case poNodeType::DIV:
+    case poNodeType::LEFT_SHIFT:
+    case poNodeType::RIGHT_SHIFT:
     case poNodeType::CMP_EQUALS:
     case poNodeType::CMP_NOT_EQUALS:
     case poNodeType::CMP_LESS:
@@ -1944,6 +1946,14 @@ int poCodeGenerator::emitBinaryExpr(poNode* node, poFlowGraph& cfg)
     case poNodeType::DIV:
         instructionId = _instructionCount;
         emitInstruction(poInstruction(_instructionCount++, type, left, right, IR_DIV), cfg.getLast());
+        break;
+    case poNodeType::LEFT_SHIFT:
+        instructionId = _instructionCount;
+        emitInstruction(poInstruction(_instructionCount++, type, left, right, IR_LEFT_SHIFT), cfg.getLast());
+        break;
+    case poNodeType::RIGHT_SHIFT:
+        instructionId = _instructionCount;
+        emitInstruction(poInstruction(_instructionCount++, type, left, right, IR_RIGHT_SHIFT), cfg.getLast());
         break;
     case poNodeType::CMP_EQUALS:
     case poNodeType::CMP_NOT_EQUALS:

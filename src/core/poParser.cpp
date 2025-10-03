@@ -421,9 +421,26 @@ poNode* poFunctionParser::parseUnary()
     return parsePrimary();
 }
 
-poNode* poFunctionParser::parseFactor()
+poNode* poFunctionParser::parseBitShift()
 {
     poNode* node = parseUnary();
+    while (_parser.match(poTokenType::LEFT_SHIFT) || _parser.match(poTokenType::RIGHT_SHIFT))
+    {
+        const poToken token = _parser.peek();
+        _parser.advance();
+        node = new poBinaryNode(
+            token.token() == poTokenType::LEFT_SHIFT ? poNodeType::LEFT_SHIFT : poNodeType::RIGHT_SHIFT,
+            node,
+            parseUnary(),
+            token);
+    }
+
+    return node;
+}
+
+poNode* poFunctionParser::parseFactor()
+{
+    poNode* node = parseBitShift();
     while (_parser.match(poTokenType::STAR) || _parser.match(poTokenType::SLASH))
     {
         const poToken token = _parser.peek();
@@ -431,7 +448,7 @@ poNode* poFunctionParser::parseFactor()
         node = new poBinaryNode(
             token.token() == poTokenType::STAR ? poNodeType::MUL : poNodeType::DIV,
             node,
-            parseUnary(),
+            parseBitShift(),
             token);
     }
 
@@ -545,6 +562,44 @@ poNode* poFunctionParser::parseRH(poNode* lhs)
             lhs,
             parseTerm(),
             assign);
+    }
+    else if (_parser.match(poTokenType::PLUS_EQUALS) ||
+        _parser.match(poTokenType::MINUS_EQUALS) ||
+        _parser.match(poTokenType::STAR_EQUALS) ||
+        _parser.match(poTokenType::SLASH_EQUALS))
+    {
+        auto& assign = _parser.peek();
+        _parser.advance();
+        poNodeType type = poNodeType::ADD;
+        switch (assign.token())
+        {
+        case poTokenType::PLUS_EQUALS:
+            type = poNodeType::ADD;
+            break;
+        case poTokenType::MINUS_EQUALS:
+            type = poNodeType::SUB;
+            break;
+        case poTokenType::STAR_EQUALS:
+            type = poNodeType::MUL;
+            break;
+        case poTokenType::SLASH_EQUALS:
+            type = poNodeType::DIV;
+            break;
+        default:
+            _parser.setError("Unexpected token.");
+            break;
+        }
+
+        if (!_parser.isError())
+        {
+            node = new poBinaryNode(poNodeType::ASSIGNMENT,
+                lhs,
+                new poBinaryNode(type,
+                    lhs,
+                    parseTerm(),
+                    assign),
+                assign);
+        }
     }
     else
     {
@@ -903,7 +958,11 @@ poNode* poFunctionParser::parseExpressionStatement()
             _parser.setError("Unexpected token.");
         }
     }
-    else if (_parser.match(poTokenType::EQUALS))
+    else if (_parser.match(poTokenType::EQUALS) ||
+        _parser.match(poTokenType::PLUS_EQUALS) ||
+        _parser.match(poTokenType::MINUS_EQUALS) ||
+        _parser.match(poTokenType::STAR_EQUALS) ||
+        _parser.match(poTokenType::SLASH_EQUALS))
     {
         // assignment
         poNode* assign = parseRH(new poNode(poNodeType::VARIABLE, id));
@@ -1003,7 +1062,11 @@ poNode* poFunctionParser::parseStatement()
         // Expression statement
 
         poNode* member = parseMember(new poNode(poNodeType::VARIABLE, id), id);
-        if (_parser.match(poTokenType::EQUALS))
+        if (_parser.match(poTokenType::EQUALS) ||
+            _parser.match(poTokenType::PLUS_EQUALS) ||
+            _parser.match(poTokenType::MINUS_EQUALS) ||
+            _parser.match(poTokenType::STAR_EQUALS) ||
+            _parser.match(poTokenType::SLASH_EQUALS))
         {
             // assignment
             poNode* assign = parseRH(member);
@@ -1014,7 +1077,11 @@ poNode* poFunctionParser::parseStatement()
             _parser.setError("Unexpected token.");
         }
     }
-    else if (_parser.match(poTokenType::EQUALS))
+    else if (_parser.match(poTokenType::EQUALS) ||
+        _parser.match(poTokenType::PLUS_EQUALS) || 
+        _parser.match(poTokenType::MINUS_EQUALS) || 
+        _parser.match(poTokenType::STAR_EQUALS) || 
+        _parser.match(poTokenType::SLASH_EQUALS))
     {
         // assignment
         poNode* assign = parseRH(new poNode(poNodeType::VARIABLE, id));
@@ -1109,7 +1176,11 @@ poNode* poFunctionParser::parseStatement()
                     statement = new poUnaryNode(poNodeType::STATEMENT, child, id);
                 }
             }
-            else if (_parser.match(poTokenType::EQUALS))
+            else if (_parser.match(poTokenType::EQUALS) ||
+                _parser.match(poTokenType::PLUS_EQUALS) ||
+                _parser.match(poTokenType::MINUS_EQUALS) ||
+                _parser.match(poTokenType::STAR_EQUALS) ||
+                _parser.match(poTokenType::SLASH_EQUALS))
             {
                 poNode* lhs = new poArrayAccessor(accessor, new poNode(poNodeType::VARIABLE, id), poNodeType::ARRAY_ACCESSOR, id);
                 
@@ -1126,7 +1197,11 @@ poNode* poFunctionParser::parseStatement()
                     poNodeType::ARRAY_ACCESSOR, id),
                     id);
 
-                if (_parser.match(poTokenType::EQUALS))
+                if (_parser.match(poTokenType::EQUALS) ||
+                    _parser.match(poTokenType::PLUS_EQUALS) ||
+                    _parser.match(poTokenType::MINUS_EQUALS) ||
+                    _parser.match(poTokenType::STAR_EQUALS) ||
+                    _parser.match(poTokenType::SLASH_EQUALS))
                 {
                     poNode* assign = parseRH(member);
                     statement = new poUnaryNode(poNodeType::STATEMENT, assign, id);

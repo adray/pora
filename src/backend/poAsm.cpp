@@ -1177,6 +1177,109 @@ void poAsm::ir_param(poModule& module, PO_ALLOCATOR& allocator, const poInstruct
     }
 }
 
+
+void poAsm::ir_shl(PO_ALLOCATOR& allocator, const poInstruction& ins)
+{
+    const int dst = allocator.getRegisterByVariable(ins.name());
+    const int src = allocator.getRegisterByVariable(ins.left());
+    const int count = allocator.getRegisterByVariable(ins.right());
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+    case TYPE_U64:
+        if (dst != src) {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
+        }
+        if (count != VM_REGISTER_ECX) {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_ECX, count);
+        }
+        _x86_64_lower.mc_sal_reg_x64(dst);
+        break;
+    case TYPE_I32:
+    case TYPE_U32:
+        if (dst != src) {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
+        }
+        if (count != VM_REGISTER_ECX) {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_ECX, count);
+        }
+        _x86_64_lower.mc_sal_reg_32(dst);
+        break;
+    case TYPE_I16:
+    case TYPE_U16:
+        if (dst != src) {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
+        }
+        if (count != VM_REGISTER_ECX) {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_ECX, count);
+        }
+        _x86_64_lower.mc_sal_reg_16(dst);
+        break;
+    case TYPE_I8:
+    case TYPE_U8:
+        if (dst != src) {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
+        }
+        if (count != VM_REGISTER_ECX) {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_ECX, count);
+        }
+        _x86_64_lower.mc_sal_reg_8(dst);
+        break;
+    }
+}
+
+void poAsm::ir_shr(PO_ALLOCATOR& allocator, const poInstruction& ins)
+{
+    const int dst = allocator.getRegisterByVariable(ins.name());
+    const int src = allocator.getRegisterByVariable(ins.left());
+    const int count = allocator.getRegisterByVariable(ins.right());
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+    case TYPE_U64:
+        if (dst != src) {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
+        }
+        if (count != VM_REGISTER_ECX) {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_ECX, count);
+        }
+        _x86_64_lower.mc_sar_reg_x64(dst);
+        break;
+    case TYPE_I32:
+    case TYPE_U32:
+        if (dst != src) {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
+        }
+        if (count != VM_REGISTER_ECX) {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_ECX, count);
+        }
+        _x86_64_lower.mc_sar_reg_32(dst);
+        break;
+    case TYPE_I16:
+    case TYPE_U16:
+        if (dst != src) {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
+        }
+        if (count != VM_REGISTER_ECX) {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_ECX, count);
+        }
+        _x86_64_lower.mc_sar_reg_16(dst);
+        break;
+    case TYPE_I8:
+    case TYPE_U8:
+        if (dst != src) {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
+        }
+        if (count != VM_REGISTER_ECX) {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_ECX, count);
+        }
+        _x86_64_lower.mc_sar_reg_8(dst);
+        break;
+    }
+}
+
 //================
 
 poAsm::poAsm()
@@ -1682,6 +1785,12 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg, const int numArgs)
                 break;
             case IR_RETURN:
                 ir_ret(module, allocator, ins);
+                break;
+            case IR_RIGHT_SHIFT:
+                ir_shr(allocator, ins);
+                break;
+            case IR_LEFT_SHIFT:
+                ir_shl(allocator, ins);
                 break;
             case IR_SUB:
                 ir_sub(allocator, ins);

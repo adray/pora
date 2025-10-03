@@ -21,6 +21,8 @@ namespace po
     constexpr int IR_AND = 0x14;
     constexpr int IR_OR = 0x15;
     constexpr int IR_UNARY_MINUS = 0x16;
+    constexpr int IR_LEFT_SHIFT = 0x17;
+    constexpr int IR_RIGHT_SHIFT = 0x18;
     constexpr int IR_CMP = 0x21;
     constexpr int IR_BR = 0x22;
     constexpr int IR_CALL = 0x30;

@@ -643,6 +643,97 @@ static void generateLeaInstructions(po_x86_64& x86_64)
     generatePadding(x86_64);
 }
 
+static void generateSalInstructions(po_x86_64& x86_64)
+{
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_sal_imm_to_reg_x64(i, 1);
+    }
+    generatePadding(x86_64);
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_sal_imm_to_reg_32(i, 1);
+    }
+    generatePadding(x86_64);
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_sal_imm_to_reg_16(i, 1);
+    }
+    generatePadding(x86_64);
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_sal_imm_to_reg_8(i, 1);
+    }
+    generatePadding(x86_64);
+
+
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_sal_reg_x64(i);
+    }
+    generatePadding(x86_64);
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_sal_reg_32(i);
+    }
+    generatePadding(x86_64);
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_sal_reg_16(i);
+    }
+    generatePadding(x86_64);
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_sal_reg_8(i);
+    }
+    generatePadding(x86_64);
+}
+
+static void generateSarInstructions(po_x86_64& x86_64)
+{
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_sar_imm_to_reg_x64(i, 1);
+    }
+    generatePadding(x86_64);
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_sar_imm_to_reg_32(i, 1);
+    }
+    generatePadding(x86_64);
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_sar_imm_to_reg_16(i, 1);
+    }
+    generatePadding(x86_64);
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_sar_imm_to_reg_8(i, 1);
+    }
+    generatePadding(x86_64);
+
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_sar_reg_x64(i);
+    }
+    generatePadding(x86_64);
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_sar_reg_32(i);
+    }
+    generatePadding(x86_64);
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_sar_reg_16(i);
+    }
+    generatePadding(x86_64);
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_sar_reg_8(i);
+    }
+    generatePadding(x86_64);
+}
+
 int main(int numArgs, char** args)
 {
     std::cout << "Running code gen test" << std::endl;
@@ -662,7 +753,9 @@ int main(int numArgs, char** args)
     if (strcmp(args[1], "cmp") == 0) { generateCmpInstructions1(x86_64);   }
     if (strcmp(args[1], "div") == 0) { generateDivInstructions1(x86_64);   }
     if (strcmp(args[1], "div2") == 0) { generateDivInstructions2(x86_64); }
-    if (strcmp(args[1], "lea") == 0) { generateLeaInstructions(x86_64);  }
+    if (strcmp(args[1], "lea") == 0) { generateLeaInstructions(x86_64); }
+    if (strcmp(args[1], "sal") == 0) { generateSalInstructions(x86_64); }
+    if (strcmp(args[1], "sar") == 0) { generateSarInstructions(x86_64);  }
 
     //generateMovZXInstructions1(x86_64);
     //generateMovZXInstructions2(x86_64);

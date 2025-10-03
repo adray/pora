@@ -247,6 +247,26 @@ namespace po
         VMI_LEA64_SRC_REG_DST_REG,
         VMI_LEA64_SRC_MEM_DST_REG,
 
+        VMI_SAL64_SRC_IMM_DST_REG, // left shift
+        VMI_SAL32_SRC_IMM_DST_REG,
+        VMI_SAL16_SRC_IMM_DST_REG,
+        VMI_SAL8_SRC_IMM_DST_REG,
+
+        VMI_SAR64_SRC_IMM_DST_REG, // right shift
+        VMI_SAR32_SRC_IMM_DST_REG,
+        VMI_SAR16_SRC_IMM_DST_REG,
+        VMI_SAR8_SRC_IMM_DST_REG,
+
+        VMI_SAL64_SRC_REG_DST_REG, // left shift
+        VMI_SAL32_SRC_REG_DST_REG,
+        VMI_SAL16_SRC_REG_DST_REG,
+        VMI_SAL8_SRC_REG_DST_REG,
+
+        VMI_SAR64_SRC_REG_DST_REG, // right shift
+        VMI_SAR32_SRC_REG_DST_REG,
+        VMI_SAR16_SRC_REG_DST_REG,
+        VMI_SAR8_SRC_REG_DST_REG,
+
         VMI_CDQE,
 
         VMI_PUSH_REG,
@@ -534,6 +554,10 @@ namespace po
         void mc_cmp_memory_to_reg_8(char dst, char src, int src_offset);
         void mc_cmp_reg_to_memory_8(char dst, char src, int dst_offset);
         void mc_neg_reg_8(int reg);
+        void mc_sar_imm_to_reg_8(char reg, char imm);
+        void mc_sal_imm_to_reg_8(char reg, char imm);
+        void mc_sar_reg_8(char reg);
+        void mc_sal_reg_8(char reg);
 
         /* 16-bit operations */
 
@@ -559,6 +583,10 @@ namespace po
         void mc_cmp_mem_to_reg_16(char dst, char src, int src_offset);
         void mc_cmp_reg_to_mem_16(char dst, char src, int dst_offset);
         void mc_neg_reg_16(int reg);
+        void mc_sar_imm_to_reg_16(char reg, char imm);
+        void mc_sal_imm_to_reg_16(char reg, char imm);
+        void mc_sar_reg_16(char reg);
+        void mc_sal_reg_16(char reg);
 
         /* 32-bit operations */
 
@@ -584,6 +612,10 @@ namespace po
         void mc_cmp_mem_to_reg_32(char dst, char src, int src_offset);
         void mc_cmp_reg_to_mem_32(char dst, char src, int dst_offset);
         void mc_neg_reg_32(int reg);
+        void mc_sar_imm_to_reg_32(char reg, char imm);
+        void mc_sal_imm_to_reg_32(char reg, char imm);
+        void mc_sar_reg_32(char reg);
+        void mc_sal_reg_32(char reg);
 
         /*64-bit operations */
 
@@ -617,6 +649,10 @@ namespace po
         void mc_neg_memory_x64(int reg, int offset);
         void mc_neg_reg_x64(int reg);
         void mc_lea_reg_to_reg_x64(char dst, int addr);
+        void mc_sar_imm_to_reg_x64(char reg, char imm);
+        void mc_sal_imm_to_reg_x64(char reg, char imm);
+        void mc_sar_reg_x64(char reg);
+        void mc_sal_reg_x64(char reg);
 
         /* Jump operations */
 
@@ -781,6 +817,10 @@ namespace po
         void mc_cmp_memory_to_reg_8(char dst, char src, int src_offset);
         void mc_cmp_reg_to_memory_8(char dst, char src, int dst_offset);
         void mc_neg_reg_8(int reg);
+        void mc_sar_imm_to_reg_8(char reg, char imm);
+        void mc_sal_imm_to_reg_8(char reg, char imm);
+        void mc_sar_reg_8(char reg);
+        void mc_sal_reg_8(char reg);
 
         /* 16-bit operations */
 
@@ -806,6 +846,10 @@ namespace po
         void mc_cmp_mem_to_reg_16(char dst, char src, int src_offset);
         void mc_cmp_reg_to_mem_16(char dst, char src, int dst_offset);
         void mc_neg_reg_16(int reg);
+        void mc_sar_imm_to_reg_16(char reg, char imm);
+        void mc_sal_imm_to_reg_16(char reg, char imm);
+        void mc_sar_reg_16(char reg);
+        void mc_sal_reg_16(char reg);
 
         /* 32-bit operations */
 
@@ -831,6 +875,10 @@ namespace po
         void mc_cmp_mem_to_reg_32(char dst, char src, int src_offset);
         void mc_cmp_reg_to_mem_32(char dst, char src, int dst_offset);
         void mc_neg_reg_32(int reg);
+        void mc_sar_imm_to_reg_32(char reg, char imm);
+        void mc_sal_imm_to_reg_32(char reg, char imm);
+        void mc_sar_reg_32(char reg);
+        void mc_sal_reg_32(char reg);
 
         /*64-bit operations */
 
@@ -864,6 +912,10 @@ namespace po
         void mc_neg_memory_x64(int reg, int offset);
         void mc_neg_reg_x64(int reg);
         void mc_lea_reg_to_reg_x64(char dst, int addr);
+        void mc_sar_imm_to_reg_x64(char reg, char imm);
+        void mc_sal_imm_to_reg_x64(char reg, char imm);
+        void mc_sar_reg_x64(char reg);
+        void mc_sal_reg_x64(char reg);
 
         /* Jump operations */
 
@@ -969,6 +1021,7 @@ namespace po
         void emit_um(const vm_instruction& ins, char reg);
         void emit_umo(const vm_instruction& ins, char reg, int offset);
         void emit_bri(const vm_instruction& ins, char reg, int imm);
+        void emit_bri(const vm_instruction& ins, char reg, char imm);
         void emit_brr(const vm_instruction& ins, char dst, char src);
         void emit_brm(const vm_instruction& ins, char dst, char src);
         void emit_bmr(const vm_instruction& ins, char dst, char src);

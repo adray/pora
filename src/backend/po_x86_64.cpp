@@ -86,6 +86,7 @@ enum vm_instruction_encoding
     VMI_ENC_A = 7,      // destination R, source R/M
     VMI_ENC_C = 8,      // destination R/M, source R
     VMI_ENC_Z0 = 9,     // no operands
+    VMI_ENC_MC = 10,    // destination R/M, source CL
 };
 
 struct vm_instruction
@@ -312,6 +313,26 @@ static constexpr vm_instruction gInstructions[VMI_MAX_INSTRUCTIONS] = {
     INS(0x0, 0x48, 0x8D, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BRR, VMI_ENC_RM),    // VMI_LEA64_SRC_REG_DST_REG,
     INS(0x0, 0x48, 0x8D, VMI_UNUSED, VM_INSTRUCTION_BINARY, CODE_BMR, VMI_ENC_RM),    // VMI_LEA64_SRC_MEM_DST_REG,
 
+    INS(0x0, 0x48, 0xC1, 0x4, VM_INSTRUCTION_BINARY, CODE_BRI, VMI_ENC_MI),// VMI_SAL64_SRC_IMM_DST_REG, // left shift
+    INS(0x0, 0x0, 0xC1, 0x4, VM_INSTRUCTION_BINARY, CODE_BRI, VMI_ENC_MI),// VMI_SAL32_SRC_IMM_DST_REG,
+    INS(0x66, 0x0, 0xC1, 0x4, VM_INSTRUCTION_BINARY, CODE_BRI, VMI_ENC_MI),// VMI_SAL16_SRC_IMM_DST_REG,
+    INS(0x0, 0x40, 0xC0, 0x4, VM_INSTRUCTION_BINARY, CODE_BRI, VMI_ENC_MI),// VMI_SAL8_SRC_IMM_DST_REG,
+
+    INS(0x0, 0x48, 0xC1, 0x7, VM_INSTRUCTION_BINARY, CODE_BRI, VMI_ENC_MI),// VMI_SAR64_SRC_IMM_DST_REG, // right shift
+    INS(0x0, 0x0, 0xC1, 0x7, VM_INSTRUCTION_BINARY, CODE_BRI, VMI_ENC_MI),// VMI_SAR32_SRC_IMM_DST_REG,
+    INS(0x66, 0x0, 0xC1, 0x7, VM_INSTRUCTION_BINARY, CODE_BRI, VMI_ENC_MI),// VMI_SAR16_SRC_IMM_DST_REG,
+    INS(0x0, 0x40, 0xC0, 0x7, VM_INSTRUCTION_BINARY, CODE_BRI, VMI_ENC_MI),// VMI_SAR8_SRC_IMM_DST_REG,
+
+    INS(0x0, 0x48, 0xD3, 0x4, VM_INSTRUCTION_UNARY, CODE_UR, VMI_ENC_MC),// VMI_SAL64_SRC_REG_DST_REG, // left shift
+    INS(0x0, 0x0, 0xD3, 0x4, VM_INSTRUCTION_UNARY, CODE_UR, VMI_ENC_MC),// VMI_SAL32_SRC_REG_DST_REG,
+    INS(0x66, 0x0, 0xD3, 0x4, VM_INSTRUCTION_UNARY, CODE_UR, VMI_ENC_MC),// VMI_SAL16_SRC_REG_DST_REG,
+    INS(0x0, 0x40, 0xD2, 0x4, VM_INSTRUCTION_UNARY, CODE_UR, VMI_ENC_MC),// VMI_SAL8_SRC_REG_DST_REG,
+
+    INS(0x0, 0x48, 0xD3, 0x7, VM_INSTRUCTION_UNARY, CODE_UR, VMI_ENC_MC),// VMI_SAR64_SRC_REG_DST_REG, // right shift
+    INS(0x0, 0x0, 0xD3, 0x7, VM_INSTRUCTION_UNARY, CODE_UR, VMI_ENC_MC),// VMI_SAR32_SRC_REG_DST_REG,
+    INS(0x66, 0x0, 0xD3, 0x7, VM_INSTRUCTION_UNARY, CODE_UR, VMI_ENC_MC),// VMI_SAR16_SRC_REG_DST_REG,
+    INS(0x0, 0x40, 0xD2, 0x7, VM_INSTRUCTION_UNARY, CODE_UR, VMI_ENC_MC),// VMI_SAR8_SRC_REG_DST_REG,
+
     INS(0x0, 0x48, 0x98, 0x0, VM_INSTRUCTION_NONE, CODE_NONE, VMI_ENC_Z0),// VMI_CDQE
 
     INS(0x0, 0x0, 0x50, 0x0, VM_INSTRUCTION_NONE, CODE_NONE, VMI_ENC_C), // VMI_PUSH_REG, (not implemented)
@@ -476,6 +497,10 @@ void po_x86_64::emit_umo(const vm_instruction& ins, char reg, int offset)
 void po_x86_64::emit_bri(const vm_instruction& ins, char reg, int imm)
 {
     assert(ins.code == CODE_BRI);
+    if (ins.legacy > 0)
+    {
+        _programData.push_back(ins.legacy);
+    }
     if (ins.rex > 0)
     {
         _programData.push_back(ins.rex | (reg >= VM_REGISTER_R8 ? 0x1 : 0x0));
@@ -489,13 +514,55 @@ void po_x86_64::emit_bri(const vm_instruction& ins, char reg, int imm)
             _programData.push_back(0x40 | 0x1);
         }
 
-        _programData.push_back(ins.ins | (reg % 8));
+        if (ins.subins != VMI_UNUSED)
+        {
+            _programData.push_back(ins.ins);
+            _programData.push_back((ins.subins << 3) | (reg % 8) | (0x3 << 6));
+        }
+        else
+        {
+            _programData.push_back(ins.ins | (reg % 8));
+        }
     }
 
     _programData.push_back((unsigned char)(imm & 0xff));
     _programData.push_back((unsigned char)((imm >> 8) & 0xff));
     _programData.push_back((unsigned char)((imm >> 16) & 0xff));
     _programData.push_back((unsigned char)((imm >> 24) & 0xff));
+}
+
+void po_x86_64::emit_bri(const vm_instruction& ins, char reg, char imm)
+{
+    assert(ins.code == CODE_BRI);
+    if (ins.legacy > 0)
+    {
+        _programData.push_back(ins.legacy);
+    }
+    if (ins.rex > 0)
+    {
+        _programData.push_back(ins.rex | (reg >= VM_REGISTER_R8 ? 0x1 : 0x0));
+        _programData.push_back(ins.ins);
+        _programData.push_back((ins.subins << 3) | (reg % 8) | (0x3 << 6));
+    }
+    else
+    {
+        if (reg >= VM_REGISTER_R8)
+        {
+            _programData.push_back(0x40 | 0x1);
+        }
+
+        if (ins.subins != VMI_UNUSED)
+        {
+            _programData.push_back(ins.ins );
+            _programData.push_back((ins.subins << 3) | (reg % 8) | (0x3 << 6));
+        }
+        else
+        {
+            _programData.push_back(ins.ins | (reg % 8));
+        }
+    }
+
+    _programData.push_back((unsigned char)(imm & 0xff));
 }
 
 void po_x86_64::emit_brr(const vm_instruction& ins, char dst, char src)
@@ -762,6 +829,10 @@ void po_x86_64_Lower::mc_cmp_reg_to_reg_8(char dst, char src) { binop(src, dst, 
 void po_x86_64_Lower::mc_cmp_memory_to_reg_8(char dst, char src, int src_offset) { binop(src, dst, VMI_CMP8_SRC_MEM_DST_REG, src_offset); }
 void po_x86_64_Lower::mc_cmp_reg_to_memory_8(char dst, char src, int dst_offset) { binop(src, dst, VMI_SUB8_SRC_REG_DST_MEM, dst_offset); }
 void po_x86_64_Lower::mc_neg_reg_8(int reg) { unaryop(reg, VMI_NEG8_DST_REG); }
+void po_x86_64_Lower::mc_sar_imm_to_reg_8(char reg, char imm) { unaryop_imm(reg, VMI_SAR8_SRC_IMM_DST_REG, imm); }
+void po_x86_64_Lower::mc_sal_imm_to_reg_8(char reg, char imm) { unaryop_imm(reg, VMI_SAL8_SRC_IMM_DST_REG, imm); }
+void po_x86_64_Lower::mc_sar_reg_8(char reg) { unaryop(reg, VMI_SAR8_SRC_REG_DST_REG); }
+void po_x86_64_Lower::mc_sal_reg_8(char reg) { unaryop(reg, VMI_SAL8_SRC_REG_DST_REG); }
 
 /* 16-bit operations */
 
@@ -787,6 +858,10 @@ void po_x86_64_Lower::mc_cmp_reg_to_reg_16(char dst, char src) { binop(src, dst,
 void po_x86_64_Lower::mc_cmp_mem_to_reg_16(char dst, char src, int src_offset) { binop(src, dst, VMI_CMP16_SRC_MEM_DST_REG, src_offset); }
 void po_x86_64_Lower::mc_cmp_reg_to_mem_16(char dst, char src, int dst_offset) { binop(src, dst, VMI_MOV16_SRC_REG_DST_MEM, dst_offset); }
 void po_x86_64_Lower::mc_neg_reg_16(int reg) { unaryop(reg, VMI_NEG16_DST_REG); }
+void po_x86_64_Lower::mc_sar_imm_to_reg_16(char reg, char imm) { unaryop_imm(reg, VMI_SAR16_SRC_IMM_DST_REG, imm); }
+void po_x86_64_Lower::mc_sal_imm_to_reg_16(char reg, char imm) { unaryop_imm(reg, VMI_SAL16_SRC_IMM_DST_REG, imm); }
+void po_x86_64_Lower::mc_sar_reg_16(char reg) { unaryop(reg, VMI_SAR16_SRC_REG_DST_REG); }
+void po_x86_64_Lower::mc_sal_reg_16(char reg) { unaryop(reg, VMI_SAL16_SRC_REG_DST_REG); }
 
 /* 32-bit operations */
 
@@ -812,6 +887,10 @@ void po_x86_64_Lower::mc_cmp_reg_to_reg_32(char dst, char src) { binop(src, dst,
 void po_x86_64_Lower::mc_cmp_mem_to_reg_32(char dst, char src, int src_offset) { binop(src, dst, VMI_CMP32_SRC_MEM_DST_REG, src_offset); }
 void po_x86_64_Lower::mc_cmp_reg_to_mem_32(char dst, char src, int dst_offset) { binop(src, dst, VMI_CMP32_SRC_REG_DST_MEM, dst_offset); }
 void po_x86_64_Lower::mc_neg_reg_32(int reg) { unaryop(reg, VMI_NEG32_DST_REG); }
+void po_x86_64_Lower::mc_sar_imm_to_reg_32(char reg, char imm) { unaryop_imm(reg, VMI_SAR32_SRC_IMM_DST_REG, imm); }
+void po_x86_64_Lower::mc_sal_imm_to_reg_32(char reg, char imm) { unaryop_imm(reg, VMI_SAL32_SRC_IMM_DST_REG, imm); }
+void po_x86_64_Lower::mc_sar_reg_32(char reg) { unaryop(reg, VMI_SAR32_SRC_REG_DST_REG); }
+void po_x86_64_Lower::mc_sal_reg_32(char reg) { unaryop(reg, VMI_SAL32_SRC_REG_DST_REG); }
 
 /*64-bit operations */
 
@@ -845,6 +924,10 @@ void po_x86_64_Lower::mc_dec_memory_x64(int reg, int offset) { unaryop(reg, VMI_
 void po_x86_64_Lower::mc_neg_memory_x64(int reg, int offset) { unaryop(reg, VMI_NEG64_DST_MEM, offset); }
 void po_x86_64_Lower::mc_neg_reg_x64(int reg) { unaryop(reg, VMI_NEG64_DST_REG); }
 void po_x86_64_Lower::mc_lea_reg_to_reg_x64(char dst, int addr) { binop(-1, dst, VMI_LEA64_SRC_REG_DST_REG, addr); }
+void po_x86_64_Lower::mc_sar_imm_to_reg_x64(char reg, char imm) { unaryop_imm(reg, VMI_SAR64_SRC_IMM_DST_REG, imm); }
+void po_x86_64_Lower::mc_sal_imm_to_reg_x64(char reg, char imm) { unaryop_imm(reg, VMI_SAL64_SRC_IMM_DST_REG, imm); }
+void po_x86_64_Lower::mc_sar_reg_x64(char reg) { unaryop(reg, VMI_SAR64_SRC_REG_DST_REG); }
+void po_x86_64_Lower::mc_sal_reg_x64(char reg) { unaryop(reg, VMI_SAL64_SRC_REG_DST_REG); }
 
 /* Jump operations */
 
@@ -1296,7 +1379,6 @@ void po_x86_64::mc_add_reg_to_reg_8(char dst, char src)
 }
 void po_x86_64::mc_add_imm_to_reg_8(char dst, char imm)
 {
-    // TODO: the immediate in emit_bri takes an int not a byte
     emit_bri(gInstructions[VMI_ADD8_SRC_IMM_DST_REG], dst, imm);
 }
 void po_x86_64::mc_add_memory_to_reg_8(char dst, char src, int src_offset)
@@ -1309,7 +1391,6 @@ void po_x86_64::mc_add_reg_to_memory_8(char dst, char src, int dst_offset)
 }
 void po_x86_64::mc_sub_imm_to_reg_8(char dst, char imm)
 {
-    // TODO: the immediate in emit_bri takes an int not a byte
     emit_bri(gInstructions[VMI_SUB8_SRC_IMM_DST_REG], dst, imm);
 }
 void po_x86_64::mc_sub_reg_to_reg_8(char dst, char src)
@@ -1464,6 +1545,22 @@ void po_x86_64::mc_neg_reg_16(int reg)
 {
     emit_ur(gInstructions[VMI_NEG16_DST_REG], reg);
 }
+void po_x86_64::mc_sar_imm_to_reg_16(char reg, char imm)
+{
+    emit_bri(gInstructions[VMI_SAR16_SRC_IMM_DST_REG], reg, imm);
+}
+void po_x86_64::mc_sal_imm_to_reg_16(char reg, char imm)
+{
+    emit_bri(gInstructions[VMI_SAL16_SRC_IMM_DST_REG], reg, imm);
+}
+void po_x86_64::mc_sar_reg_16(char reg)
+{
+    emit_ur(gInstructions[VMI_SAR16_SRC_REG_DST_REG], reg);
+}
+void po_x86_64::mc_sal_reg_16(char reg)
+{
+    emit_ur(gInstructions[VMI_SAL16_SRC_REG_DST_REG], reg);
+}
 void po_x86_64::mc_add_reg_to_reg_32(char dst, char src)
 {
     emit_brr(gInstructions[VMI_ADD32_SRC_REG_DST_REG], dst, src);
@@ -1551,6 +1648,22 @@ void po_x86_64::mc_cmp_reg_to_mem_32(char dst, char src, int dst_offset)
 void po_x86_64::mc_neg_reg_32(int reg)
 {
     emit_ur(gInstructions[VMI_NEG32_DST_REG], reg);
+}
+void po_x86_64::mc_sar_imm_to_reg_32(char reg, char imm)
+{
+    emit_bri(gInstructions[VMI_SAR32_SRC_IMM_DST_REG], reg, imm);
+}
+void po_x86_64::mc_sal_imm_to_reg_32(char reg, char imm)
+{
+    emit_bri(gInstructions[VMI_SAL32_SRC_IMM_DST_REG], reg, imm);
+}
+void po_x86_64::mc_sar_reg_32(char reg)
+{
+    emit_ur(gInstructions[VMI_SAR32_SRC_REG_DST_REG], reg);
+}
+void po_x86_64::mc_sal_reg_32(char reg)
+{
+    emit_ur(gInstructions[VMI_SAL32_SRC_REG_DST_REG], reg);
 }
 void po_x86_64::mc_mov_imm_to_reg_x64(char dst, long long imm)
 {
@@ -1801,9 +1914,41 @@ void po_x86_64::mc_lea_reg_to_reg_x64(char dst, int addr)
 {
     emit_brr_disp(gInstructions[VMI_LEA64_SRC_REG_DST_REG], dst, addr);
 }
+void po_x86_64::mc_sar_imm_to_reg_x64(char reg, char imm)
+{
+    emit_bri(gInstructions[VMI_SAR64_SRC_IMM_DST_REG], reg, imm);
+}
+void po_x86_64::mc_sal_imm_to_reg_x64(char reg, char imm)
+{
+    emit_bri(gInstructions[VMI_SAL64_SRC_IMM_DST_REG], reg, imm);
+}
+void po_x86_64::mc_sar_reg_x64(char reg)
+{
+    emit_ur(gInstructions[VMI_SAR64_SRC_REG_DST_REG], reg);
+}
+void po_x86_64::mc_sal_reg_x64(char reg)
+{
+    emit_ur(gInstructions[VMI_SAL64_SRC_REG_DST_REG], reg);
+}
 void po_x86_64::mc_neg_reg_8(int reg)
 {
     emit_ur(gInstructions[VMI_NEG8_DST_REG], reg);
+}
+void po_x86_64::mc_sar_imm_to_reg_8(char reg, char imm)
+{
+    emit_bri(gInstructions[VMI_SAR8_SRC_IMM_DST_REG], reg, imm);
+}
+void po_x86_64::mc_sal_imm_to_reg_8(char reg, char imm)
+{
+    emit_bri(gInstructions[VMI_SAL8_SRC_IMM_DST_REG], reg, imm);
+}
+void po_x86_64::mc_sar_reg_8(char reg)
+{
+    emit_ur(gInstructions[VMI_SAR8_SRC_REG_DST_REG], reg);
+}
+void po_x86_64::mc_sal_reg_8(char reg)
+{
+    emit_ur(gInstructions[VMI_SAL8_SRC_REG_DST_REG], reg);
 }
 
 void po_x86_64::mc_movsx_8_to_16_reg_to_reg(char dst, char src)

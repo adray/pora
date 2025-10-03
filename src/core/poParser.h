@@ -45,6 +45,7 @@ namespace po
         poNode* parsePrimary();
         poNode* parseUnary();
         poNode* parseCall(const poToken& token);
+        poNode* parseBitShift();
         poNode* parseFactor();
         poNode* parseTerm();
         poNode* parseEquality();

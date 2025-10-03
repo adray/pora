@@ -730,6 +730,12 @@ void poModule::dump()
                     case IR_CONSTANT:
                         std::cout << " IR_CONSTANT " << int(ins.type()) << " " << ins.constant();
                         break;
+                    case IR_LEFT_SHIFT:
+                        std::cout << " IR_LEFT_SHIFT " << int(ins.type()) << " " << ins.left() << " " << ins.right();
+                        break;
+                    case IR_RIGHT_SHIFT:
+                        std::cout << " IR_RIGHT_SHIFT " << int(ins.type()) << " " << ins.left() << " " << ins.right();
+                        break;
                     case IR_RETURN:
                         std::cout << " IR_RETURN " << int(ins.type()) << " " << ins.left();
                         break;

@@ -1,0 +1,16 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        i16 x = (i16)10 << (i32)2;
+        i16 y = x >> (i32)2;
+        
+        print_64((i64)x);
+        print_64((i64)y);
+        
+        u16 z = (u16)10 << (u32)2;
+        print_64((i64)z);
+    }
+}

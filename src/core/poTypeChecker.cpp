@@ -862,6 +862,44 @@ int poTypeChecker::checkExpr(poNode* node)
         }
         break;
     }
+    case poNodeType::LEFT_SHIFT:
+    case poNodeType::RIGHT_SHIFT:
+    {
+        poBinaryNode* binary = static_cast<poBinaryNode*>(node);
+        type = checkExpr(binary->left());
+        switch (type)
+        {
+        case TYPE_U8:
+        case TYPE_I8:
+        case TYPE_U16:
+        case TYPE_I16:
+        case TYPE_U32:
+        case TYPE_I32:
+        case TYPE_U64:
+        case TYPE_I64:
+            switch (checkExpr(binary->right()))
+            {
+            case TYPE_U8:
+            case TYPE_I8:
+            case TYPE_U16:
+            case TYPE_I16:
+            case TYPE_U32:
+            case TYPE_I32:
+            case TYPE_U64:
+            case TYPE_I64:
+                break;
+            default:
+                type = -1;
+                break;
+            }
+            break;
+        default:
+            type = -1; // shift not allowed
+            break;
+        }
+        break;
+    }
+        break;
     case poNodeType::ADD:
     case poNodeType::SUB:
     case poNodeType::MUL:

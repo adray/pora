@@ -430,6 +430,13 @@ void po::syntaxTest()
         "   x = x * (y + 10.0);"\
         "}"\
         "}", true);
+    checkSyntax("Arithmetic Test #7", "namespace Test {"\
+        "static void main() {"\
+        "   f64 x = 5.0;"\
+        "   f64 y = 15.0;"\
+        "   x += y;"\
+        "}"\
+        "}", true);
     checkSyntax("Branch Test #1", "namespace Test {"\
         "static void main() {"\
         "   i64 x = 5;"\
@@ -658,6 +665,11 @@ void po::syntaxTest()
         "   break;"\
         "}"\
         "}", false);
+    checkSyntax("For Test #16", "namespace Test {"\
+        "static void main() {"\
+        "   for (i64 i =0; i < 10; i+=2){}"\
+        "}"\
+        "}", true);
     //checkSyntax("For Test #13", "namespace Test {"\
     //    "static void main() {"\
     //    "   for (;;){} "\
@@ -789,6 +801,16 @@ void po::syntaxTest()
         "   v1.x = y;"\
         "}"\
         "}", false);
+    checkSyntax("Struct Test #17", "namespace Test {"\
+        "struct myStruct {"\
+        "   i64 x;"\
+        "}"\
+        "static void main() {"\
+        "   myStruct v1;"\
+        "   v1.x = 9;"\
+        "   v1.x += 12;"\
+        "}"\
+        "}", true);
     checkSyntax("Array Test #1", "namespace Test {"\
         "static void main() {"\
         "   i64[10] myArray;"\
@@ -909,6 +931,21 @@ void po::syntaxTest()
         "   u8[] arr;"\
         "   arr = (u8[12])test();"
         "}", false);
+    checkSyntax("Array Test #16", "namespace Test {"\
+        "static void main() {"\
+        "   i64[8] arr;"\
+        "   arr[0] = 5;"\
+        "   arr[0] += 2;"\
+        "}"\
+        "}", true);
+    checkSyntax("Array Test #17", "namespace Test {"\
+        "struct test { i64 x; }"\
+        "static void main() {"\
+        "   test[8] arr;"\
+        "   arr[0].x = 5;"\
+        "   arr[0].x += 2;"\
+        "}"\
+        "}", true);
     checkSyntax("Pointers Test #1", "namespace Test {"\
         "static void main() {"\
         "   i64 x = 900;"\
@@ -1075,5 +1112,15 @@ void po::syntaxTest()
         "   u64 size = sizeof(i32"\
         "}"\
         "}", false);
+    checkSyntax("Bitshift Test #1", "namespace Test {"\
+        "static void main() {"\
+        "   i64 x = 1 << 4;"\
+        "}"\
+        "}", true);
+    checkSyntax("Bitshift Test #2", "namespace Test {"\
+        "static void main() {"\
+        "   i64 x = 8 >> 2;"\
+        "}"\
+        "}", true);
 
 }

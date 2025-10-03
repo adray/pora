@@ -161,6 +161,8 @@ namespace po
         void ir_unary_minus(PO_ALLOCATOR& linear, const poInstruction& ins);
         void ir_call(poModule& module, PO_ALLOCATOR& linear, const poInstruction& ins, const int pos, const std::vector<poInstruction>& args);
         void ir_param(poModule& module, PO_ALLOCATOR& linear, const poInstruction& ins, const int numArgs);
+        void ir_shl(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_shr(PO_ALLOCATOR& allocator, const poInstruction& ins);
         bool ir_jump(const int jump, const int imm, const int type);
 
         std::unordered_map<std::string, int> _mapping;
