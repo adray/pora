@@ -27,15 +27,7 @@ poSSABasicBlock::poSSABasicBlock()
 
 void poSSA::construct(poModule& module)
 {
-    for (poNamespace& ns : module.namespaces())
-    {
-        constructNamespaces(ns);
-    }
-}
-
-void poSSA::constructNamespaces(poNamespace& ns)
-{
-    for (poFunction& func : ns.functions())
+    for (poFunction& func : module.functions())
     {
         if (func.hasAttribute(poAttributes::EXTERN))
         {

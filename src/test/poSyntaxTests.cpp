@@ -437,6 +437,11 @@ void po::syntaxTest()
         "   x += y;"\
         "}"\
         "}", true);
+    checkSyntax("Arithmetic Test #8", "namespace Test {"\
+        "static void main() {"\
+        "   i64 x = 5 % 3;"\
+        "}"\
+        "}", true);
     checkSyntax("Branch Test #1", "namespace Test {"\
         "static void main() {"\
         "   i64 x = 5;"\
@@ -811,6 +816,73 @@ void po::syntaxTest()
         "   v1.x += 12;"\
         "}"\
         "}", true);
+    checkSyntax("Class Test #1", "namespace Test {"\
+        "class myClass {"\
+        "   public i64 x;"\
+        "}"\
+        "static void main() {"\
+        "   myClass v1;"\
+        "   v1.x = 9;"\
+        "   v1.x += 12;"\
+        "}"\
+        "}", true);
+    checkSyntax("Class Test #2", "namespace Test {"\
+        "class myClass {"\
+        "   private i64 _x;"\
+        "   i64 getX();"\
+        "   i64 setX(i64 x);"\
+        "}"\
+        "i64 myClass::getX() { return _x; } "\
+        "void myClass::setX(i64 x) { _x = x; } "\
+        "static void main() {"\
+        "   myClass v1;"\
+        "   v1.setX(10);"\
+        "   i64 x = v1.getX();"\
+        "}"\
+        "}", true);
+    checkSyntax("Class Test #3", "namespace Test {"\
+        "class myClass {"\
+        "   private i64 x;"\
+        "}"\
+        "static void main() {"\
+        "   myClass v1;"\
+        "   v1.x = 9;"\
+        "}"\
+        "}", false);
+    checkSyntax("Class Test #4", "namespace Test {"\
+        "class myClass {"\
+        "   private i64 x;"\
+        "   private i64 getX();"\
+        "}"\
+        "i64 myClass::getX() { return x; } "\
+        "static void main() {"\
+        "   myClass v1;"\
+        "   i64 x = v1.getX();"\
+        "}"\
+        "}", false);
+    checkSyntax("Class Test #5", "namespace Test {"\
+        "class myClass {"\
+        "   private i64 x;"\
+        "   private i64 innerGetX();"\
+        "   public i64 getX();"\
+        "}"\
+        "i64 myClass::innerGetX() { return x; } "\
+        "i64 myClass::getX() { return innerGetX(); } "\
+        "static void main() {"\
+        "   myClass v1;"\
+        "   i64 x = v1.getX();"\
+        "}"\
+        "}", true);
+    checkSyntax("Class Test #6", "namespace Test {"\
+        "class myClass {"\
+        "   private i64 x;"\
+        "   public i64 getX();"\
+        "}"\
+        "i64 myClass:getX() { return innerGetX(); } "\
+        "static void main() {"\
+        "   myClass v1;"\
+        "}"\
+        "}", false);
     checkSyntax("Array Test #1", "namespace Test {"\
         "static void main() {"\
         "   i64[10] myArray;"\

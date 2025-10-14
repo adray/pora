@@ -1,0 +1,68 @@
+import std;
+
+namespace TimerApp {
+    static void printTime(SYSTEMTIME* time) {
+        print_64((i64)time.wHour);
+        if ((i64)time.wHour < 10) {
+            print("0", (u32)2);
+        }
+        print(":", (u32)2);
+        print_64((i64)time.wMinute);
+        if ((i64)time.wMinute < 10) {
+            print("0", (u32)2);
+        }
+        print(":", (u32)2);
+        print_64((i64)time.wSecond);
+        if ((i64)time.wSecond < 10) {
+            print("0", (u32)2);
+        }
+        println("", (u32)1);
+    }
+    
+    static void main() {
+        println("Timer App", (u32)10);
+        print("Enter timer (mins):", (u32)20);
+        
+        u8[4] line;
+        u32 count = readLine((u8*)line, (u32)4);
+        if (count == (u32)(-1)) {
+            println("Invalid data.", (u32)14);
+            return;
+        }
+        
+        //println((u8*)line, count);
+        
+        i64 mins;
+        if (parseInt((u8*)line, count, &mins) == false) {
+            println("Error parsing data", (u32)19);
+            return;
+        }
+        
+        SYSTEMTIME time;
+        GetLocalTime(&time);        
+        time.wMinute += (u16)mins;
+        if (time.wMinute >= (u16)60) {
+            time.wHour += (u16)1;
+            time.wMinute -= (u16)60;
+        }
+        
+        print("Timer set for: ", (u32)16);
+        printTime(&time);
+        
+        i64 numSleeps = mins * 60;
+        i64 numMinsLeft = mins;
+        while (numSleeps > 0) {
+            Sleep((u32)1000);
+            numSleeps -= 1;
+            i64 minsLeft = numSleeps / 60;
+            if (minsLeft != numMinsLeft) {
+                numMinsLeft = minsLeft;
+                print("Time left: ", (u32)12);
+                print_64(numMinsLeft + 1);
+                println("(mins)", (u32)7);
+            }
+        }
+        
+        println("Timer done!", (u32)12);
+    }
+}

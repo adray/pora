@@ -104,7 +104,7 @@ void poLexer::addToken(poTokenType type)
 
 bool poLexer::isLetter(char ch)
 {
-    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_';
 }
 
 void poLexer::scanIdentifier()
@@ -421,8 +421,9 @@ void poLexer::scanLine(const std::string& line)
             else { addToken(poTokenType::GREATER); }
             break;
         case ':':
-            addToken(poTokenType::COLON);
             advance();
+            if (peek() == ':') { advance(); addToken(poTokenType::RESOLVER); }
+            else { addToken(poTokenType::COLON); }
             break;
         case ';':
             addToken(poTokenType::SEMICOLON);
@@ -510,6 +511,10 @@ void poLexer::scanLine(const std::string& line)
             {
                 setError("Bitwise OR not supported.");
             }
+            break;
+        case '%':
+            advance();
+            addToken(poTokenType::MODULO);
             break;
         default:
             if (isDigit(ch))

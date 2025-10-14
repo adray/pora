@@ -20,6 +20,15 @@ namespace po
     constexpr int TYPE_NULLPTR = 13;
     constexpr int TYPE_OBJECT = 14; /* values above this are user defined (non primitive) */
 
+    enum class poAttributes
+    {
+        PUBLIC = 0x1,
+        PRIVATE = 0x2,
+        INTERNAL = 0x4,
+        EXTERN = 0x8,
+        PROTECTED = 0x10,
+    };
+
     enum class poOperatorType
     {
         IMPLICIT_CAST,
@@ -56,16 +65,38 @@ namespace po
     class poField
     {
     public:
-        poField(const int offset, const int type, const std::string& name);
+        poField(const poAttributes attributes, const int offset, const int type, const std::string& name);
 
+        inline const poAttributes attributes() const { return _attributes; }
         inline const int offset() const { return _offset; }
         inline const int type() const { return _type; }
         inline const std::string& name() const { return _name; }
 
     private:
+        poAttributes _attributes;
         int _offset;
         int _type;
         std::string _name;
+    };
+
+    class poMemberFunction
+    {
+    public:
+        poMemberFunction(const poAttributes attributes, const int returnType, const std::string& name);
+        inline void addArgument(const int type) { _arguments.push_back(type); }
+        inline void setId(const int id) { _id = id; }
+        inline const std::vector<int>& arguments() const { return _arguments; }
+        inline const poAttributes attributes() const { return _attributes; }
+        inline const int returnType() const { return _returnType; }
+        inline const std::string& name() const { return _name; }
+        inline const int id() const { return _id; }
+
+    private:
+        poAttributes _attributes;
+        int _returnType;
+        int _id;
+        std::string _name;
+        std::vector<int> _arguments;
     };
 
     class poType
@@ -74,6 +105,7 @@ namespace po
         poType(const int id, const int baseType, const std::string& name);
 
         inline void addField(const poField& field) { _fields.push_back(field); }
+        inline void addMethod(const poMemberFunction& method) { _methods.push_back(method); }
         inline void addOperator(const poOperator& operator_) { _operators.push_back(operator_); }
         inline void setSize(const int size) { _size = size; }
         inline void setAlignment(const int alignment) { _alignment = alignment; }
@@ -82,6 +114,7 @@ namespace po
         inline void setPointer(const bool isPointer) { _isPointer = isPointer; }
 
         inline const std::vector<poField>& fields() const { return _fields; }
+        inline const std::vector<poMemberFunction>& functions() const { return _methods; }
         inline const std::vector<poOperator>& operators() const { return _operators; }
 
         inline const int id() const { return _id; }
@@ -103,6 +136,7 @@ namespace po
         bool _isPointer;
         std::string _name;
         std::vector<poField> _fields;
+        std::vector<poMemberFunction> _methods;
         std::vector<poOperator> _operators;
     };
 }

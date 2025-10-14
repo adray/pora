@@ -1,0 +1,22 @@
+import std;
+
+namespace Test {
+    class myClass {
+       private i64 _i;
+       public i64 _x;
+       i64 getX();
+       void setX(i64 x);
+    }
+    i64 myClass::getX() { return _x; } 
+    void myClass::setX(i64 x) { _x = x; } 
+    static i64 test(myClass* c) { return c._x; }
+    static void main() {
+       myClass v1;
+       myClass* v2 = &v1;
+       v2.setX(10);
+       i64 x = v2.getX();
+       print_64(x);
+       i64 y = test(v2);
+       print_64(y);
+    }
+}

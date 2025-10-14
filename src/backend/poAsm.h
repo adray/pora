@@ -141,26 +141,27 @@ namespace po
         // IR to machine code routines
         //=====================================
 
-        void ir_element_ptr(poModule& module, PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_ptr(poModule& module, PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_store(PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_load(PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_zero_extend(PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_sign_extend(PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_bitwise_cast(PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_convert(PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_add(PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_sub(PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_mul(PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_div(PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_cmp(PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_br(PO_ALLOCATOR& linear, const poInstruction& ins, poBasicBlock* bb);
-        void ir_constant(poModule& module, poConstantPool& constants, PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_copy(PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_ret(poModule& module, PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_unary_minus(PO_ALLOCATOR& linear, const poInstruction& ins);
-        void ir_call(poModule& module, PO_ALLOCATOR& linear, const poInstruction& ins, const int pos, const std::vector<poInstruction>& args);
-        void ir_param(poModule& module, PO_ALLOCATOR& linear, const poInstruction& ins, const int numArgs);
+        void ir_element_ptr(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_ptr(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_store(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_load(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_zero_extend(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_sign_extend(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_bitwise_cast(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_convert(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_add(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_sub(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_mul(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_div(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_mod(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_cmp(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_br(PO_ALLOCATOR& allocator, const poInstruction& ins, poBasicBlock* bb);
+        void ir_constant(poModule& module, poConstantPool& constants, PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_copy(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_ret(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_unary_minus(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_call(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins, const int pos, const std::vector<poInstruction>& args);
+        void ir_param(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins, const int numArgs);
         void ir_shl(PO_ALLOCATOR& allocator, const poInstruction& ins);
         void ir_shr(PO_ALLOCATOR& allocator, const poInstruction& ins);
         bool ir_jump(const int jump, const int imm, const int type);

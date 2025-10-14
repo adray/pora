@@ -9,6 +9,7 @@
 #include "poOptFold.h"
 #include "poOptMemToReg.h"
 #include "poOptDCE.h"
+#include "poOptCopy.h"
 #include "poSSA.h"
 #include "poTypeResolver.h"
 
@@ -97,6 +98,10 @@ int poCompiler:: compile()
     poOptMemToReg regToMem;
     regToMem.optimize(module);
     //module.dump();
+
+    // Perform copy propagation optimization
+    //poOptCopy copy;
+    //copy.optimize(module);
 
     // Eliminate any dead code
     poOptDCE dce;

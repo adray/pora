@@ -30,7 +30,7 @@ namespace po
 
         bool checkEquivalence(const int lhs, const int rhs);
         void checkModules(poNode* node);
-        void checkNamespaces(poNode* node);
+        void checkNamespaces(poNode* node, const std::vector<poNode*> importNodes);
         void checkFunctions(poNode* node);
         void checkBody(poNode* node, const int returnType);
         void checkStatement(poNode* node, const int returnType);
@@ -39,6 +39,7 @@ namespace po
         void checkReturn(poNode* node, const int returnType);
         int checkExpr(poNode* node);
         int checkMember(poNode* node);
+        int checkMemberCall(poNode* node);
         int checkArray(poNode* node);
         int checkCall(poNode* node);
         int checkCast(poNode* node);
@@ -48,6 +49,7 @@ namespace po
         void checkIfStatement(po::poNode* node, const int returnType);
         void checkWhileStatement(po::poNode* node, const int returnType);
 
+        poListNode* getFunction(const std::string& name);
         int getVariable(const std::string& name);
         bool addVariable(const std::string& name, const int type);
         void pushScope();
@@ -57,6 +59,7 @@ namespace po
         std::unordered_map<std::string, poListNode*> _types;
         std::vector<std::unordered_map<std::string, int>> _variables;
         std::unordered_map<std::string, poListNode*> _functions;
+        std::vector<std::string> _imports;
         std::string _errorText;
         int _errorLine;
         int _errorCol;

@@ -1,0 +1,26 @@
+import std;
+
+namespace Test {
+    class myClass {
+       private i64 _i;
+       private i64 _j;
+       void init();
+       void print();
+       private i64 get();
+    }
+    void myClass::init() {
+        _i = 60;
+        _j = 99;
+    }
+    void myClass::print() {
+        print_64(get());
+    }
+    i64 myClass::get() {
+        return _j;
+    }
+    static void main() {
+       myClass v1;
+       v1.init();
+       v1.print();
+    }
+}

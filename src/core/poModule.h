@@ -8,35 +8,9 @@
 
 namespace po
 {
-    enum class poAttributes
-    {
-        PUBLIC = 0x1,
-        PRIVATE = 0x2,
-        INTERNAL = 0x4,
-        EXTERN = 0x8
-    };
-
     enum class poCallConvention
     {
         X86_64
-    };
-
-    template<typename T>
-    class poResult
-    {
-    public:
-        poResult(const std::vector<T>& list, const int index)
-            :
-            _list(list),
-            _index(index)
-        { }
-
-        inline bool HasValue() const { return _index != 0; }
-        inline T& Value() { return _list[_index]; }
-
-    private:
-        int _index;
-        const std::vector<T>& _list;
     };
 
     class poConstant
@@ -84,8 +58,9 @@ namespace po
     class poFunction
     {
     public:
-        poFunction(const std::string& name, int arity, poAttributes attribute, poCallConvention callingConvention);
+        poFunction(const std::string& name, const std::string& fullname, int arity, poAttributes attribute, poCallConvention callingConvention);
         inline const std::string& name() const { return _name; }
+        inline const std::string& fullname() const { return _fullname; }
         inline const poAttributes attribute() const { return _attribute; }
         inline const poCallConvention callConvention() const { return _callingConvention; }
         inline poFlowGraph& cfg() { return _cfg; }
@@ -99,6 +74,7 @@ namespace po
         int _arity;
         poAttributes _attribute;
         std::string _name;
+        std::string _fullname;
         poFlowGraph _cfg;
         poCallConvention _callingConvention;
         std::vector<int> _variables;
@@ -109,14 +85,16 @@ namespace po
     {
     public:
         poNamespace(const std::string& name);
-        void addFunction(const poFunction& function);
         inline const std::string& name() const { return _name; }
-        inline std::vector<poFunction>& functions() { return _functions; }
-        inline const std::vector<poFunction>& functions() const { return _functions; }
+        inline void addFunction(const int id) { _functions.push_back(id); }
+        inline void addType(const int id) { _types.push_back(id); }
+        inline const std::vector<int>& functions() const { return _functions; }
+        inline const std::vector<int>& types() const { return _types; }
 
     private:
         std::string _name;
-        std::vector<poFunction> _functions;
+        std::vector<int> _functions;
+        std::vector<int> _types;
     };
 
     class poConstantPool
@@ -177,14 +155,16 @@ namespace po
     public:
         poModule();
         void addNamespace(const poNamespace& ns);
-        poResult<poNamespace> getNamespace(const std::string& name);
         inline std::vector<poNamespace>& namespaces() { return _namespaces; }
         inline poConstantPool& constants() { return _constants; }
         inline std::vector<poType>& types() { return _types; }
+        inline std::vector<poFunction>& functions() { return _functions; }
+        inline const std::vector<poFunction>& functions() const { return _functions; }
         int addSymbol(const std::string& symbol);
         bool getSymbol(const int id, std::string& symbol);
+        void addFunction(const poFunction& function);
         void addType(const poType& type);
-        int getTypeFromName(const std::string& name) const;
+        int getTypeFromName(const std::string& name, const std::vector<std::string>& imports) const;
         int getArrayType(const int baseType) const;
         int getPointerType(const int baseType) const;
         void dump();
@@ -195,6 +175,7 @@ namespace po
         void addExplicitCastOperators();
 
         std::vector<poType> _types;
+        std::vector<poFunction> _functions;
         std::unordered_map<std::string, int> _typeMapping;
         std::unordered_map<int, int> _arrayTypes; /* mapping from base type -> array type */
         std::unordered_map<int, int> _pointerTypes; /* mapping from base type -> pointer type */

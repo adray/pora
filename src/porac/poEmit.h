@@ -100,9 +100,7 @@ namespace po
         int getArrayType(const int baseType, const int arrayRank);
         int getPointerType(const int baseType);
         void getModules(poNode* node);
-        void getNamespaces(poNode* node);
-        void getFunction(poNode* node);
-        void getStruct(poNode* node);
+        void getNamespaces(poNode* node, const std::vector<poNode*>& importNodes);
         void emitInstruction(const poInstruction& instruction, poBasicBlock* bb);
         int emitAlloca(const int type, poBasicBlock* bb);
         int emitAlloca(const int type, const int varName, poBasicBlock* bb);
@@ -115,7 +113,8 @@ namespace po
         void emitStatement(poNode* node, poFlowGraph& cfg);
         int emitPassByValue(const int expr, poFlowGraph& cfg);
         int emitPassByReference(const int expr, poFlowGraph& cfg);
-        int emitCall(poNode* node, poFlowGraph& cfg);
+        int emitCall(poNode* node, poFlowGraph& cfg, int instanceExpr);
+        int emitMemberCall(poNode* node, poFlowGraph& cfg);
         void emitReturn(poNode* node, poFlowGraph& cfg);
         void emitDecl(poNode* node, poFlowGraph& cfg);
         void emitAssignment(poNode* node, poFlowGraph& cfg);
@@ -134,6 +133,7 @@ namespace po
         void emitStoreArray(poNode* node, poFlowGraph& cfg, const int id);
         int emitLoadMember(poNode* node, poFlowGraph& cfg);
         void emitStoreMember(poNode* node, poFlowGraph& cfg, const int id);
+        int emitLoadThis(poFlowGraph& cfg);
         int emitLoadVariable(poNode* node, poFlowGraph& cfg);
         int emitSizeof(poNode* node, poFlowGraph& cfg);
 
@@ -141,10 +141,14 @@ namespace po
         poConditionGraph _graph;
         std::unordered_map<std::string, poNode*> _functions;
         std::unordered_map<std::string, poVariable> _variables;
+        std::unordered_map<std::string, std::vector<poNode*>> _functionImports;
         std::vector<int> _types;
         std::vector<int> _qualifiers;
+        std::vector<std::string> _imports;
+        std::string _namespace;
         int _instructionCount;
         int _returnInstruction;
+        int _thisInstruction;
         bool _isError;
         std::string _errorText;
     };

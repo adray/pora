@@ -1,5 +1,28 @@
 namespace std
 {
+    static u32 readLine(u8* buffer, u32 size)
+    {
+        u32 stdIn = (u32)4294967286;
+        if (size == (u32)0)
+        {
+            return (u32)0; // Invalid buffer or size
+        }
+        u32 bytesRead = (u32)0;
+        i64 handle = GetStdHandle(stdIn);
+        ReadFile(handle,
+            buffer,
+            size - (u32)1,
+            &bytesRead,
+            null);
+        u8[] buf = (u8[128])buffer;
+        if (bytesRead > (u32)0 && buf[(i64)bytesRead - (i64)1] == 10b)
+        {
+            bytesRead -= (u32)1; // Remove newline character
+        }
+        buf[(i64)bytesRead] = 0b; // Null-terminate the string
+        return bytesRead;
+    }
+
     static void print(u8* str, u32 size)
     {
         u32 stdOut = (u32)4294967285;
@@ -12,6 +35,24 @@ namespace std
             &bytesWritten,
             null);
     }
+
+    //static void println()
+    //{
+    //    u32 stdOut = (u32)4294967285;
+    //    
+    //    u32 bytesWritten = (u32)0;
+    //    i64 handle = GetStdHandle(stdOut);
+    //    
+    //    u8[2] newline;
+    //    newline[0] = 10b;
+    //    newline[1] = 0b;
+    //    
+    //    WriteFile(handle,
+    //        (u8*)newline,
+    //        (u32)2,
+    //        &bytesWritten,
+    //        null);
+    //}
 
     static void println(u8* str, u32 size)
     {
@@ -63,16 +104,16 @@ namespace std
         if (value == 0 && size > (u32)0)
         {
             outputBuffer[(i64)index] = '0';
-            index = index + (u32)1;
+            index += (u32)1;
         }
 
         while (value > 0 && index < size)
         {
-            i64 remainder = value - (value / 10) * 10; // workaround as we don't have a modulus operator
+            i64 remainder = value % 10;
 
             outputBuffer[(i64)index] = (u8)remainder + (u8)'0';
-            index = index + (u32)1;
-            value = value / 10;
+            index += (u32)1;
+            value /= 10;
         } 
 
         if (isNegative == true && index < size)
@@ -95,7 +136,7 @@ namespace std
         if (index < size)
         {
             outputBuffer[(i64)index] = 0b;
-            index = index + (u32)1;
+            index += (u32)1;
         }
         return index;
     }

@@ -286,76 +286,73 @@ void poAnalyzer::fixFunctionCalls(poModule& module, po_x86_64_flow_graph& cfg)
             std::string symbol;
             if (!module.getSymbol(id, symbol)) { continue; }
             
-            for (poNamespace& ns : module.namespaces())
+            for (poFunction& func : module.functions())
             {
-                for (poFunction& func : ns.functions())
+                if (func.fullname() == symbol)
                 {
-                    if (func.name() == symbol)
+                    const std::vector<int>& args = func.args();
+                    size_t argsDone = 0;
+                    size_t pos = k - 1;
+                    int stackPos = registerHomes + (int(args.size()) - VM_MAX_ARGS - 1) * 8;
+                    while (argsDone < args.size())
                     {
-                        const std::vector<int>& args = func.args();
-                        size_t argsDone = 0;
-                        size_t pos = k - 1;
-                        int stackPos = registerHomes + (int(args.size()) - VM_MAX_ARGS - 1) * 8;
-                        while (argsDone < args.size())
+                        const int argIndex = int(args.size() - argsDone) - 1;
+                        const int typeId = args[argIndex];
+                        const poType& type = module.types()[typeId];
+                        auto& instr = ins[pos];
+
+                        switch (typeId)
                         {
-                            const int argIndex = int(args.size() - argsDone) - 1;
-                            const int typeId = args[argIndex];
-                            const poType& type = module.types()[typeId];
-                            auto& instr = ins[pos];
+                            case TYPE_I64:
+                            case TYPE_I32:
+                            case TYPE_I16:
+                            case TYPE_I8:
+                            case TYPE_U64:
+                            case TYPE_U32:
+                            case TYPE_U16:
+                            case TYPE_U8:
+                                if (argIndex >= VM_MAX_ARGS &&
+                                    instr.dstReg() == VM_REGISTER_ESP)
+                                {
+                                    instr.setImm32(stackPos);
+                                    stackPos -= 8;
+                                    argsDone++;
+                                }
+                                else if (instr.dstReg() == generalArgs[argIndex])
+                                {
+                                    argsDone++;
+                                }
+                                break;
+                            case TYPE_F32:
+                            case TYPE_F64:
+                                if (argIndex >= VM_MAX_SSE_ARGS &&
+                                    instr.dstReg() == VM_REGISTER_ESP)
+                                {
+                                    instr.setImm32(stackPos);
+                                    stackPos -= 8;
+                                    argsDone++;
+                                }
+                                else if (instr.dstReg() == sseArgs[argIndex])
+                                {
+                                    argsDone++;
+                                }
+                                break;
+                            default:
+                                if (argIndex >= VM_MAX_ARGS &&
+                                    instr.dstReg() == VM_REGISTER_ESP)
+                                {
+                                    instr.setImm32(stackPos);
+                                    stackPos -= 8;
+                                    argsDone++;
+                                }
+                                else if (instr.dstReg() == generalArgs[argIndex])
+                                {
+                                    argsDone++;
+                                }
+                                break;
+                        }
 
-                            switch (typeId)
-                            {
-                                case TYPE_I64:
-                                case TYPE_I32:
-                                case TYPE_I16:
-                                case TYPE_I8:
-                                case TYPE_U64:
-                                case TYPE_U32:
-                                case TYPE_U16:
-                                case TYPE_U8:
-                                    if (argIndex >= VM_MAX_ARGS &&
-                                        instr.dstReg() == VM_REGISTER_ESP)
-                                    {
-                                        instr.setImm32(stackPos);
-                                        stackPos -= 8;
-                                        argsDone++;
-                                    }
-                                    else if (instr.dstReg() == generalArgs[argIndex])
-                                    {
-                                        argsDone++;
-                                    }
-                                    break;
-                                case TYPE_F32:
-                                case TYPE_F64:
-                                    if (argIndex >= VM_MAX_SSE_ARGS &&
-                                        instr.dstReg() == VM_REGISTER_ESP)
-                                    {
-                                        instr.setImm32(stackPos);
-                                        stackPos -= 8;
-                                        argsDone++;
-                                    }
-                                    else if (instr.dstReg() == sseArgs[argIndex])
-                                    {
-                                        argsDone++;
-                                    }
-                                    break;
-                                default:
-                                    if (argIndex >= VM_MAX_ARGS &&
-                                        instr.dstReg() == VM_REGISTER_ESP)
-                                    {
-                                        instr.setImm32(stackPos);
-                                        stackPos -= 8;
-                                        argsDone++;
-                                    }
-                                    else if (instr.dstReg() == generalArgs[argIndex])
-                                    {
-                                        argsDone++;
-                                    }
-                                    break;
-                            }
-
-                            pos--;
-                         }
+                        pos--;
                     }
                 }
             }
@@ -372,49 +369,46 @@ int poAnalyzer::checkFunction(poModule& module, const int id)
         return stackSize;
     }
 
-    for (poNamespace& ns : module.namespaces())
+    for (poFunction& func : module.functions())
     {
-        for (poFunction& func : ns.functions())
+        if (func.fullname() != symbol)
         {
-            if (func.name() != symbol)
-            {
-                continue;
-            }
+            continue;
+        }
 
-            const std::vector<int>& args = func.args();
-            for (size_t i = 0; i < args.size(); i++)
+        const std::vector<int>& args = func.args();
+        for (size_t i = 0; i < args.size(); i++)
+        {
+            const int typeId = args[i];
+            const poType& type = module.types()[typeId];
+            switch (typeId)
             {
-                const int typeId = args[i];
-                const poType& type = module.types()[typeId];
-                switch (typeId)
-                {
-                    case TYPE_I64:
-                    case TYPE_I32:
-                    case TYPE_I16:
-                    case TYPE_I8:
-                    case TYPE_U64:
-                    case TYPE_U32:
-                    case TYPE_U16:
-                    case TYPE_U8:
-                        if (i >= VM_MAX_ARGS)
-                        {
-                            stackSize += type.size();
-                        }
-                        break;
-                    case TYPE_F32:
-                    case TYPE_F64:
-                        if (i >= VM_MAX_SSE_ARGS)
-                        {
-                            stackSize += type.size();
-                        }
-                        break;
-                    default:
-                        if (i >= VM_MAX_ARGS)
-                        {
-                            stackSize += type.size();
-                        }
-                        break;
-                }
+                case TYPE_I64:
+                case TYPE_I32:
+                case TYPE_I16:
+                case TYPE_I8:
+                case TYPE_U64:
+                case TYPE_U32:
+                case TYPE_U16:
+                case TYPE_U8:
+                    if (i >= VM_MAX_ARGS)
+                    {
+                        stackSize += type.size();
+                    }
+                    break;
+                case TYPE_F32:
+                case TYPE_F64:
+                    if (i >= VM_MAX_SSE_ARGS)
+                    {
+                        stackSize += type.size();
+                    }
+                    break;
+                default:
+                    if (i >= VM_MAX_ARGS)
+                    {
+                        stackSize += type.size();
+                    }
+                    break;
             }
         }
     }

@@ -92,6 +92,13 @@ namespace std
           u32*      lpNumberOfBytesWritten, // [out, optional] LPDWORD
           OVERLAPPED* lpOverlapped // [in, out, optional] LPOVERLAPPED
         );
+    extern boolean ReadFile(
+          i64       hFile, // [in] HANDLE
+          u8*       lpBuffer, // [out] LPVOID
+          u32       nNumberOfBytesToRead, // [in] DWORD
+          u32*      lpNumberOfBytesRead, // [out, optional] LPDWORD
+          OVERLAPPED* lpOverlapped // [in, out, optional] LPOVERLAPPED
+        );
 
     extern i64 GetStdHandle(
         u32 nStdHandle //_In_ DWORD 
@@ -128,4 +135,23 @@ namespace std
     extern i64 RegisterClassA(
         WNDCLASSA* lpWndClass // WNDCLASSA*
     ); // returns ATOM
+
+    extern void Sleep(
+        u32 dwMilliseconds // DWORD
+    );
+
+    struct SYSTEMTIME {
+        u16 wYear;
+        u16 wMonth;
+        u16 wDayOfWeek;
+        u16 wDay;
+        u16 wHour;
+        u16 wMinute;
+        u16 wSecond;
+        u16 wMilliseconds;
+    }
+
+    extern void GetLocalTime(
+        SYSTEMTIME* lpSystemTime // [out] LPSYSTEMTIME lpSystemTime
+    );
 }

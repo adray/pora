@@ -45,6 +45,8 @@ set (PORACORE_SOURCES
     "poTypeResolver.cpp"
     "poOptDCE.cpp"
     "poOptDCE.h"
+    "poOptCopy.cpp"
+    "poOptCopy.h"
 )
 
 project ("poracore")

@@ -34,7 +34,6 @@ namespace po
     public:
         void construct(poModule& module);
     private:
-        void constructNamespaces(poNamespace& ns);
         void constructFunction(const std::vector<int>& variables, poFlowGraph& cfg);
         void insertPhiNodes(const std::vector<int>& variables, poDom& dom);
         void ssaRename(const std::vector<int>& variables, poDom& dom);

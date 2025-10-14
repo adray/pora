@@ -396,9 +396,10 @@ const std::string& poConstantPool::getString(const int id)
 // Function
 //================
 
-poFunction::poFunction(const std::string& name, int arity, poAttributes attribute, poCallConvention callingConvention)
+poFunction::poFunction(const std::string& name, const std::string& fullname, int arity, poAttributes attribute, poCallConvention callingConvention)
     :
     _name(name),
+    _fullname(fullname),
     _arity(arity),
     _attribute(attribute),
     _callingConvention(callingConvention)
@@ -413,10 +414,6 @@ poNamespace::poNamespace(const std::string& name)
     :
     _name(name)
 {
-}
-void poNamespace::addFunction(const poFunction& function)
-{
-    _functions.push_back(function);
 }
 
 //================
@@ -620,7 +617,7 @@ int poModule::getPointerType(const int baseType) const
     return -1;
 }
 
-int poModule::getTypeFromName(const std::string& name) const
+int poModule::getTypeFromName(const std::string& name, const std::vector<std::string>& imports) const
 {
     const auto& it = _typeMapping.find(name);
     if (it != _typeMapping.end())
@@ -629,20 +626,10 @@ int poModule::getTypeFromName(const std::string& name) const
     }
     return -1;
 }
- 
-poResult<poNamespace> poModule::getNamespace(const std::string& name)
-{
-    int index = -1;
-    for (size_t i = 0; i < _namespaces.size(); i++)
-    {
-        if (_namespaces[i].name() == name)
-        {
-            index = int(i);
-            break;
-        }
-    }
 
-    return poResult<poNamespace>(_namespaces, index);
+void poModule::addFunction(const poFunction& function)
+{
+    _functions.push_back(function);
 }
 
 int poModule::addSymbol(const std::string& symbol)
@@ -678,123 +665,123 @@ void poModule::dumpTypes()
 
 void poModule::dump()
 {
-    for (auto& ns : _namespaces)
+    for (auto& func : _functions)
     {
-        std::cout << "===================" << std::endl;
-        for (auto& func : ns.functions())
+        if (func.hasAttribute(poAttributes::EXTERN))
         {
-            if (func.hasAttribute(poAttributes::EXTERN))
-            {
-                continue;
-            }
-
-            std::cout << ns.name() << "::" << func.name() << std::endl;
-            
-            const int numBB = int(func.cfg().numBlocks());
-            std::unordered_map<poBasicBlock*, int> blocks;
-            for (int i = 0; i < numBB; i++)
-            {
-                blocks[func.cfg().getBasicBlock(i)] = i;
-            }
-
-            for (int i = 0; i < numBB; i++)
-            {
-                std::cout << "Basic Block " << i << ":" << std::endl;
-                poBasicBlock* bb = func.cfg().getBasicBlock(i);
-                for (auto& ins : bb->instructions())
-                {
-                    std::cout << ins.name();
-                    switch (ins.code())
-                    {
-                    case IR_ADD:
-                        std::cout << " IR_ADD " << int(ins.type()) << " " << ins.left() << " " << ins.right();
-                        break;
-                    case IR_SUB:
-                        std::cout << " IR_SUB " << int(ins.type()) << " " << ins.left() << " " << ins.right();
-                        break;
-                    case IR_MUL:
-                        std::cout << " IR_MUL " << int(ins.type()) << " " << ins.left() << " " << ins.right();
-                        break;
-                    case IR_DIV:
-                        std::cout << " IR_DIV " << int(ins.type()) << " " << ins.left() << " " << ins.right();
-                        break;
-                    case IR_CMP:
-                        std::cout << " IR_CMP " << int(ins.type()) << " " << ins.left() << " " << ins.right();
-                        break;
-                    case IR_PHI:
-                        std::cout << " IR_PHI " << int(ins.type()) << " " << ins.left() << " " << ins.right();
-                        break;
-                    case IR_UNARY_MINUS:
-                        std::cout << " IR_UNARY_MINUS " << int(ins.type()) << " " << ins.left();
-                        break;
-                    case IR_CONSTANT:
-                        std::cout << " IR_CONSTANT " << int(ins.type()) << " " << ins.constant();
-                        break;
-                    case IR_LEFT_SHIFT:
-                        std::cout << " IR_LEFT_SHIFT " << int(ins.type()) << " " << ins.left() << " " << ins.right();
-                        break;
-                    case IR_RIGHT_SHIFT:
-                        std::cout << " IR_RIGHT_SHIFT " << int(ins.type()) << " " << ins.left() << " " << ins.right();
-                        break;
-                    case IR_RETURN:
-                        std::cout << " IR_RETURN " << int(ins.type()) << " " << ins.left();
-                        break;
-                    case IR_COPY:
-                        std::cout << " IR_COPY " << int(ins.type()) << " " << ins.left();
-                        break;
-                    case IR_CALL:
-                        std::cout << " IR_CALL " << int(ins.type()) << " " << int(ins.left());
-                        break;
-                    case IR_ARG:
-                        std::cout << " IR_ARG " << int(ins.type()) << " " << int(ins.left());
-                        break;
-                    case IR_PARAM:
-                        std::cout << " IR_PARAM " << int(ins.type());
-                        break;
-                    case IR_BR:
-                        std::cout << " IR_BR " << int(ins.type()) << " " << ins.left();
-                        if (bb->getBranch())
-                        {
-                            const int target = blocks[bb->getBranch()];
-                            std::cout << " --> Basic Block " << target;
-                        }
-                        break;
-                    case IR_ALLOCA:
-                        std::cout << " IR_ALLOCA " << int(ins.type()) << " " << int(ins.left());
-                        break;
-                    case IR_MALLOC:
-                        std::cout << " IR_MALLOC " << int(ins.type()) << " " << int(ins.left());
-                        break;
-                    case IR_LOAD:
-                        std::cout << " IR_LOAD " << int(ins.type()) << " " << int(ins.left());
-                        break;
-                    case IR_STORE:
-                        std::cout << " IR_STORE " << int(ins.type()) << " " << int(ins.left()) << " " << int(ins.right());
-                        break;
-                    case IR_PTR:
-                        std::cout << " IR_PTR " << int(ins.type()) << " " << int(ins.left()) << " " << int(ins.right()) << " #" << int(ins.memOffset());
-                        break;
-                    case IR_ELEMENT_PTR:
-                        std::cout << " IR_ELEMENT_PTR " << int(ins.type()) << " " << int(ins.left()) << " " << int(ins.right()) << " #" << int(ins.memOffset());
-                        break;
-                    case IR_SIGN_EXTEND:
-                        std::cout << " IR_SIGN_EXTEND " << int(ins.type()) << " " << int(ins.left()) << " /" << int(ins.memOffset());
-                        break;
-                    case IR_ZERO_EXTEND:
-                        std::cout << " IR_ZERO_EXTEND " << int(ins.type()) << " " << int(ins.left()) << " /" << int(ins.memOffset());
-                        break;
-                    case IR_BITWISE_CAST:
-                        std::cout << " IR_BITWISE_CAST " << int(ins.type()) << " " << int(ins.left()) << " /" << int(ins.memOffset());
-                        break;
-                    case IR_CONVERT:
-                        std::cout << " IR_CONVERT " << int(ins.type()) << " " << int(ins.left()) << " /" << int(ins.memOffset());
-                        break;
-                    }
-                    std::cout << std::endl;
-                }
-            }
-
-            std::cout << "===================" << std::endl;
+            continue;
         }
+
+        std::cout << "===================" << std::endl;
+        std::cout << func.name() << std::endl;
+
+        const int numBB = int(func.cfg().numBlocks());
+        std::unordered_map<poBasicBlock*, int> blocks;
+        for (int i = 0; i < numBB; i++)
+        {
+            blocks[func.cfg().getBasicBlock(i)] = i;
+        }
+
+        for (int i = 0; i < numBB; i++)
+        {
+            std::cout << "Basic Block " << i << ":" << std::endl;
+            poBasicBlock* bb = func.cfg().getBasicBlock(i);
+            for (auto& ins : bb->instructions())
+            {
+                std::cout << ins.name();
+                switch (ins.code())
+                {
+                case IR_ADD:
+                    std::cout << " IR_ADD " << int(ins.type()) << " " << ins.left() << " " << ins.right();
+                    break;
+                case IR_SUB:
+                    std::cout << " IR_SUB " << int(ins.type()) << " " << ins.left() << " " << ins.right();
+                    break;
+                case IR_MUL:
+                    std::cout << " IR_MUL " << int(ins.type()) << " " << ins.left() << " " << ins.right();
+                    break;
+                case IR_DIV:
+                    std::cout << " IR_DIV " << int(ins.type()) << " " << ins.left() << " " << ins.right();
+                    break;
+                case IR_MODULO:
+                    std::cout << " IR_MODULO " << int(ins.type()) << " " << ins.left() << " " << ins.right();
+                    break;
+                case IR_CMP:
+                    std::cout << " IR_CMP " << int(ins.type()) << " " << ins.left() << " " << ins.right();
+                    break;
+                case IR_PHI:
+                    std::cout << " IR_PHI " << int(ins.type()) << " " << ins.left() << " " << ins.right();
+                    break;
+                case IR_UNARY_MINUS:
+                    std::cout << " IR_UNARY_MINUS " << int(ins.type()) << " " << ins.left();
+                    break;
+                case IR_CONSTANT:
+                    std::cout << " IR_CONSTANT " << int(ins.type()) << " " << ins.constant();
+                    break;
+                case IR_LEFT_SHIFT:
+                    std::cout << " IR_LEFT_SHIFT " << int(ins.type()) << " " << ins.left() << " " << ins.right();
+                    break;
+                case IR_RIGHT_SHIFT:
+                    std::cout << " IR_RIGHT_SHIFT " << int(ins.type()) << " " << ins.left() << " " << ins.right();
+                    break;
+                case IR_RETURN:
+                    std::cout << " IR_RETURN " << int(ins.type()) << " " << ins.left();
+                    break;
+                case IR_COPY:
+                    std::cout << " IR_COPY " << int(ins.type()) << " " << ins.left();
+                    break;
+                case IR_CALL:
+                    std::cout << " IR_CALL " << int(ins.type()) << " " << int(ins.left());
+                    break;
+                case IR_ARG:
+                    std::cout << " IR_ARG " << int(ins.type()) << " " << int(ins.left());
+                    break;
+                case IR_PARAM:
+                    std::cout << " IR_PARAM " << int(ins.type());
+                    break;
+                case IR_BR:
+                    std::cout << " IR_BR " << int(ins.type()) << " " << ins.left();
+                    if (bb->getBranch())
+                    {
+                        const int target = blocks[bb->getBranch()];
+                        std::cout << " --> Basic Block " << target;
+                    }
+                    break;
+                case IR_ALLOCA:
+                    std::cout << " IR_ALLOCA " << int(ins.type()) << " " << int(ins.left());
+                    break;
+                case IR_MALLOC:
+                    std::cout << " IR_MALLOC " << int(ins.type()) << " " << int(ins.left());
+                    break;
+                case IR_LOAD:
+                    std::cout << " IR_LOAD " << int(ins.type()) << " " << int(ins.left());
+                    break;
+                case IR_STORE:
+                    std::cout << " IR_STORE " << int(ins.type()) << " " << int(ins.left()) << " " << int(ins.right());
+                    break;
+                case IR_PTR:
+                    std::cout << " IR_PTR " << int(ins.type()) << " " << int(ins.left()) << " " << int(ins.right()) << " #" << int(ins.memOffset());
+                    break;
+                case IR_ELEMENT_PTR:
+                    std::cout << " IR_ELEMENT_PTR " << int(ins.type()) << " " << int(ins.left()) << " " << int(ins.right()) << " #" << int(ins.memOffset());
+                    break;
+                case IR_SIGN_EXTEND:
+                    std::cout << " IR_SIGN_EXTEND " << int(ins.type()) << " " << int(ins.left()) << " /" << int(ins.memOffset());
+                    break;
+                case IR_ZERO_EXTEND:
+                    std::cout << " IR_ZERO_EXTEND " << int(ins.type()) << " " << int(ins.left()) << " /" << int(ins.memOffset());
+                    break;
+                case IR_BITWISE_CAST:
+                    std::cout << " IR_BITWISE_CAST " << int(ins.type()) << " " << int(ins.left()) << " /" << int(ins.memOffset());
+                    break;
+                case IR_CONVERT:
+                    std::cout << " IR_CONVERT " << int(ins.type()) << " " << int(ins.left()) << " /" << int(ins.memOffset());
+                    break;
+                }
+                std::cout << std::endl;
+            }
+        }
+
+        std::cout << "===================" << std::endl;
     }
 }

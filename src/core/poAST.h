@@ -1,5 +1,6 @@
 #pragma once
 #include "poLex.h"
+#include "poModule.h"
 
 namespace po
 {
@@ -17,6 +18,7 @@ namespace po
         SUB, /* poBinaryNode */
         MUL, /* poBinaryNode */
         DIV, /* poBinaryNode */
+        MODULO, /* poBinaryNode */
         UNARY_SUB, /* poUnaryNode */
         OR, /* poBinaryNode */
         AND, /* poBinaryNode */
@@ -58,7 +60,9 @@ namespace po
         NAMESPACE, /* poListNode */
         MODULE, /* poListNode */
         IMPORT, /* poNode */
-        SIZEOF /* poNode */
+        SIZEOF, /* poNode */
+        ATTRIBUTES, /* poAttributeNode */
+        RESOLVER, /* poResolverNode */
     };
 
     class poNode
@@ -166,5 +170,37 @@ namespace po
 
     private:
         int _count;
+    };
+
+    class poAttributeNode : public poUnaryNode
+    {
+    public:
+        poAttributeNode(poAttributes attributes, const poToken& token, poNode* child)
+            :
+            poUnaryNode(poNodeType::ATTRIBUTES, child, token),
+            _attributes(attributes)
+        {
+        }
+
+        inline const poAttributes attributes() const { return _attributes; }
+
+    private:
+        poAttributes _attributes;
+    };
+
+    class poResolverNode : public poNode
+    {
+    public:
+        poResolverNode(const poToken& token, const std::vector<std::string>& path)
+            :
+            poNode(poNodeType::RESOLVER, token),
+            _path(path)
+        {
+        }
+
+        inline const std::vector<std::string>& path() const { return _path; }
+
+    private:
+        std::vector<std::string> _path;
     };
 }

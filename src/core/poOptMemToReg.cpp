@@ -37,14 +37,11 @@ void poOptMemToReg_Alloca::addUse(const poInstructionRef& ref)
 
 void poOptMemToReg::optimize(poModule& module)
 {
-    for (poNamespace& ns : module.namespaces())
+    for (poFunction& func : module.functions())
     {
-        for (poFunction& func : ns.functions())
+        if (!func.hasAttribute(poAttributes::EXTERN))
         {
-            if (!func.hasAttribute(poAttributes::EXTERN))
-            {
-                optimize(module, func.cfg());
-            }
+            optimize(module, func.cfg());
         }
     }
 }

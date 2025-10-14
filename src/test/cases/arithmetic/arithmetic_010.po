@@ -1,0 +1,13 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        i64 x = 100 % 10;
+        print_64(x);
+        
+        i64 y = 8 % 3;
+        print_64(y);
+    }
+}

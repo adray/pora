@@ -1,0 +1,61 @@
+namespace std
+{
+    // Gets the num of characters of a null terminated string.
+    // @str The string
+    // @size the size of the backing string array
+    static i64 strlen(u8* str, u32 size)
+    {
+        //if (str == null || size >= (u32)128)
+        //{
+        //    return -1;
+        //}
+    
+        u8[] arr = (u8[128])str;
+    
+        i64 count = 0;
+        while (arr[count] != 0b && count < (i64)size) {
+            count = count + 1;
+        }
+        
+        return count;
+    }
+    
+    //static void strcpy(u8* src, u32 srcSize, u8* dst, u32 dstSize)
+    //{
+    //    if (src == null || dst == null)
+    //    {
+    //        return;
+    //    }       
+    //}
+    
+    static boolean parseInt(u8* str, u32 size, i64* ret) {
+        //if (str == null || size == (u32)0) {
+        //    return -1;
+        //}
+        
+        u8[] arr = (u8[128])str;
+        i64 value = 0;
+        i64 count = 0;
+        boolean negative = false;
+        if (arr[0] == '-') {
+            negative = true;
+            count += 1;
+        }
+        
+        while (arr[count] != 0b && count < (i64)size) {
+            u8 val = arr[count];
+            if (val < (u8)'0' || val > (u8)'9') { break; }
+            value *= 10;
+            
+            value += (i64) (val - (u8)'0');
+            count += 1;
+        }
+        
+        if (negative) {
+            value *= -1;
+        }
+        
+        *ret = value;
+        return true;
+    }
+}

@@ -7,14 +7,12 @@ using namespace po;
 
 void poOptDCE::optimize(poModule& module)
 {
-    for (poNamespace& ns : module.namespaces()) {
-        for (poFunction& function : ns.functions()) {
-            if (function.hasAttribute(poAttributes::EXTERN)) {
-                continue; // Skip extern functions
-            }
-
-            optimize(function);
+    for (poFunction& function : module.functions()) {
+        if (function.hasAttribute(poAttributes::EXTERN)) {
+            continue; // Skip extern functions
         }
+
+        optimize(function);
     }
 }
 

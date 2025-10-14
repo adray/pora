@@ -13,7 +13,7 @@ static void runDCETest1()
     poModule module;
     poNamespace ns("Example");
 
-    poFunction func("testFunc", 0, poAttributes::PUBLIC, poCallConvention::X86_64);
+    poFunction func("testFunc", "Example::testFunc", 0, poAttributes::PUBLIC, poCallConvention::X86_64);
     poFlowGraph& cfg = func.cfg();
 
     poBasicBlock* bb1 = new poBasicBlock();
@@ -24,7 +24,8 @@ static void runDCETest1()
 
     cfg.addBasicBlock(bb1);
 
-    ns.addFunction(func);
+    ns.addFunction(0);
+    module.addFunction(func);
     module.addNamespace(ns);
 
     poOptDCE dce;
@@ -47,7 +48,7 @@ static void runDCETest2()
     poModule module;
     poNamespace ns("Example");
 
-    poFunction func("testFunc", 0, poAttributes::PUBLIC, poCallConvention::X86_64);
+    poFunction func("testFunc", "Example::testFunc", 0, poAttributes::PUBLIC, poCallConvention::X86_64);
     poFlowGraph& cfg = func.cfg();
 
     poBasicBlock* bb1 = new poBasicBlock();
@@ -58,7 +59,8 @@ static void runDCETest2()
 
     cfg.addBasicBlock(bb1);
 
-    ns.addFunction(func);
+    ns.addFunction(0);
+    module.addFunction(func);
     module.addNamespace(ns);
 
     poOptDCE dce;
@@ -81,7 +83,7 @@ static void runDCETest3()
     poModule module;
     poNamespace ns("Example");
 
-    poFunction func("testFunc", 0, poAttributes::PUBLIC, poCallConvention::X86_64);
+    poFunction func("testFunc", "Example::testFunc", 0, poAttributes::PUBLIC, poCallConvention::X86_64);
     poFlowGraph& cfg = func.cfg();
 
     poBasicBlock* bb1 = new poBasicBlock();
@@ -109,7 +111,8 @@ static void runDCETest3()
     phi.addValue(0, bb1);
     bb3->addPhi(phi);
 
-    ns.addFunction(func);
+    ns.addFunction(0);
+    module.addFunction(func);
     module.addNamespace(ns);
 
     poOptDCE dce;
@@ -134,7 +137,7 @@ static void runDCETest4()
     poModule module;
     poNamespace ns("Example");
 
-    poFunction func("testFunc", 0, poAttributes::PUBLIC, poCallConvention::X86_64);
+    poFunction func("testFunc", "Example::testFunc", 0, poAttributes::PUBLIC, poCallConvention::X86_64);
     poFlowGraph& cfg = func.cfg();
 
     poBasicBlock* bb1 = new poBasicBlock();
@@ -163,7 +166,8 @@ static void runDCETest4()
     phi.addValue(0, bb1);
     bb3->addPhi(phi);
 
-    ns.addFunction(func);
+    ns.addFunction(0);
+    module.addFunction(func);
     module.addNamespace(ns);
 
     poOptDCE dce;
@@ -188,7 +192,7 @@ static void runDCETest5()
     poModule module;
     poNamespace ns("Example");
 
-    poFunction func("testFunc", 0, poAttributes::PUBLIC, poCallConvention::X86_64);
+    poFunction func("testFunc", "Example::testFunc", 0, poAttributes::PUBLIC, poCallConvention::X86_64);
     poFlowGraph& cfg = func.cfg();
 
     poBasicBlock* bb1 = new poBasicBlock();
@@ -225,7 +229,8 @@ static void runDCETest5()
     cfg.addBasicBlock(bb3);
     cfg.addBasicBlock(bb4);
 
-    ns.addFunction(func);
+    ns.addFunction(0);
+    module.addFunction(func);
     module.addNamespace(ns);
 
     poOptDCE dce;

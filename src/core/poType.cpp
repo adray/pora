@@ -10,8 +10,17 @@ poOperator::poOperator(const poOperatorType operator_, const int otherType, cons
 {
 }
 
-poField::poField(const int offset, const int type, const std::string& name)
+poMemberFunction::poMemberFunction(const poAttributes attributes, const int returnType, const std::string& name) :
+   _attributes(attributes),
+    _returnType(returnType),
+    _name(name),
+    _id(-1)
+{
+}
+
+poField::poField(const poAttributes attributes, const int offset, const int type, const std::string& name)
     :
+    _attributes(attributes),
     _offset(offset),
     _type(type),
     _name(name)

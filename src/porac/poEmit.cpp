@@ -206,6 +206,7 @@ poCodeGenerator::poCodeGenerator(poModule& module)
     _module(module),
     _instructionCount(0),
     _returnInstruction(-1),
+    _thisInstruction(-1),
     _isError(false)
 {
 }
@@ -228,13 +229,51 @@ void poCodeGenerator::generate(const std::vector<poNode*>& ast)
 
     for (auto& ns : _module.namespaces())
     {
-        for (auto& staticFunction : ns.functions())
+        _namespace = ns.name();
+
+        // Emit static functions
+        for (const int staticFunction : ns.functions())
         {
-            const auto& node = _functions.find(staticFunction.name());
+            poFunction& function = _module.functions()[staticFunction];
+            const std::string fullName = ns.name() + "::" + function.name();
+            const auto& node = _functions.find(fullName);
             if (node != _functions.end() &&
                 node->second->type() == poNodeType::FUNCTION)
             {
-                emitFunction(node->second, staticFunction);
+                _imports.clear();
+                _imports.push_back(_namespace);
+                const std::vector<poNode*> importNodes = _functionImports.find(fullName)->second;
+                for (poNode* importNode : importNodes)
+                {
+                    _imports.push_back(importNode->token().string());
+                }
+
+                emitFunction(node->second, function);
+            }
+        }
+
+        // Emit member functions
+        for (const int type : ns.types())
+        {
+            const poType& typeData = _module.types()[type];
+            const std::vector<poMemberFunction>& methods = typeData.functions();
+            for (const poMemberFunction& method : methods)
+            {
+                const std::string fullName = ns.name() + "::" + typeData.name() + "::" + method.name();
+                const auto& node = _functions.find(fullName);
+                if (node != _functions.end() &&
+                    node->second->type() == poNodeType::FUNCTION)
+                {
+                    _imports.clear();
+                    _imports.push_back(_namespace);
+                    const std::vector<poNode*> importNodes = _functionImports.find(fullName)->second;
+                    for (poNode* importNode : importNodes)
+                    {
+                        _imports.push_back(importNode->token().string());
+                    }
+
+                    emitFunction(node->second, _module.functions()[method.id()]);
+                }
             }
         }
     }
@@ -320,7 +359,7 @@ int poCodeGenerator::getType(const poToken& token)
         type = TYPE_OBJECT;
         break;
     default:
-        type = _module.getTypeFromName(token.string());
+        type = _module.getTypeFromName(token.string(), _imports);
         break;
     }
     return type;
@@ -462,6 +501,7 @@ void poCodeGenerator::emitFunction(poNode* node, poFunction& function)
     poListNode* list = static_cast<poListNode*>(node);
     poNode* body = nullptr;
     poNode* args = nullptr;
+    poResolverNode* resolver = nullptr;
     for (poNode* child : list->list())
     {
         if (child->type() == poNodeType::ARGS)
@@ -485,9 +525,44 @@ void poCodeGenerator::emitFunction(poNode* node, poFunction& function)
                 retType = getPointerType(retType);
             }
         }
+        else if (child->type() == poNodeType::RESOLVER)
+        {
+            assert(resolver == nullptr);
+            resolver = static_cast<poResolverNode*>(child);
+        }
     }
 
     _returnInstruction = -1;
+    _thisInstruction = -1;
+
+    if (resolver)
+    {
+        const std::vector<std::string>& path = resolver->path();
+        if (path.size() > 0)
+        {
+            // Extract the class type and add it as the first argument
+            const std::string& className = path[0];
+            const int type = _module.getTypeFromName(className, _imports);
+            if (type != -1)
+            {
+                const poType& typeData = _module.types()[type];
+                const int ptrType = getPointerType(getPointerType(type));
+                const int thisName = addVariable("this", ptrType, QUALIFIER_CONST, 8);
+                if (thisName == EMIT_ERROR)
+                {
+                    setError("Redefinition of variable 'this'.");
+                }
+                else
+                {
+                    _thisInstruction = _instructionCount - 1;
+                }
+            }
+            else
+            {
+                setError("Undefined type for 'this'.");
+            }
+        }
+    }
 
     poType& type = _module.types()[retType];
     if (type.size() > 8)
@@ -606,7 +681,7 @@ void poCodeGenerator::emitParameter(const int type, poBasicBlock* bb, const int 
 
         if (baseType.size() <= 8)
         {
-            // X86_64 calling convection is to pass this in via a register
+            // X86_64 calling convention is to pass this in via a register
 
             const int param = _instructionCount++;
             emitInstruction(poInstruction(param, type, paramIndex, -1, IR_PARAM), bb);
@@ -657,6 +732,13 @@ void poCodeGenerator::emitArgs(poNode* node, poFlowGraph& cfg)
         paramCount++;
     }
 
+    if (_thisInstruction > -1)
+    {
+        const int type = _types[_thisInstruction];
+        emitParameter(type, bb, paramCount, _thisInstruction);
+        paramCount++;
+    }
+
     for (poNode* child : list->list())
     {
         if (child->type() == poNodeType::PARAMETER)
@@ -702,7 +784,14 @@ void poCodeGenerator::emitStatement(poNode* node, poFlowGraph& cfg)
     }
     else if (child->type() == poNodeType::CALL)
     {
-        if (emitCall(child, cfg) == EMIT_ERROR)
+        if (emitCall(child, cfg, -1) == EMIT_ERROR)
+        {
+            setError("Error emitting call.");
+        }
+    }
+    else if (child->type() == poNodeType::MEMBER_CALL)
+    {
+        if (emitMemberCall(child, cfg) == EMIT_ERROR)
         {
             setError("Error emitting call.");
         }
@@ -908,16 +997,75 @@ int poCodeGenerator::emitPassByReference(const int expr, poFlowGraph& cfg)
     return varName; /* return the variable name that is a pointer to the stack */
 }
 
-int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg)
+int poCodeGenerator::emitMemberCall(poNode* node, poFlowGraph& cfg)
+{
+    poBinaryNode* memberCall = static_cast<poBinaryNode*>(node);
+    assert(memberCall->type() == poNodeType::MEMBER_CALL);
+
+    const int expr = emitExpr(memberCall->left(), cfg);
+    if (expr == EMIT_ERROR)
+    {
+        return EMIT_ERROR;
+    }
+
+    return emitCall(memberCall->right(), cfg, expr);
+}
+
+int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg, int instanceExpr)
 {
     poListNode* call = static_cast<poListNode*>(node);
 
     std::vector<int> args;
     std::vector<int> argTypes;
     int returnType = 0;
-    const std::string& name = call->token().string();
     poListNode* argsNode = nullptr;
-    poListNode* functionNode = static_cast<poListNode*>(_functions[name]);
+
+    std::string name = call->token().string();
+    if (instanceExpr != -1)
+    {
+        poType& typeData = _module.types()[_types[instanceExpr]];
+        assert(typeData.isPointer());
+        poType& baseType = _module.types()[typeData.baseType()];
+        name = baseType.name() + "::" + name;
+    }
+    else if (_thisInstruction != -1)
+    {
+        const int type = _types[_thisInstruction];
+        poType& typeData = _module.types()[type];
+        poType& ptrTypeData = _module.types()[typeData.baseType()];
+        poType& classType = _module.types()[ptrTypeData.baseType()];
+        for (const poMemberFunction& method : classType.functions())
+        {
+            if (method.name() != name)
+            {
+                continue;
+            }
+
+            name = classType.name() + "::" + name;
+            _thisInstruction = emitLoadThis(cfg);
+            break;
+        }
+    }
+
+    std::string fullName = name;
+    poListNode* functionNode = nullptr;
+    for (const std::string& import : _imports)
+    {
+        const auto& it = _functions.find(import + "::" + name);
+        if (it != _functions.end())
+        {
+            functionNode = static_cast<poListNode*>(it->second);
+            fullName = import + "::" + name;
+            break;
+        }
+    }
+
+    if (functionNode == nullptr)
+    {
+        setError("Undefined function '" + name + "'.");
+        return EMIT_ERROR;
+    }
+
     for (poNode* child : functionNode->list())
     {
         if (child->type() == poNodeType::ARGS)
@@ -999,6 +1147,14 @@ int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg)
 
     int numArgs = int(call->list().size());
 
+    /* Insert instance param */
+    if (instanceExpr != -1)
+    {
+        args.insert(args.begin(), instanceExpr);
+        argTypes.insert(argTypes.begin(), _types[instanceExpr]);
+        numArgs++;
+    }
+
     /* Generate the call instruction also handle the return variable */
 
     const int retVariable = _instructionCount;
@@ -1015,20 +1171,20 @@ int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg)
             _types.push_back(returnPtr);
             _instructionCount++;
 
-            const int symbol = _module.addSymbol(name);
+            const int symbol = _module.addSymbol(fullName);
             emitInstruction(poInstruction(_instructionCount++, TYPE_VOID, numArgs, symbol, IR_CALL), cfg.getLast());
 
             emitInstruction(poInstruction(_instructionCount++, returnPtr, retVariable, -1, IR_ARG), cfg.getLast());
         }
         else
         {
-            const int symbol = _module.addSymbol(name);
+            const int symbol = _module.addSymbol(fullName);
             emitInstruction(poInstruction(_instructionCount++, TYPE_I64, numArgs, symbol, IR_CALL), cfg.getLast());
         }
     }
     else
     {
-        const int symbol = _module.addSymbol(name);
+        const int symbol = _module.addSymbol(fullName);
         emitInstruction(poInstruction(_instructionCount++, returnType, numArgs, symbol, IR_CALL), cfg.getLast());
     }
 
@@ -1096,7 +1252,49 @@ void poCodeGenerator::emitAssignment(poNode* node, poFlowGraph& cfg)
 
     if (assignment->left()->type() == poNodeType::VARIABLE)
     {
-        const int variable = getVariable(assignment->left()->token().string());
+        const std::string& name = assignment->left()->token().string();
+        const int variable = getVariable(name);
+        if (variable == EMIT_ERROR)
+        {
+            // Check if this is a member variable
+            if (_thisInstruction != -1)
+            {
+                const int thisType = _types[_thisInstruction];
+                const poType& thisTypeData = _module.types()[thisType];
+                if (thisTypeData.isPointer())
+                {
+                    const int ptrType = thisTypeData.baseType();
+                    const int classType = _module.types()[ptrType].baseType();
+                    const poType& classTypeData = _module.types()[classType];
+                    int fieldOffset = 0;
+                    int fieldType = -1;
+                    for (const auto& member : classTypeData.fields())
+                    {
+                        if (member.name() == name)
+                        {
+                            fieldType = member.type();
+                            fieldOffset = member.offset();
+                            break;
+                        }
+                    }
+
+                    if (fieldType != -1)
+                    {
+                        const int thisVar = emitLoadThis(cfg);
+                        const int pointerType = getPointerType(fieldType);
+                        const int ptr = _instructionCount++;
+                        emitInstruction(poInstruction(ptr, pointerType, thisVar, -1, fieldOffset, IR_PTR), cfg.getLast());
+                        emitInstruction(poInstruction(_instructionCount++, fieldType, ptr, right, IR_STORE), cfg.getLast());
+                        return;
+                    }
+                    else
+                    {
+                        setError("Undefined member variable '" + name + "'.");
+                        return;
+                    }
+                }
+            }
+        }
 
         const poType& typeData = _module.types()[type];
         if (typeData.isPointer() && _module.types()[typeData.baseType()].baseType() == TYPE_OBJECT)
@@ -1384,6 +1582,7 @@ int poCodeGenerator::emitExpr(poNode* node, poFlowGraph& cfg)
     case poNodeType::SUB:
     case poNodeType::MUL:
     case poNodeType::DIV:
+    case poNodeType::MODULO:
     case poNodeType::LEFT_SHIFT:
     case poNodeType::RIGHT_SHIFT:
     case poNodeType::CMP_EQUALS:
@@ -1404,10 +1603,13 @@ int poCodeGenerator::emitExpr(poNode* node, poFlowGraph& cfg)
         instructionId = emitUnaryMinus(node, cfg);
         break;
     case poNodeType::CALL:
-        instructionId = emitCall(node, cfg);
+        instructionId = emitCall(node, cfg, -1);
         break;
     case poNodeType::MEMBER:
         instructionId = emitLoadMember(node, cfg);
+        break;
+    case poNodeType::MEMBER_CALL:
+        instructionId = emitMemberCall(node, cfg);
         break;
     case poNodeType::ARRAY_ACCESSOR:
         instructionId = emitLoadArray(node, cfg);
@@ -1622,10 +1824,64 @@ int poCodeGenerator::emitSizeof(poNode* node, poFlowGraph& cfg)
     return id;
 }
 
+int poCodeGenerator::emitLoadThis(poFlowGraph& cfg)
+{
+    const int thisType = _types[_thisInstruction];
+    const poType& thisTypeData = _module.types()[thisType];
+    const poType& ptrType = _module.types()[thisTypeData.baseType()];
+
+    const int ptr = _instructionCount; /* result of IR_PTR */
+    emitInstruction(poInstruction(_instructionCount++, ptrType.id(), _thisInstruction, -1, 0, IR_PTR), cfg.getLast());
+
+    const int instructionId = _instructionCount;
+    emitInstruction(poInstruction(_instructionCount++, ptrType.id(), ptr, -1, IR_LOAD), cfg.getLast());
+    return instructionId;
+}
+
 int poCodeGenerator::emitLoadVariable(poNode* node, poFlowGraph& cfg)
 {
     const std::string& name = node->token().string();
     const int varName = getVariable(name);
+    if (varName == EMIT_ERROR)
+    {
+        if (_thisInstruction != EMIT_ERROR)
+        {
+            const int thisType = _types[_thisInstruction];
+            const poType& thisTypeData = _module.types()[thisType];
+            if (thisTypeData.isPointer())
+            {
+                const int thisVar = emitLoadThis(cfg);
+                const poType& ptrType = _module.types()[thisTypeData.baseType()];
+
+                const poType& baseType = _module.types()[ptrType.baseType()];
+                int offset = 0;
+                int fieldType = -1;
+                for (const auto& field : baseType.fields())
+                {
+                    if (field.name() == name)
+                    {
+                        offset = field.offset();
+                        fieldType = field.type();
+                        break;
+                    }
+                }
+
+                if (fieldType == -1)
+                {
+                    setError("Variable '" + name + "' not found.");
+                    return EMIT_ERROR;
+                }
+
+                const int ptr = _instructionCount; /* result of IR_PTR */
+                emitInstruction(poInstruction(_instructionCount++, ptrType.id(), thisVar, -1, offset, IR_PTR), cfg.getLast());
+
+                const int instructionId = _instructionCount;
+                emitInstruction(poInstruction(_instructionCount++, fieldType, ptr, -1, IR_LOAD), cfg.getLast());
+                return instructionId;
+            }
+        }
+    }
+
     const int type = _types[varName];
 
     auto& typeData = _module.types()[type];
@@ -1809,7 +2065,7 @@ int poCodeGenerator::emitLoadMember(poNode* node, poFlowGraph& cfg)
             member = nullptr;
         }
     }
-    
+
     const poType& pointerType = _module.types()[_types[expr]];
     assert(pointerType.isPointer());
 
@@ -1902,7 +2158,7 @@ int poCodeGenerator::emitConstantExpr(poNode* node, poFlowGraph& cfg)
         emitInstruction(poInstruction(_instructionCount++, TYPE_U64, id, IR_CONSTANT), cfg.getLast());
         break;
     case TYPE_STRING:
-        constants.getConstant(constant->token().string());
+        id = constants.getConstant(constant->token().string());
         if (id == -1) { id = constants.addConstant(constant->token().string()); }
         instructionId = _instructionCount;
         emitInstruction(poInstruction(_instructionCount++, getPointerType(TYPE_U8), id, IR_CONSTANT), cfg.getLast());
@@ -1955,6 +2211,10 @@ int poCodeGenerator::emitBinaryExpr(poNode* node, poFlowGraph& cfg)
         instructionId = _instructionCount;
         emitInstruction(poInstruction(_instructionCount++, type, left, right, IR_RIGHT_SHIFT), cfg.getLast());
         break;
+    case poNodeType::MODULO:
+        instructionId = _instructionCount;
+        emitInstruction(poInstruction(_instructionCount++, type, left, right, IR_MODULO), cfg.getLast());
+        break;
     case poNodeType::CMP_EQUALS:
     case poNodeType::CMP_NOT_EQUALS:
     case poNodeType::CMP_LESS:
@@ -1972,43 +2232,62 @@ void poCodeGenerator::getModules(poNode* node)
 {
     poListNode* module = static_cast<poListNode*>(node);
     assert(module->type() == poNodeType::MODULE);
+    
+    std::vector<poNode*> importNodes;
+    for (poNode* child : module->list())
+    {
+        if (child->type() == poNodeType::IMPORT)
+        {
+            importNodes.push_back(child);
+        }
+    }
+
     for (poNode* child : module->list())
     {
         if (child->type() == poNodeType::NAMESPACE)
         {
-            getNamespaces(child);
+            getNamespaces(child, importNodes);
         }
     }
 }
 
-void poCodeGenerator::getNamespaces(poNode* node)
+void poCodeGenerator::getNamespaces(poNode* node, const std::vector<poNode*>& importNodes)
 {
     poListNode* namespaceNode = static_cast<poListNode*>(node);
     assert(namespaceNode->type() == poNodeType::NAMESPACE);
+    const std::string namespaceName = namespaceNode->token().string();
     for (poNode* child : namespaceNode->list())
     {
+        poListNode* functionNode = static_cast<poListNode*>(child);
+        poResolverNode* resolver = nullptr;
+        for (poNode* funcChild : functionNode->list())
+        {
+            if (funcChild->type() == poNodeType::RESOLVER)
+            {
+                resolver = static_cast<poResolverNode*>(funcChild);
+                break;
+            }
+        }
+
+        std::string fullName;
+        if (resolver && resolver->path().size() > 0)
+        {
+            fullName = namespaceName + "::" + resolver->path()[0] + "::" + child->token().string();
+        }
+        else
+        {
+            fullName = namespaceName + "::" + child->token().string();
+        }
+
         if (child->type() == poNodeType::FUNCTION)
         {
-            getFunction(child);
-        }
-        else if (child->type() == poNodeType::STRUCT)
-        {
-            getStruct(child);
+            _functions.insert(std::pair<std::string, poNode*>(fullName, child));
+            _functionImports.insert(std::pair<std::string, std::vector<poNode*>>(fullName, importNodes));
         }
         else if (child->type() == poNodeType::EXTERN)
         {
-            _functions.insert(std::pair<std::string, poNode*>(child->token().string(), child));
+            _functions.insert(std::pair<std::string, poNode*>(fullName, child));
         }
     }
 }
 
-void poCodeGenerator::getStruct(poNode* node)
-{
-    assert(node->type() == poNodeType::STRUCT);
-}
-
-void poCodeGenerator::getFunction(poNode* node)
-{
-    assert(node->type() == poNodeType::FUNCTION);
-    _functions.insert(std::pair<std::string, poNode*>(node->token().string(), node));
-}

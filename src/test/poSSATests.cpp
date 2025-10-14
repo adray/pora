@@ -55,7 +55,7 @@ static void ssaTest1()
 
     poModule module;
     poNamespace ns("Test");
-    poFunction function("MyFunc", 0, poAttributes::PUBLIC, poCallConvention::X86_64);
+    poFunction function("MyFunc", "Test::MyFunc", 0, poAttributes::PUBLIC, poCallConvention::X86_64);
     function.addVariable(0);
     poFlowGraph& cfg = function.cfg();
 
@@ -80,7 +80,8 @@ static void ssaTest1()
     bb4->addInstruction(poInstruction(3, TYPE_I64, 2, IR_CONSTANT));
     bb4->addInstruction(poInstruction(0, TYPE_I64, 0, 3, IR_ADD));
 
-    ns.addFunction(function);
+    ns.addFunction(0);
+    module.addFunction(function);
     module.addNamespace(ns);
 
     poSSA ssa;
@@ -103,7 +104,7 @@ static void ssaTest2()
 
     poModule module;
     poNamespace ns("Test");
-    poFunction function("MyFunc", 0, poAttributes::PUBLIC, poCallConvention::X86_64);
+    poFunction function("MyFunc", "Test::MyFunc", 0, poAttributes::PUBLIC, poCallConvention::X86_64);
     function.addVariable(0);
     poFlowGraph& cfg = function.cfg();
 
@@ -128,7 +129,8 @@ static void ssaTest2()
     bb4->addInstruction(poInstruction(3, TYPE_I64, 2, IR_CONSTANT));
     bb4->addInstruction(poInstruction(0, TYPE_I64, 0, 3, IR_ADD));
 
-    ns.addFunction(function);
+    ns.addFunction(0);
+    module.addFunction(function);
     module.addNamespace(ns);
 
     poSSA ssa;

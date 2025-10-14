@@ -57,6 +57,8 @@ namespace po
         OR,
         DOT,
         AMPERSAND,
+        MODULO,
+        RESOLVER,
 
         IF,
         ELSE,

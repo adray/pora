@@ -717,6 +717,82 @@ void poAsm::ir_div(PO_ALLOCATOR& allocator, const poInstruction& ins)
     }
 }
 
+void poAsm::ir_mod(PO_ALLOCATOR& allocator, const poInstruction& ins)
+{
+    const int dst = allocator.getRegisterByVariable(ins.name());
+    const int src1 = allocator.getRegisterByVariable(ins.left());
+    const int src2 = allocator.getRegisterByVariable(ins.right());
+
+    const int sse_dst = dst - VM_REGISTER_MAX;
+    const int sse_src1 = src1 - VM_REGISTER_MAX;
+    const int sse_src2 = src2 - VM_REGISTER_MAX;
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+        _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_mov_imm_to_reg_x64(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
+        _x86_64_lower.mc_div_reg_x64(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EDX);
+        break;
+    case TYPE_U64:
+        _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_mov_imm_to_reg_x64(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
+        _x86_64_lower.mc_udiv_reg_x64(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EDX);
+        break;
+    case TYPE_I32:
+        _x86_64_lower.mc_mov_reg_to_reg_32(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_mov_imm_to_reg_32(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
+        _x86_64_lower.mc_div_reg_32(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_32(dst, VM_REGISTER_EDX);
+        break;
+    case TYPE_U32:
+        _x86_64_lower.mc_mov_reg_to_reg_32(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_mov_imm_to_reg_32(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
+        _x86_64_lower.mc_udiv_reg_32(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_32(dst, VM_REGISTER_EDX);
+        break;
+    case TYPE_I16:
+        _x86_64_lower.mc_mov_reg_to_reg_16(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_mov_imm_to_reg_16(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
+        _x86_64_lower.mc_div_reg_16(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_16(dst, VM_REGISTER_EDX);
+        break;
+    case TYPE_U16:
+        _x86_64_lower.mc_mov_reg_to_reg_16(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_mov_imm_to_reg_16(VM_REGISTER_EDX, 0); // TODO: replace with XOR?
+        _x86_64_lower.mc_udiv_reg_16(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_16(dst, VM_REGISTER_EDX);
+        break;
+    case TYPE_I8:
+        _x86_64_lower.mc_mov_imm_to_reg_x64(VM_REGISTER_EAX, 0); // TODO: replace with XOR?
+        _x86_64_lower.mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_div_reg_8(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EDX);
+        break;
+    case TYPE_U8:
+        _x86_64_lower.mc_mov_imm_to_reg_x64(VM_REGISTER_EAX, 0); // TODO: replace with XOR?
+        _x86_64_lower.mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
+        _x86_64_lower.mc_udiv_reg_8(src2);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EDX);
+        break;
+    //case TYPE_F32:
+    //    if (sse_dst != sse_src1) { _x86_64_lower.mc_movss_reg_to_reg_x64(sse_dst, sse_src1); }
+    //    _x86_64_lower.mc_divss_reg_to_reg_x64(sse_dst, sse_src2);
+    //    break;
+    //case TYPE_F64:
+    //    if (sse_dst != sse_src1) { _x86_64_lower.mc_movsd_reg_to_reg_x64(sse_dst, sse_src1); }
+    //    _x86_64_lower.mc_divsd_reg_to_reg_x64(sse_dst, sse_src2);
+    //    break;
+    default:
+        std::stringstream ss;
+        ss << "Internal Error: Malformed mod instruction " << ins.name();
+        setError(ss.str());
+        break;
+    }
+}
+
 void poAsm::ir_cmp(PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
     const int src1 = allocator.getRegisterByVariable(ins.left());
@@ -1774,6 +1850,9 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg, const int numArgs)
             case IR_DIV:
                 ir_div(allocator, ins);
                 break;
+            case IR_MODULO:
+                ir_mod(allocator, ins);
+                break;
             case IR_MUL:
                 ir_mul(allocator, ins);
                 break;
@@ -1958,30 +2037,34 @@ void poAsm::generateExternStub(poModule& module, poFlowGraph& cfg)
 
 void poAsm::generate(poModule& module)
 {
-    std::vector<poNamespace>& namespaces = module.namespaces();
-    for (poNamespace& ns : namespaces)
+    std::vector<poFunction>& functions = module.functions();
+    for (poFunction& function : functions)
     {
-        std::vector<poFunction>& functions = ns.functions();
-        for (poFunction& function : functions)
-        {
-            _mapping.insert(std::pair<std::string, int>(function.name(), int(_x86_64.programData().size())));
+        _mapping.insert(std::pair<std::string, int>(function.fullname(), int(_x86_64.programData().size())));
 
-            if (function.hasAttribute(poAttributes::EXTERN))
-            {
-                _externCalls.push_back(poAsmExternCall(function.name(), int(_x86_64.programData().size()) + 2 /* get the position of the displacement */));
-                _imports.insert(std::pair<std::string, int>(function.name(), 0));
-                generateExternStub(module, function.cfg());
-            }
-            else
-            {
-                generate(module, function.cfg(), int(function.args().size()));
-            }
+        if (function.hasAttribute(poAttributes::EXTERN))
+        {
+            _externCalls.push_back(poAsmExternCall(function.name(), int(_x86_64.programData().size()) + 2 /* get the position of the displacement */));
+            _imports.insert(std::pair<std::string, int>(function.name(), 0));
+            generateExternStub(module, function.cfg());
+        }
+        else
+        {
+            generate(module, function.cfg(), int(function.args().size()));
         }
     }
 
     patchCalls();
 
-    const auto& main = _mapping.find("main");
+    std::string mainName;
+    for (const poFunction& function : functions) {
+        if (function.name() == "main") {
+            mainName = function.fullname();
+            break;
+        }
+    }
+
+    const auto& main = _mapping.find(mainName);
     if (main != _mapping.end())
     {
         _entryPoint = int(_x86_64.programData().size());

@@ -20,6 +20,7 @@ namespace po
         void resolveTypes(poNamespace& ns);
         void getNamespaces(poNode* node);
         void getStruct(poNode* node, poNamespace& ns);
+        void getClass(poNode* node, poNamespace& ns);
         void getExtern(poNode* node, poNamespace& ns);
         void getFunction(poNode* node, poNamespace& ns);
 
@@ -34,5 +35,6 @@ namespace po
         std::vector<poNode*> _userTypes;
         std::unordered_map<std::string, int> _resolvedTypes;
         std::unordered_map<poNode*, int> _namespaces;
+        std::unordered_map<std::string, int> _memberFunctions;
     };
 }
