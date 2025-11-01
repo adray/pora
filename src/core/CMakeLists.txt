@@ -27,6 +27,8 @@ set (PORACORE_SOURCES
     "poParser.cpp"
     "poTypeChecker.h"
     "poTypeChecker.cpp"
+    "poTypeValidator.h"
+    "poTypeValidator.cpp"
     "poModule.h"
     "poModule.cpp"
     "poSSA.h"

@@ -1,0 +1,97 @@
+namespace std
+{
+    struct clock_time {
+        u8[9] text;
+    }
+
+    class clock {
+        private u16 _seconds;
+        private u16 _minutes;
+        private u16 _hours;
+        
+        clock();
+        void setNow();
+        void reset();
+        void addSeconds(u16 seconds);
+        void addMinutes(u16 minutes);
+        void addHours(u16 hours);
+        u16 getSecond();
+        u16 getMinute();
+        u16 getHour();
+        void getTime(clock_time* time);
+        private void update();
+    }
+    
+    clock::clock() {
+        _seconds = (u16)0;
+        _minutes = (u16)0;
+        _hours = (u16)0;
+    }
+    
+    void clock::setNow() {
+        SYSTEMTIME time;
+        GetLocalTime(&time);
+        
+        _seconds = time.wSecond;
+        _minutes = time.wMinute;
+        _hours = time.wHour;
+    }
+    
+    void clock::reset() {
+        _seconds = (u16)0;
+        _minutes = (u16)0;
+        _hours = (u16)0;
+    }
+    
+    void clock::update() {
+        if (_seconds >= (u16)60) {
+            _seconds -= (u16)60;
+            _minutes += (u16)1;
+        }
+        if (_minutes >= (u16)60) {
+            _minutes -= (u16)60;
+            _hours += (u16)1;
+        }
+        if (_hours >= (u16)24) {
+            _hours -= (u16)24;
+        }
+    }
+    
+    void clock::addSeconds(u16 seconds) {
+        _seconds += seconds;
+        update();
+    }
+    
+    void clock::addMinutes(u16 minutes) {
+        _minutes += minutes;
+        update();
+    }
+    
+    void clock::addHours(u16 hours) {
+        _hours += hours;
+        update();
+    }
+    
+    u16 clock::getSecond() { return _seconds; }
+    u16 clock::getMinute() { return _minutes; }
+    u16 clock::getHour() { return _hours; }
+    
+    // Formats the time in text format.
+    void clock::getTime(clock_time* time) {
+        //if (time == null) {
+        //    return;
+        //}
+        
+        time.text[0] = '0' + (u8)(_hours / (u16)10);
+        time.text[1] = '0' + (u8)(_hours % (u16)10);        
+        time.text[2] = ':';
+        
+        time.text[3] = '0' + (u8)(_minutes / (u16)10);
+        time.text[4] = '0' + (u8)(_minutes % (u16)10);
+        time.text[5] = ':';
+       
+        time.text[6] = '0' + (u8)(_seconds / (u16)10);
+        time.text[7] = '0' + (u8)(_seconds % (u16)10);
+        time.text[8] = 0b;
+    }
+}

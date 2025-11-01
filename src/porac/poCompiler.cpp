@@ -12,6 +12,7 @@
 #include "poOptCopy.h"
 #include "poSSA.h"
 #include "poTypeResolver.h"
+#include "poTypeValidator.h"
 
 #include <sstream>
 
@@ -61,6 +62,23 @@ int poCompiler:: compile()
     poModule module;
     poTypeResolver typeResolver(module);
     typeResolver.resolve(nodes);
+    if (typeResolver.isError())
+    {
+        std::stringstream ss;
+        ss << "Type resolution failed: " << typeResolver.errorText() << std::endl;
+        _errors.push_back(ss.str());
+        return 0;
+    }
+
+    // Validate types
+    poTypeValidator typeValidator;
+    if (!typeValidator.validateModule(module))
+    {
+        std::stringstream ss;
+        ss << "Type validation failed: " << typeValidator.errorText() << std::endl;
+        _errors.push_back(ss.str());
+        return 0;
+    }
 
     // Type check AST
     poTypeChecker typeChecker(module);

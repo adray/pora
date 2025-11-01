@@ -9,8 +9,15 @@ using namespace po;
 
 poTypeResolver::poTypeResolver(poModule& module)
     :
-    _module(module)
+    _module(module),
+    _isError(false)
 {
+}
+
+void poTypeResolver::setError(const std::string& errorText)
+{
+    _isError = true;
+    _errorText = errorText;
 }
 
 int poTypeResolver::getTypeSize(const int type)
@@ -110,6 +117,10 @@ void poTypeResolver::getNamespaces(poNode* node)
         {
             getFunction(child, ns);
         }
+        else if (child->type() == poNodeType::CONSTRUCTOR)
+        {
+            getConstructor(child, ns);
+        }
         else if (child->type() == poNodeType::STRUCT)
         {
             getStruct(child, ns);
@@ -145,7 +156,8 @@ void poTypeResolver::getExtern(poNode* node, poNamespace& ns)
 {
     assert(node->type() == poNodeType::EXTERN);
 
-    poListNode* functionNode = static_cast<poListNode*>(node);
+    poUnaryNode* externNode = static_cast<poUnaryNode*>(node);
+    poListNode* functionNode = static_cast<poListNode*>(externNode->child());
     for (poNode* child : functionNode->list())
     {
         if (child->type() == poNodeType::ARGS)
@@ -178,6 +190,53 @@ void poTypeResolver::getFunction(poNode* node, poNamespace& ns)
             if (resolver && resolver->path().size() > 0)
             {
                 fullname = ns.name() + "::" + resolver->path()[0] + "::" + node->token().string();
+                if (_memberFunctions.find(fullname) != _memberFunctions.end())
+                {
+                    setError("Duplicate member function: " + fullname);
+                    return;
+                }
+                _memberFunctions.insert(std::pair<std::string, int>(fullname, id));
+            }
+            else
+            {
+                ns.addFunction(id);
+            }
+
+            _module.addFunction(poFunction(
+                node->token().string(),
+                fullname,
+                int(args->list().size()),
+                poAttributes::PUBLIC,
+                poCallConvention::X86_64));
+        }
+        else if (child->type() == poNodeType::RESOLVER)
+        {
+            resolver = static_cast<poResolverNode*>(child);
+        }
+    }
+}
+
+void poTypeResolver::getConstructor(poNode* node, poNamespace& ns)
+{
+    assert(node->type() == poNodeType::CONSTRUCTOR);
+
+    poListNode* constructorNode = static_cast<poListNode*>(node);
+    poResolverNode* resolver = nullptr;
+    for (poNode* child : constructorNode->list())
+    {
+        if (child->type() == poNodeType::ARGS)
+        {
+            poListNode* args = static_cast<poListNode*>(child);
+            const int id = int(_module.functions().size());
+            std::string fullname = ns.name() + "::" + node->token().string();
+            if (resolver && resolver->path().size() > 0)
+            {
+                fullname = ns.name() + "::" + resolver->path()[0] + "::" + node->token().string();
+                if (_memberFunctions.find(fullname) != _memberFunctions.end())
+                {
+                    setError("Duplicate constructor: " + fullname);
+                    return;
+                }
                 _memberFunctions.insert(std::pair<std::string, int>(fullname, id));
             }
             else
@@ -238,6 +297,22 @@ int poTypeResolver::getPointerType(const int baseType, const int count)
     return pointerType;
 }
 
+bool poTypeResolver::isTypeResolved(poNode* node)
+{
+    bool resolved = true;
+    const int type = getType(node->token());
+    if (type == -1) /* is not a primitive */
+    {
+        const auto& entry = _resolvedTypes.find(node->token().string());
+        if (entry == _resolvedTypes.end())
+        {
+            // unable to resolve yet..
+            resolved = false;
+        }
+    }
+    return resolved;
+}
+
 void poTypeResolver::resolveTypes(poNamespace& ns)
 {
     //
@@ -265,55 +340,55 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
             poListNode* typeNode = static_cast<poListNode*>(node);
             for (poNode* child : typeNode->list())
             {
-                if (child->type() == poNodeType::DECL)
+                if (child->type() != poNodeType::DECL)
                 {
-                    poUnaryNode* decl = static_cast<poUnaryNode*>(child);
-                    poAttributes attributes = poAttributes::PUBLIC;
-                    if (decl->child()->type() == poNodeType::ATTRIBUTES)
+                    continue;
+                }
+
+                poUnaryNode* decl = static_cast<poUnaryNode*>(child);
+                poAttributes attributes = poAttributes::PUBLIC;
+                if (decl->child()->type() == poNodeType::ATTRIBUTES)
+                {
+                    poAttributeNode* attributeNode = static_cast<poAttributeNode*>(decl->child());
+                    attributes = attributeNode->attributes();
+                    decl = attributeNode;
+                }
+
+                if (decl->child()->type() == poNodeType::POINTER)
+                {
+                    poPointerNode* pointerNode = static_cast<poPointerNode*>(decl->child());
+                    decl = pointerNode;
+                }
+
+                if (decl->child()->type() == poNodeType::ARRAY)
+                {
+                    // An array type is in a good state if the base type is resolved.
+
+                    poArrayNode* arrayNode = static_cast<poArrayNode*>(decl->child());
+                    poNode* typeNode = arrayNode->child();
+
+                    resolved &= isTypeResolved(typeNode);
+                }
+
+                else if (decl->child()->type() == poNodeType::TYPE)
+                {
+                    resolved &= isTypeResolved(decl->child());
+                }
+                else if (decl->child()->type() == poNodeType::EXTERN)
+                {
+                    // Method or constructor
+                    poUnaryNode* externNode = static_cast<poUnaryNode*>(decl->child());
+                    poListNode* method = static_cast<poListNode*>(externNode->child());
+
+                    for (poNode* node : method->list())
                     {
-                        poAttributeNode* attributeNode = static_cast<poAttributeNode*>(decl->child());
-                        attributes = attributeNode->attributes();
-                        decl = attributeNode;
-                    }
-
-                    if (decl->child()->type() == poNodeType::POINTER)
-                    {
-                        poPointerNode* pointerNode = static_cast<poPointerNode*>(decl->child());
-                        decl = pointerNode;
-                    }
-
-                    if (decl->child()->type() == poNodeType::ARRAY)
-                    {
-                        // An array type is in a good state if the base type is resolved.
-
-                        poArrayNode* arrayNode = static_cast<poArrayNode*>(decl->child());
-                        poNode* typeNode = arrayNode->child();
-
-                        const int type = getType(typeNode->token());
-                        if (type == -1) /* is not a primitive */
+                        if (node->type() == poNodeType::ARGS)
                         {
-                            const auto& entry = _resolvedTypes.find(typeNode->token().string());
-                            if (entry == _resolvedTypes.end())
+                            poListNode* args = static_cast<poListNode*>(node);
+                            for (poNode* argument : args->list())
                             {
-                                // unable to resolve yet..
-                                resolved = false;
-                                break;
-                            }
-                        }
-                    }
-
-                    else if (decl->child()->type() == poNodeType::TYPE)
-                    {
-                        poNode* typeNode = decl->child();
-                        const int type = getType(typeNode->token());
-                        if (type == -1) /* is not a primitive */
-                        {
-                            const auto& entry = _resolvedTypes.find(typeNode->token().string());
-                            if (entry == _resolvedTypes.end())
-                            {
-                                // unable to resolve yet..
-                                resolved = false;
-                                break;
+                                poUnaryNode* argNode = static_cast<poUnaryNode*>(argument);
+                                resolved &= isTypeResolved(argNode->child());
                             }
                         }
                     }
@@ -329,193 +404,7 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
                     continue;
                 }
 
-                const int id = int(_module.types().size());
-                _module.addType(poType(id,
-                    TYPE_OBJECT,
-                    name));
-                ns.addType(id);
-                int offset = 0;
-                int sizeOfLargestField = 0;
-                for (poNode* child : typeNode->list())
-                {
-                    if (child->type() == poNodeType::DECL)
-                    {
-                        poAttributes attributes = poAttributes::PUBLIC;
-                        poUnaryNode* decl = static_cast<poUnaryNode*>(child);
-                        if (decl->child()->type() == poNodeType::ATTRIBUTES)
-                        {
-                            poAttributeNode* attributeNode = static_cast<poAttributeNode*>(decl->child());
-                            decl = attributeNode;
-                            attributes = attributeNode->attributes();
-                        }
-
-                        int pointerCount = 0;
-                        if (decl->child()->type() == poNodeType::POINTER)
-                        {
-                            poPointerNode* pointerNode = static_cast<poPointerNode*>(decl->child());
-                            decl = pointerNode;
-                            pointerCount = pointerNode->count();
-                        }
-
-                        if (decl->child()->type() == poNodeType::TYPE)
-                        {
-                            poNode* typeNode = decl->child();
-                            int fieldType = getPointerType(getType(typeNode->token()), pointerCount);
-                            int size = 0;
-                            if (fieldType == -1)
-                            {
-                                const auto& userType = _resolvedTypes.find(typeNode->token().string());
-                                if (userType != _resolvedTypes.end())
-                                {
-                                    auto& typeData = _module.types()[userType->second];
-                                    size = typeData.size();
-                                    fieldType = typeData.id();
-                                }
-                            }
-                            else
-                            {
-                                size = getTypeSize(fieldType);
-                            }
-
-                            // Align the offset to the size of the type
-                            const int alignment = _module.types()[fieldType].alignment();
-                            const int padding = align(offset, alignment);
-                            offset += padding;
-
-                            auto& type = _module.types()[id];
-                            type.addField(poField(attributes, offset, fieldType, decl->token().string()));
-
-                            offset += size;
-                            sizeOfLargestField = std::max(sizeOfLargestField, alignment);
-                        }
-                        else if (decl->child()->type() == poNodeType::ARRAY)
-                        {
-                            poArrayNode* arrayNode = static_cast<poArrayNode*>(decl->child());
-                            poNode* typeNode = arrayNode->child();
-                            int fieldType = getPointerType(getType(typeNode->token()), pointerCount);
-                            int size = 0;
-                            if (fieldType == -1)
-                            {
-                                const auto& userType = _resolvedTypes.find(typeNode->token().string());
-                                if (userType != _resolvedTypes.end())
-                                {
-                                    auto& typeData = _module.types()[userType->second];
-                                    size = typeData.size();
-                                    fieldType = typeData.id();
-                                }
-                            }
-                            else
-                            {
-                                size = getTypeSize(fieldType);
-                            }
-
-                            int arrayType = _module.getArrayType(fieldType);
-                            if (arrayType == -1)
-                            {
-                                arrayType = int(_module.types().size());
-                                std::string baseName = _module.types()[fieldType].name();
-                                poType type(arrayType, fieldType, baseName + "[]");
-                                type.setArray(true);
-                                _module.addType(type);
-                            }
-
-                            const int alignment = size * _module.types()[fieldType].alignment();
-                            const int totalSize = size * int(arrayNode->arraySize());
-                            const int padding = align(offset, alignment);
-                            offset += padding;
-
-                            auto& type = _module.types()[id];
-                            type.addField(poField(poAttributes::PUBLIC, offset, arrayType, decl->token().string()));
-                            offset += totalSize;
-                            sizeOfLargestField = std::max(sizeOfLargestField, alignment);
-                        }
-                        else if (decl->child()->type() == poNodeType::EXTERN)
-                        {
-                            poListNode* prototypeNode = static_cast<poListNode*>(decl->child());
-                            const std::string& name = prototypeNode->token().string();
-
-                            // TODO: handle when the return type is the same as the class
-
-                            int returnType = -1;
-                            for (poNode* node : prototypeNode->list())
-                            {
-                                if (node->type() == poNodeType::RETURN_TYPE)
-                                {
-                                    poUnaryNode* returnTypeNode = static_cast<poUnaryNode*>(node);
-                                    returnType = getType(returnTypeNode->token());
-                                    if (returnType == -1)
-                                    {
-                                        const auto& it = _resolvedTypes.find(returnTypeNode->token().string());
-                                        if (it != _resolvedTypes.end())
-                                        {
-                                            returnType = it->second;
-                                        }
-                                    }
-                                    if (returnTypeNode->child()->type() == poNodeType::POINTER)
-                                    {
-                                        poPointerNode* pointerNode = static_cast<poPointerNode*>(returnTypeNode->child());
-                                        returnType = getPointerType(returnType, pointerNode->count());
-                                    }
-                                }
-                            }
-
-                            auto& type = _module.types()[id];
-                            const std::string fullName = ns.name() + "::" + type.name() + "::" + name;
-                            poMemberFunction method(attributes, returnType, name);
-                            const auto& it = _memberFunctions.find(fullName);
-                            if (it != _memberFunctions.end())
-                            {
-                                method.setId(it->second);
-                            }
-
-                            for (poNode* node : prototypeNode->list())
-                            {
-                                if (node->type() == poNodeType::ARGS)
-                                {
-                                    poListNode* args = static_cast<poListNode*>(node);
-                                    for (poNode* arg : args->list())
-                                    {
-                                        poUnaryNode* unary = static_cast<poUnaryNode*>(arg);
-                                        assert(unary->type() == poNodeType::PARAMETER);
-
-                                        poNode* type = unary->child();
-                                        int pointerCount = 0;
-                                        if (type->type() == poNodeType::POINTER)
-                                        {
-                                            poPointerNode* pointerNode = static_cast<poPointerNode*>(type);
-                                            pointerCount = pointerNode->count();
-                                            type = pointerNode->child();
-                                        }
-
-                                        assert(type->type() == poNodeType::TYPE);
-
-                                        int typeId = getType(type->token());
-                                        if (typeId == -1)
-                                        {
-                                            const auto& it = _resolvedTypes.find(type->token().string());
-                                            if (it != _resolvedTypes.end())
-                                            {
-                                                typeId = it->second;
-                                            }
-                                        }
-
-                                        const int variableType = getPointerType(typeId, pointerCount);
-                                        method.addArgument(variableType);
-                                    }
-                                }
-                            }
-
-                            type.addMethod(method);
-                        }
-                    }
-                }
-
-                // Align the size of the type to the size of the largest field
-                const int padding = align(offset, sizeOfLargestField);
-                auto& type = _module.types()[id];
-                type.setSize(offset + padding);
-                type.setAlignment(sizeOfLargestField);
-                _resolvedTypes.insert(std::pair<std::string, int>(name, id));
+                resolveType(name, ns, typeNode);
 
                 changes = true;
             }
@@ -531,6 +420,244 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
     // cannot be resolved and terminate the build
 }
 
+void poTypeResolver::resolveType(const std::string& name, poNamespace& ns, poListNode* typeNode)
+{
+    const int id = int(_module.types().size());
+    _module.addType(poType(id,
+        TYPE_OBJECT,
+        name));
+    ns.addType(id);
+    int offset = 0;
+    int sizeOfLargestField = 0;
+    for (poNode* child : typeNode->list())
+    {
+        if (child->type() != poNodeType::DECL)
+        {
+            continue;
+        }
+
+        poAttributes attributes = poAttributes::PUBLIC;
+        poUnaryNode* decl = static_cast<poUnaryNode*>(child);
+        if (decl->child()->type() == poNodeType::ATTRIBUTES)
+        {
+            poAttributeNode* attributeNode = static_cast<poAttributeNode*>(decl->child());
+            decl = attributeNode;
+            attributes = attributeNode->attributes();
+        }
+
+        int pointerCount = 0;
+        if (decl->child()->type() == poNodeType::POINTER)
+        {
+            poPointerNode* pointerNode = static_cast<poPointerNode*>(decl->child());
+            decl = pointerNode;
+            pointerCount = pointerNode->count();
+        }
+
+        if (decl->child()->type() == poNodeType::TYPE)
+        {
+            poNode* typeNode = decl->child();
+            int fieldType = getPointerType(getType(typeNode->token()), pointerCount);
+            int size = 0;
+            if (fieldType == -1)
+            {
+                const auto& userType = _resolvedTypes.find(typeNode->token().string());
+                if (userType != _resolvedTypes.end())
+                {
+                    auto& typeData = _module.types()[userType->second];
+                    size = typeData.size();
+                    fieldType = typeData.id();
+                }
+            }
+            else
+            {
+                size = getTypeSize(fieldType);
+            }
+
+            // Align the offset to the size of the type
+            const int alignment = _module.types()[fieldType].alignment();
+            const int padding = align(offset, alignment);
+            offset += padding;
+
+            auto& type = _module.types()[id];
+            type.addField(poField(attributes, offset, fieldType, decl->token().string()));
+
+            offset += size;
+            sizeOfLargestField = std::max(sizeOfLargestField, alignment);
+        }
+        else if (decl->child()->type() == poNodeType::ARRAY)
+        {
+            poArrayNode* arrayNode = static_cast<poArrayNode*>(decl->child());
+            poNode* typeNode = arrayNode->child();
+            int fieldType = getPointerType(getType(typeNode->token()), pointerCount);
+            int size = 0;
+            if (fieldType == -1)
+            {
+                const auto& userType = _resolvedTypes.find(typeNode->token().string());
+                if (userType != _resolvedTypes.end())
+                {
+                    auto& typeData = _module.types()[userType->second];
+                    size = typeData.size();
+                    fieldType = typeData.id();
+                }
+            }
+            else
+            {
+                size = getTypeSize(fieldType);
+            }
+
+            int arrayType = _module.getArrayType(fieldType);
+            if (arrayType == -1)
+            {
+                arrayType = int(_module.types().size());
+                std::string baseName = _module.types()[fieldType].name();
+                poType type(arrayType, fieldType, baseName + "[]");
+                type.setArray(true);
+                _module.addType(type);
+            }
+
+            const int alignment = size * _module.types()[fieldType].alignment();
+            const int totalSize = size * int(arrayNode->arraySize());
+            const int padding = align(offset, alignment);
+            offset += padding;
+
+            auto& type = _module.types()[id];
+            type.addField(poField(poAttributes::PUBLIC, offset, arrayType, decl->token().string()));
+            offset += totalSize;
+            sizeOfLargestField = std::max(sizeOfLargestField, alignment);
+        }
+        else if (decl->child()->type() == poNodeType::EXTERN)
+        {
+            poUnaryNode* externNode = static_cast<poUnaryNode*>(decl->child());
+            poListNode* prototypeNode = static_cast<poListNode*>(externNode->child());
+
+            // TODO: handle when the return type is the same as the class
+
+            if (prototypeNode->type() == poNodeType::FUNCTION)
+            {
+                const int returnType = getReturnType(prototypeNode);
+
+                poType type = _module.types()[id];
+                const std::string& name = prototypeNode->token().string();
+                const std::string fullName = ns.name() + "::" + type.name() + "::" + name;
+                poMemberFunction method(attributes, returnType, name);
+                const auto& it = _memberFunctions.find(fullName);
+                if (it != _memberFunctions.end())
+                {
+                    method.setId(it->second);
+                }
+
+                std::vector<int> argTypes;
+                getPrototypeArgs(prototypeNode, argTypes);
+
+                {
+                    poType& type = _module.types()[id];
+                    for (const int arg : argTypes)
+                    {
+                        method.addArgument(arg);
+                    }
+
+                    type.addMethod(method);
+                }
+            }
+            else if (prototypeNode->type() == poNodeType::CONSTRUCTOR)
+            {
+                auto& type = _module.types()[id];
+                const std::string fullName = ns.name() + "::" + type.name() + "::" + type.name();
+                poConstructor constructor(attributes);
+                const auto& it = _memberFunctions.find(fullName);
+                if (it != _memberFunctions.end())
+                {
+                    constructor.setId(it->second);
+                }
+
+                std::vector<int> argTypes;
+                getPrototypeArgs(prototypeNode, argTypes);
+
+                for (const int arg : argTypes)
+                {
+                    constructor.addArgument(arg);
+                }
+
+                type.addConstructor(constructor);
+            }
+        }
+    }
+
+    // Align the size of the type to the size of the largest field
+    const int padding = align(offset, sizeOfLargestField);
+    auto& type = _module.types()[id];
+    type.setSize(offset + padding);
+    type.setAlignment(sizeOfLargestField);
+    _resolvedTypes.insert(std::pair<std::string, int>(name, id));
+}
+
+void poTypeResolver::getPrototypeArgs(poListNode* prototypeNode, std::vector<int>& argTypes)
+{
+    for (poNode* node : prototypeNode->list())
+    {
+        if (node->type() == poNodeType::ARGS)
+        {
+            poListNode* args = static_cast<poListNode*>(node);
+            for (poNode* arg : args->list())
+            {
+                poUnaryNode* unary = static_cast<poUnaryNode*>(arg);
+                assert(unary->type() == poNodeType::PARAMETER);
+
+                poNode* type = unary->child();
+                int pointerCount = 0;
+                if (type->type() == poNodeType::POINTER)
+                {
+                    poPointerNode* pointerNode = static_cast<poPointerNode*>(type);
+                    pointerCount = pointerNode->count();
+                    type = pointerNode->child();
+                }
+
+                assert(type->type() == poNodeType::TYPE);
+
+                int typeId = getType(type->token());
+                if (typeId == -1)
+                {
+                    const auto& it = _resolvedTypes.find(type->token().string());
+                    if (it != _resolvedTypes.end())
+                    {
+                        typeId = it->second;
+                    }
+                }
+
+                const int variableType = getPointerType(typeId, pointerCount);
+                argTypes.push_back(variableType);
+            }
+        }
+    }
+}
+
+int poTypeResolver::getReturnType(poListNode* prototypeNode)
+{
+    int returnType = -1;
+    for (poNode* node : prototypeNode->list())
+    {
+        if (node->type() == poNodeType::RETURN_TYPE)
+        {
+            poUnaryNode* returnTypeNode = static_cast<poUnaryNode*>(node);
+            returnType = getType(returnTypeNode->token());
+            if (returnType == -1)
+            {
+                const auto& it = _resolvedTypes.find(returnTypeNode->token().string());
+                if (it != _resolvedTypes.end())
+                {
+                    returnType = it->second;
+                }
+            }
+            if (returnTypeNode->child()->type() == poNodeType::POINTER)
+            {
+                poPointerNode* pointerNode = static_cast<poPointerNode*>(returnTypeNode->child());
+                returnType = getPointerType(returnType, pointerNode->count());
+            }
+        }
+    }
+    return returnType;
+}
+
 void poTypeResolver::updateArgs(poNode* node)
 {
     // Update the function arguments now that all types are resolved
@@ -542,15 +669,20 @@ void poTypeResolver::updateArgs(poNode* node)
 
     for (poNode* child : namespaceNode->list())
     {
-        if (child->type() != poNodeType::FUNCTION &&
-            child->type() != poNodeType::EXTERN)
+        poNode* funcNode = child;
+        if (funcNode->type() == poNodeType::EXTERN)
+        {
+            funcNode = static_cast<poUnaryNode*>(funcNode)->child();
+        }
+
+        if (child->type() != poNodeType::FUNCTION)
         {
             continue;
         }
 
         const std::string& name = child->token().string();
 
-        poListNode* funNode = static_cast<poListNode*>(child);
+        poListNode* funNode = static_cast<poListNode*>(funcNode);
         for (poNode* funChildNode : funNode->list())
         {
             if (funChildNode->type() != poNodeType::ARGS)

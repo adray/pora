@@ -1,0 +1,15 @@
+import std;
+
+namespace Example
+{
+    struct test {
+        u8[2] a;
+    }
+
+    static void main()
+    {
+        test t;
+        t.a[0] = 'a';
+        print_64((i64)t.a[0]);
+    }
+}

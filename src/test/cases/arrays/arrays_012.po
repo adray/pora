@@ -1,0 +1,31 @@
+import std;
+
+namespace Test {
+    struct myProcess {
+        u8* name;
+        u32 len;
+        u32 pid;
+    }
+    
+    static void helper(myProcess* p, i64 count) {
+        myProcess[] procs = (myProcess[0])p;
+        for (i64 i = 0; i < count; i += 1) {
+            procs[i].pid = (u32)( 23 + i );
+            procs[i].name = "Process Name";
+            procs[i].len = (u32)13;
+        }
+    }
+    
+    static void main() {
+        myProcess[4] procs;
+        helper((myProcess*)procs, 4);
+        
+        for (i64 i = 0; i < 4; i += 1) {
+         
+            myProcess x = procs[i];
+        
+            println(x.name, x.len);
+            print_64((i64)x.pid);
+        }
+    }
+}

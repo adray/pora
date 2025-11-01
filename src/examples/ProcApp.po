@@ -1,0 +1,19 @@
+import std;
+
+namespace ProcApp {
+    static void main() {
+        println("Proceses:", (u32)10);
+        process[32] procs;
+        u32 count = findProcesses((process*)procs, (u32)32);
+        for (u32 i = (u32)0; i < count; i += (u32)1) {
+            process p = procs[(i64)i];
+            u8* name = p.name;
+            u32 len = p.len;
+            print_64((i64)p.pid);
+            println(name, len);
+        }
+        freeProcesses((process*)procs, count);
+        
+        println("Done", (u32)5);
+    }
+}

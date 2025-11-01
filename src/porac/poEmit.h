@@ -113,10 +113,12 @@ namespace po
         void emitStatement(poNode* node, poFlowGraph& cfg);
         int emitPassByValue(const int expr, poFlowGraph& cfg);
         int emitPassByReference(const int expr, poFlowGraph& cfg);
-        int emitCall(poNode* node, poFlowGraph& cfg, int instanceExpr);
+        int emitCall(poNode* node, poFlowGraph& cfg, const int instanceExpr);
+        void emitCall(poNode* node, poFlowGraph& cfg, const int instanceExpr, const int64_t arraySize);
         int emitMemberCall(poNode* node, poFlowGraph& cfg);
         void emitReturn(poNode* node, poFlowGraph& cfg);
         void emitDecl(poNode* node, poFlowGraph& cfg);
+        void emitDefaultValue(const int type, poFlowGraph& cfg, const int ptrType, const int var);
         void emitAssignment(poNode* node, poFlowGraph& cfg);
         void emitIfStatement(poNode* node, poFlowGraph& cfg, poBasicBlock* endBB, poBasicBlock* loopHeader, poBasicBlock* loopEnd);
         void emitWhileStatement(poNode* node, poFlowGraph& cfg, poBasicBlock* endBB);

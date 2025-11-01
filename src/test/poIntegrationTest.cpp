@@ -179,6 +179,9 @@ static void runIntegrationTest(const std::string& name, const std::string& path,
     ss << "\"" << compiler << "\" build \"" << path << "\"" <<
         " \"" << std << "\\os.po" << "\""
         " \"" << std << "\\io.po" << "\""
+        " \"" << std << "\\string.po" << "\""
+        " \"" << std << "\\string_class.po" << "\""
+        " \"" << std << "\\clock.po" << "\""
         ;
     if (!executeCommand(ss.str(), false))
     {

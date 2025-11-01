@@ -1,0 +1,21 @@
+import std;
+
+namespace Test {
+    struct myProcess {
+        u8* name;
+        u32 len;
+        u32 pid;
+    }
+    
+    static void main() {
+        myProcess[4] procs;
+        procs[0].name = "Process Name1";
+        procs[0].pid = (u32)123;
+        procs[1].name = "Process Name2";
+        procs[1].pid = (u32)456;
+        println(procs[0].name, (u32)14);
+        print_64((i64)procs[0].pid);
+        println(procs[1].name, (u32)14);
+        print_64((i64)procs[1].pid);
+    }
+}

@@ -32,6 +32,7 @@ namespace po
         void checkModules(poNode* node);
         void checkNamespaces(poNode* node, const std::vector<poNode*> importNodes);
         void checkFunctions(poNode* node);
+        void checkConstructor(poNode* node);
         void checkBody(poNode* node, const int returnType);
         void checkStatement(poNode* node, const int returnType);
         void checkDecl(poNode* node);

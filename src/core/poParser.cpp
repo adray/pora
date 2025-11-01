@@ -253,6 +253,11 @@ poNode* poFunctionParser::parsePrimary()
             {
                 _parser.setError("Unexpected token.");
             }
+
+            if (_parser.match(poTokenType::DOT))
+            {
+                node = parseMember(node, token);
+            }
         }
         else if (_parser.match(poTokenType::DOT))
         {
@@ -646,7 +651,25 @@ poNode* poFunctionParser::parseWhile()
         }
 
         _parser.advance();
-        poNode* equality = parseExpression();
+
+        poNode* equality = nullptr;
+        if ((_parser.match(poTokenType::IDENTIFIER) ||
+            _parser.match(poTokenType::TRUE) ||
+            _parser.match(poTokenType::FALSE)) &&
+            _parser.lookahead(poTokenType::CLOSE_PARAN, 0))
+        {
+            poToken expr = _parser.peek();
+            poNode* expression = parseExpression();
+            equality = new poBinaryNode(poNodeType::CMP_EQUALS,
+                expression,
+                new poConstantNode(poNodeType::CONSTANT, poToken(poTokenType::TRUE, expr.string(), expr.line(), expr.column())),
+                expr);
+        }
+        else
+        {
+            equality = parseExpression();
+            fixupExpression(equality);
+        }
 
         if (!_parser.match(poTokenType::CLOSE_PARAN))
         {
@@ -929,13 +952,71 @@ poNode* poFunctionParser::parseDecl(const poToken& type)
                     poNodeType::ARRAY, id);
         }
 
-        if (_parser.match(poTokenType::SEMICOLON))
+        if (_parser.match(poTokenType::SEMICOLON) ||
+            _parser.match(poTokenType::OPEN_PARAN))
         {
-            // end
-            poNode* decl = new poUnaryNode(poNodeType::DECL,
-                variable,
-                type);
-            statement = new poUnaryNode(poNodeType::STATEMENT, decl, type);
+            if (_parser.match(poTokenType::OPEN_PARAN))
+            {
+                _parser.advance();
+
+                // constructor?
+                std::vector<poNode*> args;
+                if (!_parser.match(poTokenType::CLOSE_PARAN))
+                {
+                    poNode* node = parseTerm();
+                    if (node)
+                    {
+                        args.push_back(node);
+                        while (_parser.match(poTokenType::COMMA))
+                        {
+                            _parser.advance();
+                            args.push_back(parseTerm());
+                        }
+                    }
+                }
+
+                if (_parser.match(poTokenType::CLOSE_PARAN))
+                {
+                    _parser.advance();
+
+                    poListNode* argsNode = new poListNode(poNodeType::CALL, args, type);
+                    std::vector<poNode*> constructor = {
+                        argsNode, variable
+                    };
+
+                    // end
+                    poNode* decl = new poUnaryNode(poNodeType::DECL,
+                        new poListNode(poNodeType::CONSTRUCTOR, constructor, type),
+                        type);
+                    statement = new poUnaryNode(poNodeType::STATEMENT, decl, type);
+                }
+                else
+                {
+                    _parser.setError("Expected parenthesis.");
+                }
+            }
+            else
+            {
+                // end
+                if (type.token() == poTokenType::IDENTIFIER)
+                {
+                    poListNode* argsNode = new poListNode(poNodeType::CALL, std::vector<poNode*>(), type);
+                    std::vector<poNode*> constructor = {
+                        variable, argsNode
+                    };
+                    poNode* decl = new poUnaryNode(poNodeType::DECL,
+                        new poListNode(poNodeType::CONSTRUCTOR, constructor, type),
+                        type);
+                    statement = new poUnaryNode(poNodeType::STATEMENT, decl, type);
+                }
+                else
+                {
+                    poNode* decl = new poUnaryNode(poNodeType::DECL,
+                        variable,
+                        type);
+                    statement = new poUnaryNode(poNodeType::STATEMENT, decl, type);
+                }
+            }
         }
         else
         {
@@ -970,7 +1051,11 @@ poNode* poFunctionParser::parseExpressionStatement()
     if (_parser.match(poTokenType::DOT))
     {
         poNode* member = parseMember(new poNode(poNodeType::VARIABLE, id), id);
-        if (_parser.match(poTokenType::EQUALS))
+        if (_parser.match(poTokenType::EQUALS) ||
+            _parser.match(poTokenType::PLUS_EQUALS) ||
+            _parser.match(poTokenType::MINUS_EQUALS) ||
+            _parser.match(poTokenType::STAR_EQUALS) ||
+            _parser.match(poTokenType::SLASH_EQUALS))
         {
             // assignment
             poNode* assign = parseRH(member);
@@ -1018,17 +1103,44 @@ poNode* poFunctionParser::parseExpressionStatement()
         {
             _parser.advance();
 
-            poNode* lhs = new poArrayAccessor(accessor, new poNode(poNodeType::VARIABLE, id), poNodeType::ARRAY_ACCESSOR, id);
-
-            if (_parser.match(poTokenType::EQUALS))
+            if (_parser.match(poTokenType::DOT))
             {
-                // assignment
-                poNode* assign = parseRH(lhs);
-                return new poUnaryNode(poNodeType::STATEMENT, assign, id);
+                poNode* member = parseMember(
+                    new poArrayAccessor(accessor, new poNode(poNodeType::VARIABLE, id), poNodeType::ARRAY_ACCESSOR, id),
+                    id);
+                if (_parser.match(poTokenType::EQUALS) ||
+                    _parser.match(poTokenType::PLUS_EQUALS) ||
+                    _parser.match(poTokenType::MINUS_EQUALS) ||
+                    _parser.match(poTokenType::STAR_EQUALS) ||
+                    _parser.match(poTokenType::SLASH_EQUALS))
+                {
+                    // assignment
+                    poNode* assign = parseRH(member);
+                    return new poUnaryNode(poNodeType::STATEMENT, assign, id);
+                }
+                else
+                {
+                    _parser.setError("Unexpected token.");
+                }
             }
             else
             {
-                _parser.setError("Unexpected token.");
+                poNode* lhs = new poArrayAccessor(accessor, new poNode(poNodeType::VARIABLE, id), poNodeType::ARRAY_ACCESSOR, id);
+
+                if (_parser.match(poTokenType::EQUALS) ||
+                    _parser.match(poTokenType::PLUS_EQUALS) ||
+                    _parser.match(poTokenType::MINUS_EQUALS) ||
+                    _parser.match(poTokenType::STAR_EQUALS) ||
+                    _parser.match(poTokenType::SLASH_EQUALS))
+                {
+                    // assignment
+                    poNode* assign = parseRH(lhs);
+                    return new poUnaryNode(poNodeType::STATEMENT, assign, id);
+                }
+                else
+                {
+                    _parser.setError("Unexpected token.");
+                }
             }
         }
         else
@@ -1162,8 +1274,17 @@ poNode* poFunctionParser::parseStatement()
                             new poNode(poNodeType::VARIABLE, name),
                             poNodeType::ARRAY, name);
 
+                        poListNode* argsNode = new poListNode(poNodeType::CALL,
+                            std::vector<poNode*>(), id);
+                        std::vector<poNode*> constructor = {
+                            argsNode, variable
+                        };
+
+                        poListNode* constructorNode = new poListNode(poNodeType::CONSTRUCTOR,
+                            constructor, name);
+
                         poNode* decl = new poUnaryNode(poNodeType::DECL,
-                            variable,
+                            constructorNode,
                             id);
                         statement = new poUnaryNode(poNodeType::STATEMENT, decl, id);
                     }
@@ -1404,9 +1525,11 @@ poNode* poFunctionParser::parseArg()
     if (_parser.match(poTokenType::BOOLEAN) ||
         _parser.match(poTokenType::I64_TYPE) ||
         _parser.match(poTokenType::I32_TYPE) ||
+        _parser.match(poTokenType::I16_TYPE) ||
         _parser.match(poTokenType::I8_TYPE) ||
         _parser.match(poTokenType::U64_TYPE) ||
         _parser.match(poTokenType::U32_TYPE) ||
+        _parser.match(poTokenType::U16_TYPE) ||
         _parser.match(poTokenType::U8_TYPE) ||
         _parser.match(poTokenType::F64_TYPE) ||
         _parser.match(poTokenType::F32_TYPE) ||
@@ -1429,6 +1552,97 @@ poNode* poFunctionParser::parseArg()
             }
             node = new poUnaryNode(poNodeType::PARAMETER, node, id);
         }
+    }
+
+    return node;
+}
+
+poNode* poFunctionParser::parseConstructor()
+{
+    poNode* node = nullptr;
+
+    if (_parser.match(poTokenType::IDENTIFIER))
+    {
+        poToken id = _parser.peek();
+        _parser.advance();
+
+        std::vector<std::string> path;
+        while (_parser.match(poTokenType::RESOLVER))
+        {
+            _parser.advance();
+            if (_parser.match(poTokenType::IDENTIFIER))
+            {
+                const poToken& memberId = _parser.peek();
+                _parser.advance();
+
+                path.push_back(id.string());
+                id = memberId;
+            }
+            else
+            {
+                _parser.setError("Expected identifier.");
+                return nullptr;
+            }
+        }
+
+        if (_parser.match(poTokenType::OPEN_PARAN))
+        {
+            _parser.advance();
+            std::vector<poNode*> nodes;
+            // parse args...
+            std::vector<poNode*> args;
+            const auto& token = _parser.peek();
+
+            nodes.push_back(new poResolverNode(id, path));
+
+            if (!_parser.match(poTokenType::CLOSE_PARAN))
+            {
+                args.push_back(parseArg());
+                while (_parser.match(poTokenType::COMMA))
+                {
+                    _parser.advance();
+                    args.push_back(parseArg());
+                }
+            }
+
+            nodes.push_back(new poListNode(poNodeType::ARGS, args, token));
+
+            if (_parser.match(poTokenType::CLOSE_PARAN))
+            {
+                _parser.advance();
+                if (_parser.match(poTokenType::OPEN_BRACE))
+                {
+                    nodes.push_back(parseBody(false));
+                    node = new poListNode(poNodeType::CONSTRUCTOR, nodes, id);
+                }
+                else
+                {
+                    _parser.setError("Expected open brace.");
+                    return nullptr;
+                }
+
+                if (_parser.match(poTokenType::CLOSE_BRACE))
+                {
+                    _parser.advance();
+                }
+                else
+                {
+                    _parser.setError("Expected close brace.");
+                }
+            }
+            else
+            {
+                _parser.setError("Expected close bracket.");
+            }
+        }
+        else
+        {
+            _parser.setError("Expected open bracket.");
+        }
+    }
+    else
+    {
+        _parser.setError("Expected identifier");
     }
 
     return node;
@@ -1543,6 +1757,62 @@ poNode* poFunctionParser::parse(const poToken& ret)
     return node;
 }
 
+poNode* poFunctionParser::parseConstructorPrototype()
+{
+    poNode* node = nullptr;
+    _parser.advance();
+
+    if (_parser.match(poTokenType::OPEN_PARAN))
+    {
+        _parser.advance();
+
+        std::vector<poNode*> nodes;
+        // parse args...
+        std::vector<poNode*> args;
+        const auto& token = _parser.peek();
+
+        if (!_parser.match(poTokenType::CLOSE_PARAN))
+        {
+            args.push_back(parseArg());
+            while (_parser.match(poTokenType::COMMA))
+            {
+                _parser.advance();
+                args.push_back(parseArg());
+            }
+        }
+
+        nodes.push_back(new poListNode(poNodeType::ARGS, args, token));
+
+        if (_parser.match(poTokenType::CLOSE_PARAN))
+        {
+            _parser.advance();
+        }
+        else
+        {
+            _parser.setError("Expected close parenthesis.");
+        }
+
+        if (_parser.match(poTokenType::SEMICOLON))
+        {
+            _parser.advance();
+
+            node = new poUnaryNode(poNodeType::EXTERN,
+                new poListNode(poNodeType::CONSTRUCTOR, nodes, token),
+                token);
+        }
+        else
+        {
+            _parser.setError("Expected close parenthesis.");
+        }
+    }
+    else
+    {
+        _parser.setError("Expected open parenthesis.");
+    }
+
+    return node;
+}
+
 poNode* poFunctionParser::parsePrototype(const poToken& ret)
 {
     poNode* node = nullptr;
@@ -1603,7 +1873,9 @@ poNode* poFunctionParser::parsePrototype(const poToken& ret)
             {
                 _parser.advance();
 
-                node = new poListNode(poNodeType::EXTERN, nodes, id);
+                node = new poUnaryNode(poNodeType::EXTERN,
+                    new poListNode(poNodeType::FUNCTION, nodes, id),
+                    id);
             }
             else
             {
@@ -1690,9 +1962,28 @@ poNode* poClassParser::parse()
             _parser.match(poTokenType::VOID) ||
             _parser.matchPrimitiveType())
         {
-            poToken type = _parser.peek();
+            if (_parser.lookahead(poTokenType::OPEN_PARAN, 0))
+            {
+                poToken prototypeName = _parser.peek();
 
-            if (_parser.lookahead(poTokenType::OPEN_PARAN, 1))
+                if (prototypeName.string() != name.string())
+                {
+                    _parser.setError("Malformed constructor or member function.");
+                    break;
+                }
+
+                // Constructor?
+                poFunctionParser funcParser(_parser);
+                poNode* prototype = funcParser.parseConstructorPrototype();
+                children.push_back(new poUnaryNode(poNodeType::DECL,
+                    new poAttributeNode(attributes, name, prototype),
+                    name));
+                continue;
+            }
+
+            poToken type = _parser.peek();
+            if (_parser.lookahead(poTokenType::OPEN_PARAN, 1) ||
+                _parser.lookahead(poTokenType::OPEN_PARAN, 2))
             {
                 poFunctionParser funcParser(_parser);
                 poNode* prototype = funcParser.parsePrototype(type);
@@ -1946,6 +2237,12 @@ poNode* poNamespaceParser::parseFunction(const poToken& ret)
     return parser.parse(ret);
 }
 
+poNode* poNamespaceParser::parseConstructor()
+{
+    poFunctionParser parser(_parser);
+    return parser.parseConstructor();
+}
+
 poNode* poNamespaceParser::parseStruct()
 {
     poStructParser parser(_parser);
@@ -2015,7 +2312,14 @@ poNode* poNamespaceParser::parse()
             {
                 auto& token = _parser.peek();
 
-                children.push_back(parseFunction(token));
+                if (_parser.lookahead(poTokenType::RESOLVER, 0))
+                {
+                    children.push_back(parseConstructor());
+                }
+                else
+                {
+                    children.push_back(parseFunction(token));
+                }
             }
             else
             {

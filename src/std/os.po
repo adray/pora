@@ -50,6 +50,11 @@ namespace std
           i32 flags, // [in] DWORD  dwFlags
           u64 numBytes // [in] SIZE_T dwBytes
         );
+    extern boolean HeapFree(
+           i64 handle, // [in] HANDLE hHeap
+           i32 flags, //[in] DWORD dwFlags
+           u8* mem // [in] LPVOID lpMem
+        );
     extern i64 CreateToolhelp32Snapshot(
         i32 dwFlags,
         i32 th32ProcessID

@@ -53,6 +53,7 @@ namespace po
         STATEMENT, /* poUnaryNode */
         RETURN, /* poUnaryNode */
         FUNCTION, /* poListNode */
+        CONSTRUCTOR, /*poListNode*/
         EXTERN, /* poListNode */
         BODY, /* poListNode */
         CLASS, /* poListNode */

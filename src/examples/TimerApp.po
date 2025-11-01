@@ -1,31 +1,13 @@
 import std;
 
-namespace TimerApp {
-    static void printTime(SYSTEMTIME* time) {
-        print_64((i64)time.wHour);
-        if ((i64)time.wHour < 10) {
-            print("0", (u32)2);
-        }
-        print(":", (u32)2);
-        print_64((i64)time.wMinute);
-        if ((i64)time.wMinute < 10) {
-            print("0", (u32)2);
-        }
-        print(":", (u32)2);
-        print_64((i64)time.wSecond);
-        if ((i64)time.wSecond < 10) {
-            print("0", (u32)2);
-        }
-        println("", (u32)1);
-    }
-    
+namespace TimerApp {    
     static void main() {
         println("Timer App", (u32)10);
         print("Enter timer (mins):", (u32)20);
         
         u8[4] line;
         u32 count = readLine((u8*)line, (u32)4);
-        if (count == (u32)(-1)) {
+        if (count == (u32)0) {
             println("Invalid data.", (u32)14);
             return;
         }
@@ -38,17 +20,15 @@ namespace TimerApp {
             return;
         }
         
-        SYSTEMTIME time;
-        GetLocalTime(&time);        
-        time.wMinute += (u16)mins;
-        if (time.wMinute >= (u16)60) {
-            time.wHour += (u16)1;
-            time.wMinute -= (u16)60;
-        }
-        
+        clock clock;
+        clock.setNow();
+        clock.addMinutes((u16)mins);
+
+        clock_time time;
+        clock.getTime(&time);
         print("Timer set for: ", (u32)16);
-        printTime(&time);
-        
+        println((u8*)time.text, (u32)9);
+
         i64 numSleeps = mins * 60;
         i64 numMinsLeft = mins;
         while (numSleeps > 0) {

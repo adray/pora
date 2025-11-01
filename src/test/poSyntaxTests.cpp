@@ -3,6 +3,7 @@
 #include "poParser.h"
 #include "poTypeChecker.h"
 #include "poTypeResolver.h"
+#include "poTypeValidator.h"
 #include "poModule.h"
 #include "poAST.h"
 #include <string>
@@ -126,6 +127,18 @@ static void checkSyntax(const std::string& testName, const std::string& program,
     poModule module;
     poTypeResolver resolver(module);
     resolver.resolve(nodes);
+    if (resolver.isError())
+    {
+        if (success)
+        {
+            std::cout << "FAILED Type Resolver: " << resolver.errorText() << std::endl;
+        }
+        else
+        {
+            std::cout << "OK" << std::endl;
+        }
+        return;
+    }
 
     poTypeChecker checker(module);
     if (!checker.check(nodes))
@@ -133,6 +146,20 @@ static void checkSyntax(const std::string& testName, const std::string& program,
         if (success)
         {
             std::cout << "FAILED Type Checker: " << checker.errorText() << std::endl;
+        }
+        else
+        {
+            std::cout << "OK" << std::endl;
+        }
+        return;
+    }
+
+    poTypeValidator validator;
+    if (!validator.validateModule(module))
+    {
+        if (success)
+        {
+            std::cout << "FAILED Type Validator: " << validator.errorText() << std::endl;
         }
         else
         {
@@ -883,6 +910,128 @@ void po::syntaxTest()
         "   myClass v1;"\
         "}"\
         "}", false);
+    checkSyntax("Class Test #7", "namespace Test {"\
+        "class myClass {"\
+        "   private i64 _x;"\
+        "   public myClass(i64 x);"\
+        "}"\
+        "myClass::myClass(i64 x) { _x = x; } "\
+        "static void main() {"\
+        "   myClass v1(77);"\
+        "}"\
+        "}", true);
+    checkSyntax("Class Test #8", "namespace Test {"\
+        "class myClass {"\
+        "   private i64 _x;"\
+        "   public myClass();"\
+        "}"\
+        "myClass::myClass() { _x = 99; } "\
+        "static void main() {"\
+        "   myClass v1();"\
+        "}"\
+        "}", true);
+    checkSyntax("Class Test #9", "namespace Test {"\
+        "class myClass {"\
+        "   private i64 _x;"\
+        "   public myClass(i64 x);"\
+        "}"\
+        "myClass::myClass(i64 x) { _x = x; } "\
+        "static void main() {"\
+        "   myClass v1;"\
+        "}"\
+        "}", false);
+    checkSyntax("Class Test #10", "namespace Test {"\
+        "class myClass {"\
+        "   private i64 _x;"\
+        "}"\
+        "static void main() {"\
+        "   myClass v1(10);"\
+        "}"\
+        "}", false);
+    checkSyntax("Class Test #11", "namespace Test {"\
+        "class myClass {"\
+        "   private u16 _x;"\
+        "   void setX(u16 x);"\
+        "}"\
+        "void myClass::setX(u16 x) { _x = x; }"
+        "static void main() {"\
+        "   myClass v1;"\
+        "   v1.setX(60);"
+        "}"\
+        "}", false);
+    checkSyntax("Class Test #12", "namespace Test {"\
+        "class myClass {"\
+        "   private u16 _x;"\
+        "   void setX(u16 x);"\
+        "}"\
+        "void myClass::setX(u16 x) { _x = x; }"
+        "void myClass::setX(u16 x) { _x = x; }"
+        "static void main() {"\
+        "   myClass v1;"\
+        "   v1.setX((u16)60);"
+        "}"\
+        "}", false);
+    checkSyntax("Class Test #13", "namespace Test {"\
+        "class myClass {"\
+        "   private u16 _x;"\
+        "   private u16 _x;"\
+        "}"\
+        "static void main() {"\
+        "   myClass v1;"\
+        "}"\
+        "}", false);
+    checkSyntax("Class Test #14", "namespace Test {"\
+        "class myClass {"\
+        "   private u16 _x;"\
+        "   void setX(u16 x);"\
+        "}"\
+        "void myClass::setX(u16 x) { _x = x; }"
+        "static void main() {"\
+        "   myClass[2] v1;"\
+        "   v1[0].setX((u16)20);"\
+        "}"\
+        "}", true);
+    checkSyntax("Class Test #15", "namespace Test {"\
+        "class myClass {"\
+        "   u16 x;"\
+        "}"\
+        "static void main() {"\
+        "   myClass[2] v1;"\
+        "   v1[0].x = (u16)20;"\
+        "}"\
+        "}", true);
+    checkSyntax("Class Test #16", "namespace Test {"\
+        "class myClass {"\
+        "   i64 x;"\
+        "   myClass();"\
+        "}"\
+        "myClass::myClass() { x = 0; }"\
+        "static void main() {"\
+        "   myClass[2] v1();"\
+        "}"\
+        "}", false);
+    checkSyntax("Class Test #17", "namespace Test {"\
+        "class myClass {"\
+        "   i64 x;"\
+        "   myClass(i64 y);"\
+        "}"\
+        "myClass::myClass(i64 y) { x = y; }"\
+        "static void main() {"\
+        "   myClass[2] v1;"\
+        "}"\
+        "}", false);
+    checkSyntax("Class Test #18", "namespace Test {"\
+        "class myClass {"\
+        "   private u16 _x;"\
+        "   void setX(u16 x);"\
+        "   void setX(u16 x);"\
+        "}"\
+        "void myClass::setX(u16 x) { _x = x; }"
+        "static void main() {"\
+        "   myClass v1;"\
+        "   v1.setX((u16)60);"
+        "}"\
+        "}", false);
     checkSyntax("Array Test #1", "namespace Test {"\
         "static void main() {"\
         "   i64[10] myArray;"\
@@ -1018,6 +1167,11 @@ void po::syntaxTest()
         "   arr[0].x += 2;"\
         "}"\
         "}", true);
+    checkSyntax("Array Test #18", "namespace Test {"\
+        "static void main() {"\
+        "   i64[-1] arr;"\
+        "}"\
+        "}", false);
     checkSyntax("Pointers Test #1", "namespace Test {"\
         "static void main() {"\
         "   i64 x = 900;"\

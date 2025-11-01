@@ -10,6 +10,13 @@ poOperator::poOperator(const poOperatorType operator_, const int otherType, cons
 {
 }
 
+poConstructor::poConstructor(const poAttributes attributes) :
+    _attributes(attributes),
+    _id(-1),
+    _isDefault(false)
+{
+}
+
 poMemberFunction::poMemberFunction(const poAttributes attributes, const int returnType, const std::string& name) :
    _attributes(attributes),
     _returnType(returnType),

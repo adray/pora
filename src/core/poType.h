@@ -79,6 +79,25 @@ namespace po
         std::string _name;
     };
 
+    class poConstructor
+    {
+    public:
+        poConstructor(const poAttributes attributes);
+        inline void addArgument(const int type) { _arguments.push_back(type); }
+        inline void setId(const int id) { _id = id; }
+        inline void setIsDefault(const bool isDefault) { _isDefault = isDefault; }
+
+        inline const std::vector<int>& arguments() const { return _arguments; }
+        inline const poAttributes attributes() const { return _attributes; }
+        inline const int id() const { return _id; }
+        inline const bool isDefault() const { return _isDefault; }
+    private:
+        int _id;
+        bool _isDefault;
+        poAttributes _attributes;
+        std::vector<int> _arguments;
+    };
+
     class poMemberFunction
     {
     public:
@@ -107,6 +126,7 @@ namespace po
         inline void addField(const poField& field) { _fields.push_back(field); }
         inline void addMethod(const poMemberFunction& method) { _methods.push_back(method); }
         inline void addOperator(const poOperator& operator_) { _operators.push_back(operator_); }
+        inline void addConstructor(const poConstructor& constructor) { _constructors.push_back(constructor); }
         inline void setSize(const int size) { _size = size; }
         inline void setAlignment(const int alignment) { _alignment = alignment; }
 
@@ -115,6 +135,7 @@ namespace po
 
         inline const std::vector<poField>& fields() const { return _fields; }
         inline const std::vector<poMemberFunction>& functions() const { return _methods; }
+        inline const std::vector<poConstructor>& constructors() const { return _constructors; }
         inline const std::vector<poOperator>& operators() const { return _operators; }
 
         inline const int id() const { return _id; }
@@ -137,6 +158,7 @@ namespace po
         std::string _name;
         std::vector<poField> _fields;
         std::vector<poMemberFunction> _methods;
+        std::vector<poConstructor> _constructors;
         std::vector<poOperator> _operators;
     };
 }

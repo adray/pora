@@ -1,0 +1,55 @@
+namespace std
+{
+    struct process {
+        u8* name;
+        u32 len;
+        u32 pid;
+    }
+    
+    static u32 findProcesses(process* processes, u32 maxCount) {
+        i32 error;
+        i64 handle = CreateToolhelp32Snapshot((i32)2, (i32)0);
+        if (handle == 0) {
+            error = GetLastError();
+            return (u32)0;
+        }
+        PROCESSENTRY32 entry;
+        entry.dwSize = (i32) sizeof(PROCESSENTRY32);
+        boolean ok = Process32First(handle, &entry);
+        if (ok == false) {
+            error = GetLastError();
+            return (u32)0;
+        }
+
+        i64 heap = GetProcessHeap();
+        process[] procs = (process[0])processes;
+        i64 index = 0;
+
+        while (ok && index < (i64)maxCount){
+            u64 size = (u64)strlen((u8*)entry.szExeFile, (u32)128);
+            procs[index].name = HeapAlloc(heap, (i32)0, size+(u64)1);
+            procs[index].len = (u32)size+(u32)1;
+            procs[index].pid = (u32)entry.th32ProcessID;
+
+            u8* str = procs[index].name;
+            u8[] arr = (u8[0])str;
+            for (i64 i = 0; i < (i64)size; i+=1) {
+                arr[i] = entry.szExeFile[i];
+            }
+            arr[(i64)size] = 0b;
+            index += 1;
+            ok = Process32Next(handle, &entry);
+        }
+
+        return (u32)index;
+    }
+
+    static void freeProcesses(process* processes, u32 count) {
+        process[] procs = (process[0])processes;
+        i64 heap = GetProcessHeap();
+        for (i64 i = 0; i < (i64)count; i += (i64)1) {
+            u8* name = procs[i].name;
+            HeapFree(heap, (i32)0, name);
+        }
+    }
+}

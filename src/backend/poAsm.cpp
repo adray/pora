@@ -128,6 +128,7 @@ void poAsm::ir_ptr(poModule& module, PO_ALLOCATOR& allocator, const poInstructio
     const poType& type = module.types()[ins.type()];
     const int slot = allocator.getStackSlotByVariable(ins.left()); /* assume the pointer is the stack position */
     const int src = allocator.getRegisterByVariable(ins.left());
+    const int right = allocator.getRegisterByVariable(ins.right());
     if (src != -1)
     {
         //
@@ -138,6 +139,10 @@ void poAsm::ir_ptr(poModule& module, PO_ALLOCATOR& allocator, const poInstructio
         {
             _x86_64_lower.mc_add_imm_to_reg_x64(dst, ins.memOffset());
         }
+        if (right != -1)
+        {
+            _x86_64_lower.mc_add_reg_to_reg_x64(dst, right);
+        }
     }
     else if (slot != -1)
     {
@@ -146,6 +151,10 @@ void poAsm::ir_ptr(poModule& module, PO_ALLOCATOR& allocator, const poInstructio
         const int offset = slot * 8 + ins.memOffset();
         _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_ESP);
         _x86_64_lower.mc_add_imm_to_reg_x64(dst, offset);
+        if (right != -1)
+        {
+            _x86_64_lower.mc_add_reg_to_reg_x64(dst, right);
+        }
     }
 }
 
@@ -168,12 +177,15 @@ void poAsm::ir_load(PO_ALLOCATOR& allocator, const poInstruction& ins)
     case TYPE_U16:
     case TYPE_I8:
     case TYPE_U8:
+        assert(dst != -1 && src != -1);
         _x86_64_lower.mc_mov_memory_to_reg_x64(dst, src, 0);
         break;
     case TYPE_F64:
+        assert(dst_sse != -1 && src != -1);
         _x86_64_lower.mc_movsd_memory_to_reg_x64(dst_sse, src, 0);
         break;
     case TYPE_F32:
+        assert(dst_sse != -1 && src != -1);
         _x86_64_lower.mc_movss_memory_to_reg_x64(dst_sse, src, 0);
         break;
     default:
@@ -220,7 +232,7 @@ void poAsm::ir_store(PO_ALLOCATOR& allocator, const poInstruction& ins)
         break;
     default:
         /* copy pointer value (stack) */
-        if (src_slot != -1)
+        if (src_slot != -1 && src == -1)
         {
             assert(dst != -1);
             _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_EAX, VM_REGISTER_ESP);

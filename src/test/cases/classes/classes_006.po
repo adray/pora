@@ -1,0 +1,25 @@
+import std;
+
+namespace Test {
+    class myClass {
+       private i64 _i;
+       private i64 _j;
+       public void set(i64 i, i64 j);
+       public void print();
+    }
+    void myClass::print() {
+        print_64(_i);
+        print_64(_j);
+    }
+    void myClass::set(i64 i, i64 j) {
+        _i = i;
+        _j = j;
+    }
+    static void main() {
+       myClass[4] v;
+       v[0].set(2, 4);
+       v[0].print();
+       v[1].set(99, 11);
+       v[1].print();
+    }
+}
