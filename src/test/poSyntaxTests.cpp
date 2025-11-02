@@ -843,6 +843,16 @@ void po::syntaxTest()
         "   v1.x += 12;"\
         "}"\
         "}", true);
+    checkSyntax("Struct Test #18", "namespace Test {"\
+        "struct myStruct {"\
+        "   i64 x;"\
+        "}"\
+        "static void main() {"\
+        "   myStruct v1;"\
+        "   myStruct v2;"\
+        "   if (v1 == v2) { v1.x = 4; }"\
+        "}"\
+        "}", false);
     checkSyntax("Class Test #1", "namespace Test {"\
         "class myClass {"\
         "   public i64 x;"\

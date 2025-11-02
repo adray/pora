@@ -805,7 +805,7 @@ void poAsm::ir_mod(PO_ALLOCATOR& allocator, const poInstruction& ins)
     }
 }
 
-void poAsm::ir_cmp(PO_ALLOCATOR& allocator, const poInstruction& ins)
+void poAsm::ir_cmp(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
     const int src1 = allocator.getRegisterByVariable(ins.left());
     const int src2 = allocator.getRegisterByVariable(ins.right());
@@ -838,7 +838,11 @@ void poAsm::ir_cmp(PO_ALLOCATOR& allocator, const poInstruction& ins)
         _x86_64_lower.mc_ucmps_reg_to_reg_x64(sse_src1, sse_src2);
         break;
     default:
-        //_x86_64_lower.mc_cmp_reg_to_reg_x64(src1, src2);
+        if (module.types()[ins.type()].isPointer())
+        {
+            _x86_64_lower.mc_cmp_reg_to_reg_x64(src1, src2);
+            return;
+        }
         std::stringstream ss;
         ss << "Internal Error: Malformed compare instruction " << ins.name();
         setError(ss.str());
@@ -1851,7 +1855,7 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg, const int numArgs)
             }
                 break;
             case IR_CMP:
-                ir_cmp(allocator, ins);
+                ir_cmp(module, allocator, ins);
                 break;
             case IR_CONSTANT:
                 ir_constant(module, module.constants(), allocator, ins);

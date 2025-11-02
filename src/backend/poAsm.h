@@ -154,7 +154,7 @@ namespace po
         void ir_mul(PO_ALLOCATOR& allocator, const poInstruction& ins);
         void ir_div(PO_ALLOCATOR& allocator, const poInstruction& ins);
         void ir_mod(PO_ALLOCATOR& allocator, const poInstruction& ins);
-        void ir_cmp(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_cmp(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins);
         void ir_br(PO_ALLOCATOR& allocator, const poInstruction& ins, poBasicBlock* bb);
         void ir_constant(poModule& module, poConstantPool& constants, PO_ALLOCATOR& allocator, const poInstruction& ins);
         void ir_copy(PO_ALLOCATOR& allocator, const poInstruction& ins);

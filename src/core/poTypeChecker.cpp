@@ -221,6 +221,26 @@ bool poTypeChecker::checkEquivalence(const int lhs, const int rhs)
     return false;
 }
 
+bool poTypeChecker::checkCompare(const int lhs, const int rhs)
+{
+    if (!checkEquivalence(lhs, rhs))
+    {
+        return false;
+    }
+
+    const poType& lhsType = _module.types()[lhs];
+    const poType& rhsType = _module.types()[rhs];
+    if (lhsType.baseType() == TYPE_OBJECT ||
+        rhsType.baseType() == TYPE_OBJECT)
+    {
+        // TODO: at some point we may allow this and
+        // in the emitter generate a call to memcmp
+        return false;
+    }
+
+    return true;
+}
+
 void poTypeChecker::checkModules(poNode* node)
 {
     assert(node->type() == poNodeType::MODULE);
@@ -1272,7 +1292,7 @@ int poTypeChecker::checkExpr(poNode* node)
     case poNodeType::CMP_LESS:
     {
         poBinaryNode* binary = static_cast<poBinaryNode*>(node);
-        type = checkEquivalence(checkExpr(binary->left()), checkExpr(binary->right())) ? TYPE_BOOLEAN : -1;
+        type = checkCompare(checkExpr(binary->left()), checkExpr(binary->right())) ? TYPE_BOOLEAN : -1;
     }
         break;
     case poNodeType::NULLPTR:

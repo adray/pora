@@ -29,6 +29,7 @@ namespace po
         void getNamespace(poNode* node);
 
         bool checkEquivalence(const int lhs, const int rhs);
+        bool checkCompare(const int lhs, const int rhs);
         void checkModules(poNode* node);
         void checkNamespaces(poNode* node, const std::vector<poNode*> importNodes);
         void checkFunctions(poNode* node);

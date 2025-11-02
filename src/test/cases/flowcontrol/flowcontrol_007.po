@@ -1,0 +1,13 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        i64* x = null;
+        if (x == null)
+        {
+            println("True", (u32)5);
+        }
+    }
+}

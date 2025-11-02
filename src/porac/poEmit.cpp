@@ -1846,7 +1846,13 @@ int poCodeGenerator::emitExpr(poNode* node, poFlowGraph& cfg)
 
 int poCodeGenerator::emitNullptr(poNode* node, poFlowGraph& cfg)
 {
-    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, _module.constants().getConstant((int64_t)0), IR_CONSTANT), cfg.getLast());
+    int constant = _module.constants().getConstant((int64_t)0);
+    if (constant == -1)
+    {
+        constant = _module.constants().addConstant((int64_t)0);
+    }
+
+    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, int16_t(constant), IR_CONSTANT), cfg.getLast());
     return _instructionCount - 1;
 }
 
