@@ -20,6 +20,7 @@ namespace po
         inline const std::string& error() const { return _errorText; }
         inline int errorLine() const { return _line; }
         inline int errorColumn() const { return _col; }
+        const int parsePointer();
 
     private:
         const std::vector<poToken>& _tokens;
@@ -35,7 +36,7 @@ namespace po
     {
     public:
         poFunctionParser(poParser& parser);
-        poNode* parse(const poToken& ret);
+        poNode* parse(const poToken& ret, const int pointerCount, const poToken& name);
         poNode* parseConstructor();
         poNode* parsePrototype(const poToken& ret);
         poNode* parseConstructorPrototype();
@@ -64,6 +65,7 @@ namespace po
         poNode* parseExpressionStatement();
 
         void fixupExpression(poNode* node);
+        bool evaluateNeedsFixup(poNode* node);
         poNode* insertCompare(poNode* node);
 
         poParser& _parser;
@@ -97,11 +99,12 @@ namespace po
         poNamespaceParser(poParser& parser);
         poNode* parse();
     private:
-        poNode* parseFunction(const poToken& ret);
+        poNode* parseFunction(const poToken& ret, const int pointerCount, const poToken& name);
         poNode* parseConstructor();
         poNode* parseExternalFunction(const poToken& ret);
         poNode* parseStruct();
         poNode* parseClass();
+        poNode* parseStaticVariable(const poToken& type, const int pointerCount, const poToken& name);
 
         poParser& _parser;
     };

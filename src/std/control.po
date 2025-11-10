@@ -1,0 +1,91 @@
+namespace std
+{
+    struct SharedMemoryHeader
+    {
+        u32 magic;
+        u32 version;
+        u32 command_count;
+        u32 buffer_offset;
+        i64 mutex;
+        u8[32] reserved;
+    }
+    
+    struct SharedMemoryItem
+    {
+        u32 command_type;
+        u32 size;
+    }
+    
+    class SharedMemoryController
+    {
+        private i64 _handle;
+        private boolean _running;
+        
+        i64 getHandle();
+        void init();
+        void run();
+    }
+    
+    i64 SharedMemoryController::getHandle() { return _handle; }
+    
+    void SharedMemoryController::init()
+    {
+        i64 pid = (i64)GetCurrentProcessId();
+        u8[8] name;
+        toString(pid, (u8*)name, (u32)8);
+        //println((u8*)name, (u32)strlen((u8*)name, (u32)8));
+    
+        u64 file = -1u; // INVALID_HANDLE_VALUE
+        _handle = CreateFileMappingA(
+            file,
+            null,
+            (u32)4, // PAGE_READWRITE
+            (u32)0,
+            (u32)(1024*1024),
+            (u8*)name);
+
+        if (_handle == 0) {
+            println("FATAL ERROR - Unable to create file mapping.", (u32)45);
+            ExitProcess((u32)1);
+        }
+
+        u8* data = MapViewOfFile(
+            _handle,
+            (u32)983071, // FILE_MAP_ALL_ACCESS
+            (u32)0,
+            (u32)0,
+            (u64)(256));
+
+        if (data == null) {
+            println("FATAL ERROR - Unable to create view.", (u32)37);
+            ExitProcess((u32)1);
+        }
+
+        SharedMemoryHeader* header = (SharedMemoryHeader*)data;
+        header.magic = (u32)92;
+        header.version = (u32)0;
+        header.command_count = (u32)0;
+        header.buffer_offset = (u32)256;
+        header.mutex = 0;
+    }
+    
+    void SharedMemoryController::run() {
+        _running = true;
+        while (_running) {
+            
+        }
+    }
+
+    static SharedMemoryController* ctrl;
+
+    static void startController() {
+        i64 heap = GetProcessHeap();
+        ctrl = (SharedMemoryController*)HeapAlloc(heap, (i32)0, (u64)sizeof(SharedMemoryController));
+        ctrl.init();
+    }
+    
+    static void shutdownController() {
+        i64 heap = GetProcessHeap();
+        HeapFree(heap, (i32)0, (u8*)ctrl);
+    }
+}

@@ -75,12 +75,20 @@ namespace std
     }
 
     extern i64 CreateFileMappingA(
-      i64                hFile,
+      u64                hFile,
       SECURITY_ATTRIBUTES* lpFileMappingAttributes,
-      i32                 flProtect,
-      i32                 dwMaximumSizeHigh,
-      i32                 dwMaximumSizeLow,
+      u32                 flProtect,
+      u32                 dwMaximumSizeHigh,
+      u32                 dwMaximumSizeLow,
       u8*                lpName
+    );
+    
+    extern u8* MapViewOfFile(
+      i64 handle, //[in] HANDLE hFileMappingObject,
+      u32 dwDesiredAccess, //[in] DWORD  dwDesiredAccess,
+      u32 dwFileOffsetHigh, //[in] DWORD  dwFileOffsetHigh,
+      u32 dwFileOffsetLow, //[in] DWORD  dwFileOffsetLow,
+      u64 dwNumberOfBytesToMap //[in] SIZE_T dwNumberOfBytesToMap
     );
 
     struct OVERLAPPED {

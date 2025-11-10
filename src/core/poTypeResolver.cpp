@@ -100,7 +100,153 @@ void poTypeResolver::resolve(const std::vector<poNode*>& nodes)
                 if (child->type() == poNodeType::NAMESPACE)
                 {
                     updateArgs(child);
+                    resolveStatics(child);
                 }
+            }
+        }
+    }
+}
+
+void poTypeResolver::resolveStatics(poNode* namespaceNode)
+{
+    poListNode* list = static_cast<poListNode*>(namespaceNode);
+    poNamespace& ns = _module.namespaces()[_namespaces[namespaceNode]];
+
+    for (poNode* child : list->list())
+    {
+        if (child->type() == poNodeType::STATEMENT)
+        {
+            poUnaryNode* statementNode = static_cast<poUnaryNode*>(child);
+            poNode* decl = statementNode->child();
+            poNode* constant = nullptr;
+            if (statementNode->child()->type() == poNodeType::ASSIGNMENT)
+            {
+                poBinaryNode* assignment = static_cast<poBinaryNode*>(statementNode->child());
+                decl = assignment->left();
+                constant = assignment->right();
+            }
+
+            if (decl->type() == poNodeType::DECL)
+            {
+                poUnaryNode* declNode = static_cast<poUnaryNode*>(decl);
+
+                poNode* type = declNode->child();
+                int pointerCount = 0;
+                if (declNode->child()->type() == poNodeType::POINTER)
+                {
+                    poPointerNode* pointerNode = static_cast<poPointerNode*>(declNode->child());
+                    pointerCount = pointerNode->count();
+                    type = pointerNode->child();
+                }
+
+                poToken& token = type->token();
+                int dataType = getType(token);
+                if (dataType == -1) { dataType = _module.getTypeFromName(token.string());}
+
+                const int resultType = getPointerType(dataType, pointerCount);
+                poType& resultTypeInfo = _module.types()[resultType];
+                int constantId = -1;
+                if (constant == nullptr)
+                {
+                    poConstantPool& pool = _module.constants();
+                    switch (token.token())
+                    {
+                    case poTokenType::I64_TYPE:
+                        constantId = pool.getConstant((int64_t)0);
+                        if (constantId == -1) { constantId = pool.addConstant((int64_t)0); }
+                        break;
+                    case poTokenType::U64_TYPE:
+                        constantId = pool.getConstant((uint64_t)0);
+                        if (constantId == -1) { constantId = pool.addConstant((uint64_t)0); }
+                        break;
+                    case poTokenType::I32_TYPE:
+                        constantId = pool.getConstant((int32_t)0);
+                        if (constantId == -1) { constantId = pool.addConstant((int32_t)0); }
+                        break;
+                    case poTokenType::U32_TYPE:
+                        constantId = pool.getConstant((uint32_t)0);
+                        if (constantId == -1) { constantId = pool.addConstant((uint32_t)0); }
+                        break;
+                    case poTokenType::I16_TYPE:
+                        constantId = pool.getConstant((int16_t)0);
+                        if (constantId == -1) { constantId = pool.addConstant((int16_t)0); }
+                        break;
+                    case poTokenType::U16_TYPE:
+                        constantId = pool.getConstant((uint16_t)0);
+                        if (constantId == -1) { constantId = pool.addConstant((uint16_t)0); }
+                        break;
+                    case poTokenType::I8_TYPE:
+                        constantId = pool.getConstant((int8_t)0);
+                        if (constantId == -1) { constantId = pool.addConstant((int8_t)0); }
+                        break;
+                    case poTokenType::U8_TYPE:
+                    case poTokenType::BOOLEAN:
+                        constantId = pool.getConstant((uint8_t)0);
+                        if (constantId == -1) { constantId = pool.addConstant((uint8_t)0); }
+                        break;
+                    default:
+                        if (resultTypeInfo.isPointer())
+                        {
+                            constantId = pool.getConstant((int64_t)0);
+                            if (constantId == -1) { constantId = pool.addConstant((int64_t)0); }
+                        }
+                        break;
+                    }
+                }
+                else
+                {
+                    poConstantPool& pool = _module.constants();
+                    poToken token = constant->token();
+                    switch (token.token())
+                    {
+                    case poTokenType::I64:
+                        constantId = pool.getConstant(token.i64());
+                        if (constantId == -1) { constantId = pool.addConstant(token.i64()); }
+                        break;
+                    case poTokenType::U64:
+                        constantId = pool.getConstant(token.u64());
+                        if (constantId == -1) { constantId = pool.addConstant(token.u64()); }
+                        break;
+                    case poTokenType::I32:
+                        constantId = pool.getConstant(token.i32());
+                        if (constantId == -1) { constantId = pool.addConstant(token.i32()); }
+                        break;
+                    case poTokenType::U32:
+                        constantId = pool.getConstant(token.u32());
+                        if (constantId == -1) { constantId = pool.addConstant(token.u32()); }
+                        break;
+                    case poTokenType::I16:
+                        constantId = pool.getConstant(token.i16());
+                        if (constantId == -1) { constantId = pool.addConstant(token.i16()); }
+                        break;
+                    case poTokenType::U16:
+                        constantId = pool.getConstant(token.u16());
+                        if (constantId == -1) { constantId = pool.addConstant(token.u16()); }
+                        break;
+                    case poTokenType::I8:
+                        constantId = pool.getConstant(token.i8());
+                        if (constantId == -1) { constantId = pool.addConstant(token.i8()); }
+                        break;
+                    case poTokenType::BOOLEAN:
+                    case poTokenType::U8:
+                        constantId = pool.getConstant(token.u8());
+                        if (constantId == -1) { constantId = pool.addConstant(token.u8()); }
+                        break;
+                    }
+                }
+                if (constantId != -1)
+                {
+                    _module.addStaticVariable(poStaticVariable(
+                        resultType,
+                        declNode->token().string(),
+                        constantId
+                    ));
+                }
+                else
+                {
+                    setError("Unable to resolve constant for static variable: " + declNode->token().string());
+                }
+                ns.addStaticVariable(int(_module.staticVariables().size()) - 1);
             }
         }
     }
@@ -675,7 +821,7 @@ void poTypeResolver::updateArgs(poNode* node)
             funcNode = static_cast<poUnaryNode*>(funcNode)->child();
         }
 
-        if (child->type() != poNodeType::FUNCTION)
+        if (funcNode->type() != poNodeType::FUNCTION)
         {
             continue;
         }
@@ -701,7 +847,7 @@ void poTypeResolver::updateArgs(poNode* node)
                     poUnaryNode* unary = static_cast<poUnaryNode*>(arg);
                     assert(unary->type() == poNodeType::PARAMETER);
                     poNode* type = unary->child();
-            
+
                     int pointerCount = 0;
                     if (type->type() == poNodeType::POINTER)
                     {

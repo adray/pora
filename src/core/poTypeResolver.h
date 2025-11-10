@@ -23,6 +23,7 @@ namespace po
     private:
         void resolveTypes(poNamespace& ns);
         void resolveType(const std::string& name, poNamespace& ns, poListNode* typeNode);
+        void resolveStatics(poNode* namespaceNode);
         void getPrototypeArgs(poListNode* prototypeNode, std::vector<int>& argTypes);
         void getNamespaces(poNode* node);
         void getStruct(poNode* node, poNamespace& ns);

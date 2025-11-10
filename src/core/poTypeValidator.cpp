@@ -17,6 +17,19 @@ bool poTypeValidator::validateModule(poModule& module)
         }
     }
 
+    // Check the static variable are uniquely named
+    std::vector<std::string> varNames;
+    for (const poStaticVariable& variable : module.staticVariables())
+    {
+        const auto& it = std::lower_bound(varNames.begin(), varNames.end(), variable.name());
+        if (it != varNames.end() && *it == variable.name())
+        {
+            ok = false;
+            break;
+        }
+        varNames.insert(it, variable.name());
+    }
+
     return ok;
 }
 

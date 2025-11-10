@@ -582,6 +582,11 @@ void poModule::addNamespace(const poNamespace& ns)
     _namespaces.push_back(ns);
 }
 
+void poModule::addStaticVariable(const poStaticVariable& variable)
+{
+    _staticVariables.push_back(variable);
+}
+
 void poModule::addType(const poType& type)
 {
     _types.push_back(type);
@@ -617,7 +622,7 @@ int poModule::getPointerType(const int baseType) const
     return -1;
 }
 
-int poModule::getTypeFromName(const std::string& name, const std::vector<std::string>& imports) const
+int poModule::getTypeFromName(const std::string& name) const
 {
     const auto& it = _typeMapping.find(name);
     if (it != _typeMapping.end())
@@ -758,6 +763,12 @@ void poModule::dump()
                     break;
                 case IR_STORE:
                     std::cout << " IR_STORE " << int(ins.type()) << " " << int(ins.left()) << " " << int(ins.right());
+                    break;
+                case IR_LOAD_GLOBAL:
+                    std::cout << " IR_LOAD_GLOBAL " << int(ins.type()) << " " << int(ins.left());
+                    break;
+                case IR_STORE_GLOBAL:
+                    std::cout << " IR_STORE_GLOBAL " << int(ins.type()) << " " << int(ins.left()) << " " << int(ins.right());
                     break;
                 case IR_PTR:
                     std::cout << " IR_PTR " << int(ins.type()) << " " << int(ins.left()) << " " << int(ins.right()) << " #" << int(ins.memOffset());

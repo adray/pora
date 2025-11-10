@@ -88,13 +88,16 @@ namespace po
         inline const std::string& name() const { return _name; }
         inline void addFunction(const int id) { _functions.push_back(id); }
         inline void addType(const int id) { _types.push_back(id); }
+        inline void addStaticVariable(const int id) { _staticVariables.push_back(id); }
         inline const std::vector<int>& functions() const { return _functions; }
         inline const std::vector<int>& types() const { return _types; }
+        inline const std::vector<int>& staticVariables() const { return _staticVariables; }
 
     private:
         std::string _name;
         std::vector<int> _functions;
         std::vector<int> _types;
+        std::vector<int> _staticVariables;
     };
 
     class poConstantPool
@@ -150,6 +153,29 @@ namespace po
         std::vector<std::string> _strConstants;
     };
 
+    class poStaticVariable
+    {
+    public:
+        poStaticVariable(const int type, const std::string& name)
+            : _type(type), _name(name), _constantId(-1)
+        {
+        }
+
+        poStaticVariable(const int type, const std::string& name, const int constantId)
+            : _type(type), _name(name), _constantId(constantId)
+        {
+        }
+
+        inline const int type() const { return _type; }
+        inline const std::string& name() const { return _name; }
+        inline const int constantId() const { return _constantId; }
+
+    private:
+        int _type;
+        int _constantId;
+        std::string _name;
+    };
+
     class poModule
     {
     public:
@@ -160,11 +186,13 @@ namespace po
         inline std::vector<poType>& types() { return _types; }
         inline std::vector<poFunction>& functions() { return _functions; }
         inline const std::vector<poFunction>& functions() const { return _functions; }
+        inline std::vector<poStaticVariable>& staticVariables() { return _staticVariables; }
         int addSymbol(const std::string& symbol);
         bool getSymbol(const int id, std::string& symbol);
         void addFunction(const poFunction& function);
         void addType(const poType& type);
-        int getTypeFromName(const std::string& name, const std::vector<std::string>& imports) const;
+        void addStaticVariable(const poStaticVariable& variable);
+        int getTypeFromName(const std::string& name) const;
         int getArrayType(const int baseType) const;
         int getPointerType(const int baseType) const;
         void dump();
@@ -176,6 +204,7 @@ namespace po
 
         std::vector<poType> _types;
         std::vector<poFunction> _functions;
+        std::vector<poStaticVariable> _staticVariables;
         std::unordered_map<std::string, int> _typeMapping;
         std::unordered_map<int, int> _arrayTypes; /* mapping from base type -> array type */
         std::unordered_map<int, int> _pointerTypes; /* mapping from base type -> pointer type */

@@ -156,7 +156,10 @@ namespace po
 
         inline poPortableExecutableSection& textSection() { return _sections[_textSection]; }
         inline poPortableExecutableSection& initializedDataSection() { return _sections[_initializedSection]; }
+        inline poPortableExecutableSection& readOnlyDataSection() { return _sections[_readonlySection]; }
         const int initializedDataImagePos() const;
+        const int uninitializedDataImagePos() const;
+        const int readonlyDataImagePos() const;
 
         const int addImportTable(const std::string& name);
         inline poPortableExecutableImportTable& importTable(const int index) { return _imports[index]; }

@@ -310,6 +310,37 @@ static void generateMovInstructions2(po_x86_64& x86_64)
     generatePadding(x86_64);
 }
 
+static void generateMovInstructions3(po_x86_64& x86_64)
+{
+    for (int i = VM_REGISTER_EAX; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_mov_memory_to_reg_x64(i, 0x1000);
+    }
+
+    generatePadding(x86_64);
+
+    for (int i = VM_REGISTER_EAX; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_mov_reg_to_memory_x64(0x1000, i);
+    }
+
+    generatePadding(x86_64);
+
+    for (int i = VM_REGISTER_EAX; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_mov_mem_to_reg_16(i, 0x1000);
+    }
+
+    generatePadding(x86_64);
+
+    for (int i = VM_REGISTER_EAX; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_mov_reg_to_mem_16(i, 0x1000);
+    }
+
+    generatePadding(x86_64);
+}
+
 static void generateMovSXInstructions1(po_x86_64& x86_64)
 {
     for (int i = VM_REGISTER_EAX; i <= VM_REGISTER_R15; i++)
@@ -744,12 +775,13 @@ int main(int numArgs, char** args)
     if (strcmp(args[1], "mul") == 0) { generateMulInstructions1(x86_64); }
     if (strcmp(args[1], "mul2") == 0) { generateMulInstructions2(x86_64); }
     if (strcmp(args[1], "mov") == 0) {  generateMovInstructions1(x86_64); }
+    if (strcmp(args[1], "mov2") == 0) { generateMovInstructions2(x86_64); }
+    if (strcmp(args[1], "mov3") == 0) { generateMovInstructions3(x86_64);   }
     if (strcmp(args[1], "movsx") == 0) { generateMovSXInstructions1(x86_64);  }
     if (strcmp(args[1], "movsx2") == 0) { generateMovSXInstructions2(x86_64);  }
     if (strcmp(args[1], "add2") == 0) { generateAddInstructions2(x86_64); }
     if (strcmp(args[1], "add3") == 0) { generateAddInstructions3(x86_64); }
     if (strcmp(args[1], "sub2") == 0) { generateSubInstructions2(x86_64); }
-    if (strcmp(args[1], "mov2") == 0) { generateMovInstructions2(x86_64);   }
     if (strcmp(args[1], "cmp") == 0) { generateCmpInstructions1(x86_64);   }
     if (strcmp(args[1], "div") == 0) { generateDivInstructions1(x86_64);   }
     if (strcmp(args[1], "div2") == 0) { generateDivInstructions2(x86_64); }
@@ -769,6 +801,7 @@ int main(int numArgs, char** args)
     exe.addSection(poSectionType::INITIALIZED, 1024);
     exe.addSection(poSectionType::UNINITIALIZED, 1024);
     exe.addSection(poSectionType::IDATA, 1024);
+    exe.addSection(poSectionType::READONLY, 1024);
     exe.initializeSections();
 
     // Write program data

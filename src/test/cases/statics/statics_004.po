@@ -1,0 +1,24 @@
+import std;
+namespace Test {
+    struct p {
+        u32 q;
+    }
+
+    static u32 x;
+    //static i32 y = (i32)5;
+    static u32 z;
+    static p* p;
+    static void main() {
+        x = (u32)10;
+        print_64((i64)x);
+        //print_64(y);
+        
+        z = x + (u32)5;
+        print_64((i64)z);
+        
+        i64 heap = GetProcessHeap();
+        p = (p*)HeapAlloc(heap, (i32)0, (u64)sizeof(p));
+        p.q = (u32)99;
+        print_64((i64)p.q);
+    }
+}

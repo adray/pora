@@ -131,6 +131,7 @@ int main(const int numArgs, const char** const args)
 
         const std::vector<unsigned char>& programData = compiler.assembler().programData();
         const std::vector<unsigned char>& initializedData = compiler.assembler().initializedData();
+        const std::vector<unsigned char>& readOnlyData = compiler.assembler().readOnlyData();
         std::unordered_map<std::string, int>& imports = compiler.assembler().imports();
 
         // Create portable executable
@@ -167,7 +168,8 @@ int main(const int numArgs, const char** const args)
         exe.addSection(poSectionType::TEXT, align(int(programData.size()), 1024));
         exe.addSection(poSectionType::INITIALIZED, align(int(initializedData.size()), 1024));
         exe.addSection(poSectionType::UNINITIALIZED, 1024);
-        exe.addSection(poSectionType::IDATA, 1024*2);
+        exe.addSection(poSectionType::IDATA, 1024 * 2);
+        exe.addSection(poSectionType::READONLY, align(int(readOnlyData.size()), 1024));
         exe.initializeSections();
         
         // Final linking..
@@ -190,11 +192,12 @@ int main(const int numArgs, const char** const args)
             }
         }
 #endif
-        compiler.assembler().link(0x1000, exe.initializedDataImagePos());
+        compiler.assembler().link(0x1000, exe.initializedDataImagePos(), exe.readonlyDataImagePos());
 
         // Write program data
         std::memcpy(exe.textSection().data().data(), programData.data(), programData.size());
         std::memcpy(exe.initializedDataSection().data().data(), initializedData.data(), initializedData.size());
+        std::memcpy(exe.readOnlyDataSection().data().data(), readOnlyData.data(), readOnlyData.size());
 
         // Write the executable file
         exe.write("app.exe");

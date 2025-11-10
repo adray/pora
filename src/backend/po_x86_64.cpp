@@ -690,14 +690,19 @@ void po_x86_64::emit_bmro(const vm_instruction& ins, char dst, char src, int off
     }
 }
 
-void po_x86_64::emit_brr_disp(const vm_instruction& ins, int dst, int disp32)
+void po_x86_64::emit_brr_disp(const vm_instruction& ins, int reg, int disp32)
 {
-    assert(ins.code == CODE_BRR);
-    assert(ins.enc == VMI_ENC_RM);
+    assert(ins.code == CODE_BRR ||
+        ins.code == CODE_BRMO ||
+        ins.code == CODE_BMRO ||
+        ins.code == CODE_BMR ||
+        ins.code == CODE_BRM);
+    assert(ins.enc == VMI_ENC_RM || ins.enc == VMI_ENC_MR);
+    if (ins.legacy) { _programData.push_back(ins.legacy); }
 
     unsigned char rex = ins.rex;
 
-    if (dst >= VM_REGISTER_R8) { rex |= 0x4 | (1 << 6); }
+    if (reg >= VM_REGISTER_R8) { rex |= 0x4 | (1 << 6); }
     if (rex > 0) { _programData.push_back(rex); }
 
     if (ins.ins != VMI_UNUSED) {
@@ -706,7 +711,7 @@ void po_x86_64::emit_brr_disp(const vm_instruction& ins, int dst, int disp32)
 
     /* Relative RIP addressing (Displacement from end of instruction) */
 
-    _programData.push_back((((dst % 8) & 0x7) << 3) | 0x5 | (0x0 << 6));
+    _programData.push_back((((reg % 8) & 0x7) << 3) | 0x5 | (0x0 << 6));
     _programData.push_back((unsigned char)(disp32 & 0xff));
     _programData.push_back((unsigned char)((disp32 >> 8) & 0xff));
     _programData.push_back((unsigned char)((disp32 >> 16) & 0xff));
@@ -811,6 +816,8 @@ void po_x86_64_Lower::mc_mov_imm_to_reg_8(char dst, char imm) { unaryop_imm(dst,
 void po_x86_64_Lower::mc_mov_reg_to_reg_8(char dst, char src) { binop(src, dst, VMI_MOV8_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_mov_memory_to_reg_8(char dst, char src, int src_offset) { binop(src, dst, VMI_MOV8_SRC_MEM_DST_REG, src_offset); }
 void po_x86_64_Lower::mc_mov_reg_to_memory_8(char dst, char src, int dst_offset) { binop(src, dst, VMI_MOV8_SRC_REG_DST_MEM, dst_offset); }
+void po_x86_64_Lower::mc_mov_memory_to_reg_8(char dst, int addr) { binop(-1, dst, VMI_MOV8_SRC_MEM_DST_REG, addr); }
+void po_x86_64_Lower::mc_mov_reg_to_memory_8(char src, int addr) { binop(src, -1, VMI_MOV8_SRC_REG_DST_MEM, addr); }
 void po_x86_64_Lower::mc_add_reg_to_reg_8(char dst, char src) { binop(src, dst, VMI_ADD8_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_add_imm_to_reg_8(char dst, char imm) { unaryop_imm(dst, VMI_ADD8_SRC_IMM_DST_REG, imm); }
 void po_x86_64_Lower::mc_add_memory_to_reg_8(char dst, char src, int src_offset) { binop(src, dst, VMI_ADD8_SRC_MEM_DST_REG, src_offset); }
@@ -854,6 +861,8 @@ void po_x86_64_Lower::mc_udiv_mem_16(char reg) { unaryop(reg, VMI_DIV16_SRC_MEM)
 void po_x86_64_Lower::mc_mov_reg_to_reg_16(char dst, char src) { binop(src, dst, VMI_MOV16_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_mov_mem_to_reg_16(char dst, char src, int src_offset) { binop(src, dst, VMI_MOV16_SRC_MEM_DST_REG, src_offset); }
 void po_x86_64_Lower::mc_mov_reg_to_mem_16(char dst, char src, int dst_offset) { binop(src, dst, VMI_MOV16_SRC_REG_DST_MEM, dst_offset); }
+void po_x86_64_Lower::mc_mov_mem_to_reg_16(char dst, int addr) { binop(-1, dst, VMI_MOV16_SRC_MEM_DST_REG, addr); }
+void po_x86_64_Lower::mc_mov_reg_to_mem_16(char src, int addr) { binop(src, -1, VMI_MOV16_SRC_REG_DST_MEM, addr); }
 void po_x86_64_Lower::mc_cmp_reg_to_reg_16(char dst, char src) { binop(src, dst, VMI_CMP16_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_cmp_mem_to_reg_16(char dst, char src, int src_offset) { binop(src, dst, VMI_CMP16_SRC_MEM_DST_REG, src_offset); }
 void po_x86_64_Lower::mc_cmp_reg_to_mem_16(char dst, char src, int dst_offset) { binop(src, dst, VMI_MOV16_SRC_REG_DST_MEM, dst_offset); }
@@ -883,6 +892,8 @@ void po_x86_64_Lower::mc_mov_reg_to_reg_32(char dst, char src) { binop(src, dst,
 void po_x86_64_Lower::mc_mov_mem_to_reg_32(char dst, char src, int src_offset) { binop(src, dst, VMI_MOV32_SRC_MEM_DST_REG, src_offset); }
 void po_x86_64_Lower::mc_mov_reg_to_mem_32(char dst, char src, int dst_offset) { binop(src, dst, VMI_MOV32_SRC_REG_DST_MEM, dst_offset); }
 void po_x86_64_Lower::mc_mov_imm_to_reg_32(char dst, int imm) { unaryop_imm(dst, VMI_MOV32_SRC_IMM_DST_REG, imm); }
+void po_x86_64_Lower::mc_mov_mem_to_reg_32(char dst, int addr) { binop(-1, dst, VMI_MOV32_SRC_MEM_DST_REG, addr); }
+void po_x86_64_Lower::mc_mov_reg_to_mem_32(char src, int addr) { binop(src, -1, VMI_MOV32_SRC_REG_DST_MEM, addr); }
 void po_x86_64_Lower::mc_cmp_reg_to_reg_32(char dst, char src) { binop(src, dst, VMI_CMP32_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_cmp_mem_to_reg_32(char dst, char src, int src_offset) { binop(src, dst, VMI_CMP32_SRC_MEM_DST_REG, src_offset); }
 void po_x86_64_Lower::mc_cmp_reg_to_mem_32(char dst, char src, int dst_offset) { binop(src, dst, VMI_CMP32_SRC_REG_DST_MEM, dst_offset); }
@@ -897,6 +908,8 @@ void po_x86_64_Lower::mc_sal_reg_32(char reg) { unaryop(reg, VMI_SAL32_SRC_REG_D
 void po_x86_64_Lower::mc_mov_imm_to_reg_x64(char dst, long long imm) { unaryop_imm(dst, VMI_MOV64_SRC_IMM_DST_REG, (int64_t)imm); }
 void po_x86_64_Lower::mc_mov_reg_to_memory_x64(char dst, int dst_offset, char src) { binop(src, dst, VMI_MOV64_SRC_REG_DST_MEM, dst_offset); }
 void po_x86_64_Lower::mc_mov_memory_to_reg_x64(char dst, char src, int src_offset) { binop(src, dst, VMI_MOV64_SRC_MEM_DST_REG, src_offset); }
+void po_x86_64_Lower::mc_mov_memory_to_reg_x64(char dst, int addr) { binop(-1, dst, VMI_MOV64_SRC_MEM_DST_REG, addr); }
+void po_x86_64_Lower::mc_mov_reg_to_memory_x64(char src, int addr) { binop(src, -1, VMI_MOV64_SRC_REG_DST_MEM, addr); };
 void po_x86_64_Lower::mc_mov_reg_to_reg_x64(char dst, char src) { binop(src, dst, VMI_MOV64_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_add_reg_to_reg_x64(char dst, char src) { binop(src, dst, VMI_ADD64_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_add_memory_to_reg_x64(char dst, char src, int src_offset) { binop(src, dst, VMI_ADD64_SRC_MEM_DST_REG, src_offset); }
@@ -1373,6 +1386,14 @@ void po_x86_64::mc_mov_reg_to_memory_8(char dst, char src, int dst_offset)
 {
     emit_bmro(gInstructions[VMI_MOV8_SRC_REG_DST_MEM], dst, src, dst_offset);
 }
+void po_x86_64::mc_mov_memory_to_reg_8(char dst, int addr)
+{
+    emit_brr_disp(gInstructions[VMI_MOV8_SRC_MEM_DST_REG], dst, addr);
+}
+void po_x86_64::mc_mov_reg_to_memory_8(char src, int addr)
+{
+    emit_brr_disp(gInstructions[VMI_MOV8_SRC_REG_DST_MEM], src, addr);
+}
 void po_x86_64::mc_add_reg_to_reg_8(char dst, char src)
 {
     emit_brr(gInstructions[VMI_ADD8_SRC_REG_DST_REG], dst, src);
@@ -1529,6 +1550,14 @@ void po_x86_64::mc_mov_reg_to_mem_16(char dst, char src, int dst_offset)
 {
     emit_bmro(gInstructions[VMI_MOV16_SRC_REG_DST_MEM], dst, src, dst_offset);
 }
+void po_x86_64::mc_mov_mem_to_reg_16(char dst, int addr)
+{
+    emit_brr_disp(gInstructions[VMI_MOV16_SRC_MEM_DST_REG], dst, addr);
+}
+void po_x86_64::mc_mov_reg_to_mem_16(char src, int addr)
+{
+    emit_brr_disp(gInstructions[VMI_MOV16_SRC_REG_DST_MEM], src, addr);
+}
 void po_x86_64::mc_cmp_reg_to_reg_16(char dst, char src)
 {
     emit_brr(gInstructions[VMI_CMP16_SRC_REG_DST_REG], dst, src);
@@ -1629,6 +1658,14 @@ void po_x86_64::mc_mov_reg_to_mem_32(char dst, char src, int dst_offset)
 {
     emit_bmro(gInstructions[VMI_MOV32_SRC_REG_DST_MEM], dst, src, dst_offset);
 }
+void po_x86_64::mc_mov_mem_to_reg_32(char dst, int addr)
+{
+    emit_brr_disp(gInstructions[VMI_MOV32_SRC_MEM_DST_REG], dst, addr);
+}
+void po_x86_64::mc_mov_reg_to_mem_32(char src, int addr)
+{
+    emit_brr_disp(gInstructions[VMI_MOV32_SRC_REG_DST_MEM], src, addr);
+}
 void po_x86_64::mc_mov_imm_to_reg_32(char dst, int imm)
 {
     emit_bri(gInstructions[VMI_MOV32_SRC_IMM_DST_REG], dst, imm);
@@ -1691,6 +1728,14 @@ void po_x86_64::mc_mov_memory_to_reg_x64(char dst, char src, int src_offset)
 void po_x86_64::mc_mov_reg_to_reg_x64(char dst, char src)
 {
     emit_brr(gInstructions[VMI_MOV64_SRC_REG_DST_REG], dst, src);
+}
+void po_x86_64::mc_mov_reg_to_memory_x64(const int addr, char src)
+{
+    emit_brr_disp(gInstructions[VMI_MOV64_SRC_REG_DST_MEM], src, addr);
+}
+void po_x86_64::mc_mov_memory_to_reg_x64(const char dst, const int addr)
+{
+    emit_brr_disp(gInstructions[VMI_MOV64_SRC_MEM_DST_REG], dst, addr);
 }
 void po_x86_64::mc_add_reg_to_reg_x64(char dst, char src)
 {

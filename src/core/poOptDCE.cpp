@@ -60,6 +60,8 @@ void poOptDCE::optimize(poDom& dom, const int id)
         case IR_BR:
         case IR_LOAD:
         case IR_STORE:
+        case IR_LOAD_GLOBAL:
+        case IR_STORE_GLOBAL:
         case IR_CALL: /* call may have uses or not, but certainly can have side-effects */
             goto done;
         default:

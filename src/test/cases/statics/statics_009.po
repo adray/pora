@@ -1,0 +1,28 @@
+import std;
+namespace Test {
+    struct p {
+        boolean q;
+    }
+
+    static boolean x;
+    static boolean z;
+    static p* p;
+    static void main() {
+        x = true;
+        if (x) {
+            print_64(10);
+        }
+        
+        z = x;
+        if (z) {
+            print_64(15);
+        }
+        
+        i64 heap = GetProcessHeap();
+        p = (p*)HeapAlloc(heap, (i32)0, (u64)sizeof(p));
+        p.q = true;
+        if (p.q) {
+            print_64(99);
+        }
+    }
+}

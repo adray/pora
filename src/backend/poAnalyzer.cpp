@@ -14,6 +14,10 @@ static const int align(const int size)
     {
         return 0;
     }
+    else if (remainder == 4)
+    {
+        return 4;
+    }
 
     return 8;
 }
@@ -288,72 +292,78 @@ void poAnalyzer::fixFunctionCalls(poModule& module, po_x86_64_flow_graph& cfg)
             
             for (poFunction& func : module.functions())
             {
-                if (func.fullname() == symbol)
+                if (func.fullname() != symbol)
                 {
-                    const std::vector<int>& args = func.args();
-                    size_t argsDone = 0;
-                    size_t pos = k - 1;
-                    int stackPos = registerHomes + (int(args.size()) - VM_MAX_ARGS - 1) * 8;
-                    while (argsDone < args.size())
+                    continue;
+                }
+
+                // TOOO: there are still some issues this doesn't handle,
+                // such as return values which are structs being passed via the stack
+                // and class instance methods where the "this" pointer is passed
+
+                const std::vector<int>& args = func.args();
+                size_t argsDone = 0;
+                size_t pos = k - 1;
+                int stackPos = registerHomes + (int(args.size()) - VM_MAX_ARGS - 1) * 8;
+                while (argsDone < args.size())
+                {
+                    const int argIndex = int(args.size() - argsDone) - 1;
+                    const int typeId = args[argIndex];
+                    const poType& type = module.types()[typeId];
+                    auto& instr = ins[pos];
+
+                    switch (typeId)
                     {
-                        const int argIndex = int(args.size() - argsDone) - 1;
-                        const int typeId = args[argIndex];
-                        const poType& type = module.types()[typeId];
-                        auto& instr = ins[pos];
-
-                        switch (typeId)
-                        {
-                            case TYPE_I64:
-                            case TYPE_I32:
-                            case TYPE_I16:
-                            case TYPE_I8:
-                            case TYPE_U64:
-                            case TYPE_U32:
-                            case TYPE_U16:
-                            case TYPE_U8:
-                                if (argIndex >= VM_MAX_ARGS &&
-                                    instr.dstReg() == VM_REGISTER_ESP)
-                                {
-                                    instr.setImm32(stackPos);
-                                    stackPos -= 8;
-                                    argsDone++;
-                                }
-                                else if (instr.dstReg() == generalArgs[argIndex])
-                                {
-                                    argsDone++;
-                                }
-                                break;
-                            case TYPE_F32:
-                            case TYPE_F64:
-                                if (argIndex >= VM_MAX_SSE_ARGS &&
-                                    instr.dstReg() == VM_REGISTER_ESP)
-                                {
-                                    instr.setImm32(stackPos);
-                                    stackPos -= 8;
-                                    argsDone++;
-                                }
-                                else if (instr.dstReg() == sseArgs[argIndex])
-                                {
-                                    argsDone++;
-                                }
-                                break;
-                            default:
-                                if (argIndex >= VM_MAX_ARGS &&
-                                    instr.dstReg() == VM_REGISTER_ESP)
-                                {
-                                    instr.setImm32(stackPos);
-                                    stackPos -= 8;
-                                    argsDone++;
-                                }
-                                else if (instr.dstReg() == generalArgs[argIndex])
-                                {
-                                    argsDone++;
-                                }
-                                break;
-                        }
-
-                        pos--;
+                        case TYPE_I64:
+                        case TYPE_I32:
+                        case TYPE_I16:
+                        case TYPE_I8:
+                        case TYPE_U64:
+                        case TYPE_U32:
+                        case TYPE_U16:
+                        case TYPE_U8:
+                            if (argIndex >= VM_MAX_ARGS &&
+                                instr.dstReg() == VM_REGISTER_ESP)
+                            {
+                                instr.setImm32(stackPos);
+                                stackPos -= 8;
+                                argsDone++;
+                            }
+                            else if (instr.dstReg() == generalArgs[argIndex])
+                            {
+                                argsDone++;
+                            }
+                            break;
+                        case TYPE_F32:
+                        case TYPE_F64:
+                            if (argIndex >= VM_MAX_SSE_ARGS &&
+                                instr.dstReg() == VM_REGISTER_ESP)
+                            {
+                                instr.setImm32(stackPos);
+                                stackPos -= 8;
+                                argsDone++;
+                            }
+                            else if (instr.dstReg() == sseArgs[argIndex])
+                            {
+                                argsDone++;
+                            }
+                            break;
+                        default:
+                            if (argIndex >= VM_MAX_ARGS &&
+                                instr.dstReg() == VM_REGISTER_ESP)
+                            {
+                                instr.setImm32(stackPos);
+                                stackPos -= 8;
+                                argsDone++;
+                            }
+                            else if (instr.dstReg() == generalArgs[argIndex])
+                            {
+                                argsDone++;
+                            }
+                            break;
                     }
+
+                    pos--;
                 }
             }
         }

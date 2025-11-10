@@ -1,0 +1,10 @@
+namespace std {
+    static void pora_open() {
+        //println("Starting up", (u32)12);
+        initializeMemory();
+        startController();
+    }
+    static void pora_close() {
+        shutdownController();
+    }
+}

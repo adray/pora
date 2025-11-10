@@ -1,0 +1,16 @@
+import std;
+
+namespace ControlApp {
+    static void main() {
+        i64 pid = (i64)GetCurrentProcessId();
+        print("Process Id: ", (u32)13);
+        print_64(pid);
+        println("", (u32)1);
+    
+        println("Press key to exit...", (u32)21);
+        
+        u8[2] x;
+        readLine((u8*)x, (u32)2);
+    }
+}
+

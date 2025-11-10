@@ -536,6 +536,8 @@ namespace po
         void mc_mov_reg_to_reg_8(char dst, char src);
         void mc_mov_memory_to_reg_8(char dst, char src, int src_offset);
         void mc_mov_reg_to_memory_8(char dst, char src, int dst_offset);
+        void mc_mov_memory_to_reg_8(char dst, int addr);
+        void mc_mov_reg_to_memory_8(char src, int addr);
         void mc_add_reg_to_reg_8(char dst, char src);
         void mc_add_imm_to_reg_8(char dst, char imm);
         void mc_add_memory_to_reg_8(char dst, char src, int src_offset);
@@ -579,6 +581,8 @@ namespace po
         void mc_mov_reg_to_reg_16(char dst, char src);
         void mc_mov_mem_to_reg_16(char dst, char src, int src_offset);
         void mc_mov_reg_to_mem_16(char dst, char src, int dst_offset);
+        void mc_mov_mem_to_reg_16(char dst, int addr);
+        void mc_mov_reg_to_mem_16(char src, int addr);
         void mc_cmp_reg_to_reg_16(char dst, char src);
         void mc_cmp_mem_to_reg_16(char dst, char src, int src_offset);
         void mc_cmp_reg_to_mem_16(char dst, char src, int dst_offset);
@@ -608,6 +612,8 @@ namespace po
         void mc_mov_mem_to_reg_32(char dst, char src, int src_offset);
         void mc_mov_reg_to_mem_32(char dst, char src, int dst_offset);
         void mc_mov_imm_to_reg_32(char dst, int imm);
+        void mc_mov_mem_to_reg_32(char dst, int addr);
+        void mc_mov_reg_to_mem_32(char src, int addr);
         void mc_cmp_reg_to_reg_32(char dst, char src);
         void mc_cmp_mem_to_reg_32(char dst, char src, int src_offset);
         void mc_cmp_reg_to_mem_32(char dst, char src, int dst_offset);
@@ -622,6 +628,8 @@ namespace po
         void mc_mov_imm_to_reg_x64(char dst, long long imm);
         void mc_mov_reg_to_memory_x64(char dst, int dst_offset, char src);
         void mc_mov_memory_to_reg_x64(char dst, char src, int src_offset);
+        void mc_mov_memory_to_reg_x64(char dst, int addr);
+        void mc_mov_reg_to_memory_x64(char src, int addr);
         void mc_mov_reg_to_reg_x64(char dst, char src);
         void mc_add_reg_to_reg_x64(char dst, char src);
         void mc_add_memory_to_reg_x64(char dst, char src, int src_offset);
@@ -799,6 +807,8 @@ namespace po
         void mc_mov_reg_to_reg_8(char dst, char src);
         void mc_mov_memory_to_reg_8(char dst, char src, int src_offset);
         void mc_mov_reg_to_memory_8(char dst, char src, int dst_offset);
+        void mc_mov_memory_to_reg_8(char dst, int addr);
+        void mc_mov_reg_to_memory_8(char src, int addr);
         void mc_add_reg_to_reg_8(char dst, char src);
         void mc_add_imm_to_reg_8(char dst, char imm);
         void mc_add_memory_to_reg_8(char dst, char src, int src_offset);
@@ -842,6 +852,8 @@ namespace po
         void mc_mov_reg_to_reg_16(char dst, char src);
         void mc_mov_mem_to_reg_16(char dst, char src, int src_offset);
         void mc_mov_reg_to_mem_16(char dst, char src, int dst_offset);
+        void mc_mov_mem_to_reg_16(char dst, int addr);
+        void mc_mov_reg_to_mem_16(char src, int addr);
         void mc_cmp_reg_to_reg_16(char dst, char src);
         void mc_cmp_mem_to_reg_16(char dst, char src, int src_offset);
         void mc_cmp_reg_to_mem_16(char dst, char src, int dst_offset);
@@ -870,6 +882,8 @@ namespace po
         void mc_mov_reg_to_reg_32(char dst, char src);
         void mc_mov_mem_to_reg_32(char dst, char src, int src_offset);
         void mc_mov_reg_to_mem_32(char dst, char src, int dst_offset);
+        void mc_mov_mem_to_reg_32(char dst, int addr);
+        void mc_mov_reg_to_mem_32(char src, int addr);
         void mc_mov_imm_to_reg_32(char dst, int imm);
         void mc_cmp_reg_to_reg_32(char dst, char src);
         void mc_cmp_mem_to_reg_32(char dst, char src, int src_offset);
@@ -886,6 +900,8 @@ namespace po
         void mc_mov_reg_to_memory_x64(char dst, int dst_offset, char src);
         void mc_mov_memory_to_reg_x64(char dst, char src, int src_offset);
         void mc_mov_reg_to_reg_x64(char dst, char src);
+        void mc_mov_reg_to_memory_x64(const int addr, char src);
+        void mc_mov_memory_to_reg_x64(const char dst, const int addr);
         void mc_add_reg_to_reg_x64(char dst, char src);
         void mc_add_memory_to_reg_x64(char dst, char src, int src_offset);
         void mc_add_reg_to_memory_x64(char dst, char src, int dst_offset);
@@ -1027,7 +1043,7 @@ namespace po
         void emit_bmr(const vm_instruction& ins, char dst, char src);
         void emit_brmo(const vm_instruction& ins, char dst, char src, int offset);
         void emit_bmro(const vm_instruction& ins, char dst, char src, int offset);
-        void emit_brr_disp(const vm_instruction& ins, int dst, int disp32);
+        void emit_brr_disp(const vm_instruction& ins, int reg, int disp32);
         void emit_ui(const vm_instruction& ins, char imm);
         void emit_ui(const vm_instruction& ins, int imm);
 

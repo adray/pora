@@ -80,11 +80,11 @@ namespace po
     {
     public:
         poAsmConstant(const int initializedDataPos, const int programDataPos);
-        inline int getInitializedDataPos() const { return _initializedDataPos; }
+        inline int getDataPos() const { return _dataPos; }
         inline int getProgramDataPos() const { return _programDataPos; }
 
     private:
-        int _initializedDataPos;
+        int _dataPos;
         int _programDataPos;
     };
 
@@ -101,16 +101,43 @@ namespace po
         std::string _name;
     };
 
+    class poAsmDataBuffer
+    {
+    public:
+        void addData(const int id, const float f32, const size_t programDataSize, const int programDataOffset);
+        void addData(const int id, const double f64, const size_t programDataSize, const int programDataOffset);
+        void addData(const int id, const std::string& str, const size_t programDataSize, const int programDataOffset);
+        void addData(const int id, const int64_t i64, const size_t programDataSize, const int programDataOffset);
+        void addData(const int id, const uint64_t u64, const size_t programDataSize, const int programDataOffset);
+        void addData(const int id, const int32_t i32, const size_t programDataSize, const int programDataOffset);
+        void addData(const int id, const uint32_t u32, const size_t programDataSize, const int programDataOffset);
+        void addData(const int id, const int16_t i16, const size_t programDataSize, const int programDataOffset);
+        void addData(const int id, const uint16_t u16, const size_t programDataSize, const int programDataOffset);
+        void addData(const int id, const int8_t i8, const size_t programDataSize, const int programDataOffset);
+        void addData(const int id, const uint8_t u8, const size_t programDataSize, const int programDataOffset);
+
+        inline const std::vector<unsigned char>& data() const { return _data; }
+        inline const std::vector<poAsmConstant>& constants() const { return _constants; }
+
+    private:
+        bool cache(const int id, const size_t programDataSize, const int programDataOffset);
+
+        std::vector<unsigned char> _data;
+        std::vector<poAsmConstant> _constants;
+        std::unordered_map<int, int> _constantMap;
+    };
+
     class poAsm
     {
     public:
         poAsm();
         void generate(poModule& module);
-        void link(const int programDataPos, const int initializedDataPos);
+        void link(const int programDataPos, const int initializedDataPos, const int readOnlyDataPos);
 
         inline std::unordered_map<std::string, int>& imports() { return _imports; }
         inline const std::vector<unsigned char>& programData() const { return _x86_64.programData(); }
-        inline const std::vector<unsigned char>& initializedData() const { return _initializedData; }
+        inline const std::vector<unsigned char>& initializedData() const { return _initializedData.data(); }
+        inline const std::vector<unsigned char>& readOnlyData() const { return _readOnlyData.data(); }
         inline const int entryPoint() const { return _entryPoint; }
         inline bool isError() const { return _isError; }
         inline const std::string& errorText() const { return _errorText; }
@@ -131,9 +158,6 @@ namespace po
         void generatePrologue(PO_ALLOCATOR& linear);
         void generateEpilogue(PO_ALLOCATOR& linear);
         void setError(const std::string& errorText);
-        void addInitializedData(const float f32, const int programDataOffset);
-        void addInitializedData(const double f64, const int programDataOffset);
-        void addInitializedData(const std::string& str, const int programDataOffset);
 
         void emitJump(po_x86_64_basic_block* bb);
 
@@ -164,15 +188,17 @@ namespace po
         void ir_param(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins, const int numArgs);
         void ir_shl(PO_ALLOCATOR& allocator, const poInstruction& ins);
         void ir_shr(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_load_global(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_store_global(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins);
         bool ir_jump(const int jump, const int imm, const int type);
 
         std::unordered_map<std::string, int> _mapping;
         std::vector<poAsmCall> _calls;
         std::vector<poAsmExternCall> _externCalls;
         std::unordered_map<std::string, int> _imports;
-        std::vector<poAsmConstant> _constants;
+        poAsmDataBuffer _readOnlyData;
+        poAsmDataBuffer _initializedData;
         std::unordered_map<poBasicBlock*, po_x86_64_basic_block*> _basicBlockMap;
-        std::vector<unsigned char> _initializedData;
         poPhiWeb _web;
         po_x86_64 _x86_64;
         po_x86_64_Lower _x86_64_lower;

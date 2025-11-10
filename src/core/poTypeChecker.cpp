@@ -276,6 +276,18 @@ void poTypeChecker::checkNamespaces(poNode* node, const std::vector<poNode*> imp
         _imports.push_back(import->token().string());
     }
     
+    // Add static variables to the scope
+    pushScope();
+    for (const poNamespace& ns : _module.namespaces()) {
+        if (ns.name() == node->token().string())
+        {
+            for (const int staticVarId : ns.staticVariables())
+            {
+                const poStaticVariable& staticVar = _module.staticVariables()[staticVarId];
+                addVariable(staticVar.name(), staticVar.type());
+            }
+        }
+    }
 
     for (poNode* child : ns->list())
     {
@@ -297,7 +309,8 @@ void poTypeChecker::checkNamespaces(poNode* node, const std::vector<poNode*> imp
         }
         else if (child->type() == poNodeType::STRUCT ||
             child->type() == poNodeType::CLASS ||
-            child->type() == poNodeType::EXTERN)
+            child->type() == poNodeType::EXTERN ||
+            child->type() == poNodeType::STATEMENT)
         {
             continue;
         }
@@ -307,6 +320,7 @@ void poTypeChecker::checkNamespaces(poNode* node, const std::vector<poNode*> imp
             break;
         }
     }
+    popScope();
 }
 
 void poTypeChecker::checkConstructor(poNode* node)
@@ -352,7 +366,7 @@ void poTypeChecker::checkConstructor(poNode* node)
             if (path.size() > 0) {
                 // Extract the class type and add it as the first argument
                 const std::string& className = path[0];
-                const int type = _module.getTypeFromName(className, _imports);
+                const int type = _module.getTypeFromName(className);
                 if (type != -1)
                 {
                     const int ptrType = getPointerType(type, 1);
@@ -453,7 +467,7 @@ void poTypeChecker::checkFunctions(poNode* node)
             if (path.size() > 0) {
                 // Extract the class type and add it as the first argument
                 const std::string& className = path[0];
-                const int type = _module.getTypeFromName(className, _imports);
+                const int type = _module.getTypeFromName(className);
                 if (type != -1)
                 {
                     const int ptrType = getPointerType(type, 1);
@@ -629,7 +643,7 @@ int poTypeChecker::getArrayType(const int baseType, const int arrayRank)
 {
     const poType& type = _module.types()[baseType];
     const std::string name = type.name() + "[]";
-    int arrayType = _module.getTypeFromName(name, _imports);
+    int arrayType = _module.getTypeFromName(name);
     if (arrayType == -1)
     {
         const int numTypes = int(_module.types().size());
@@ -686,7 +700,7 @@ int poTypeChecker::getType(const poToken& token)
         type = TYPE_OBJECT;
         break;
     case poTokenType::IDENTIFIER:
-        type = _module.getTypeFromName(token.string(), _imports);
+        type = _module.getTypeFromName(token.string());
         break;
     default:
         type = -1;

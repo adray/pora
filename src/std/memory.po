@@ -1,0 +1,50 @@
+namespace std
+{
+    struct small_alloc
+    {
+        u8* data;
+        u64 size;
+    }
+
+    struct memory
+    {
+        i64 heap;
+        i64 pageSize;
+    }
+
+    static memory* mem;
+
+    static void initializeMemory() {        
+        i64 heap = GetProcessHeap();
+        mem = (memory*)HeapAlloc(heap, (i32)0, sizeof(memory));
+        mem.heap = heap;
+    }
+
+    static u8* malloc(u64 numBytes) {
+        if (mem == null) {
+            return (u8*)null;
+        }
+        
+        u8* bytes;
+        u64 limit = (u64)(256*1024);
+        if (numBytes <= limit) {
+            // Here we cache it and we won't free it, only mark it.
+            bytes = HeapAlloc(mem.heap, (i32)0, limit);
+            
+        } else {
+            // No caching apply the memory directly.
+            bytes = HeapAlloc(mem.heap, (i32)0, numBytes);
+        }
+        
+        if (numBytes <= (u64)248)  {
+            // Small memory allocation
+            
+        }
+        else
+        {
+            // Large memory allocation
+        }
+
+        return bytes;
+    }
+}

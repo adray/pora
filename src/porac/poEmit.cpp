@@ -379,13 +379,13 @@ int poCodeGenerator::getType(const poToken& token)
         type = TYPE_VOID;
         break;
     case poTokenType::BOOLEAN:
-        type = TYPE_U8; // Boolean is represented as a single byte
+        type = TYPE_BOOLEAN;
         break;
     case poTokenType::OBJECT:
         type = TYPE_OBJECT;
         break;
     default:
-        type = _module.getTypeFromName(token.string(), _imports);
+        type = _module.getTypeFromName(token.string());
         break;
     }
     return type;
@@ -569,7 +569,7 @@ void poCodeGenerator::emitFunction(poNode* node, poFunction& function)
         {
             // Extract the class type and add it as the first argument
             const std::string& className = path[0];
-            const int type = _module.getTypeFromName(className, _imports);
+            const int type = _module.getTypeFromName(className);
             if (type != -1)
             {
                 const poType& typeData = _module.types()[type];
@@ -1374,6 +1374,21 @@ void poCodeGenerator::emitAssignment(poNode* node, poFlowGraph& cfg)
     {
         const std::string& name = assignment->left()->token().string();
         const int variable = getVariable(name);
+
+        if (variable == EMIT_ERROR)
+        {
+            for (int id = 0; id < int(_module.staticVariables().size()); id++)
+            {
+                const poStaticVariable& variable = _module.staticVariables()[id];
+                if (variable.name() == name)
+                {
+                    const int store = _instructionCount++;
+                    emitInstruction(poInstruction(store, variable.type(), -1, right, id, IR_STORE_GLOBAL), cfg.getLast());
+                    return;
+                }
+            }
+        }
+
         if (variable == EMIT_ERROR)
         {
             // Check if this is a member variable
@@ -2095,6 +2110,20 @@ int poCodeGenerator::emitLoadVariable(poNode* node, poFlowGraph& cfg)
                 const int instructionId = _instructionCount;
                 emitInstruction(poInstruction(_instructionCount++, fieldType, ptr, -1, IR_LOAD), cfg.getLast());
                 return instructionId;
+            }
+        }
+    }
+
+    if (varName == EMIT_ERROR)
+    {
+        for (int id = 0; id < int(_module.staticVariables().size()); id++)
+        {
+            const poStaticVariable& variable = _module.staticVariables()[id];
+            if (variable.name() == name)
+            {
+                const int load = _instructionCount++;
+                emitInstruction(poInstruction(load, variable.type(), id, IR_LOAD_GLOBAL), cfg.getLast());
+                return load;
             }
         }
     }

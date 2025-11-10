@@ -1358,5 +1358,40 @@ void po::syntaxTest()
         "   i64 x = 8 >> 2;"\
         "}"\
         "}", true);
+    checkSyntax("Static Variable Test #1", "namespace Test {"\
+        "static i64 x;"\
+        "static void main() {"\
+        "   x = 10;"\
+        "   i64 y = x;"\
+        "}"\
+        "}", true);
+    checkSyntax("Static Variable Test #2", "namespace Test {"\
+        "static i64 x;"\
+        "static i64 x;"\
+        "static void main() {"\
+        "   x = 10;"\
+        "   i64 y = x;"\
+        "}"\
+        "}", false);
+    checkSyntax("Static Variable Test #3", "namespace Test {"\
+        "static i64 x = 5;"\
+        "static void main() {"\
+        "   i64 y = x;"\
+        "}"\
+        "}", true);
+    checkSyntax("Static Variable Test #4", "namespace Test {"\
+        "struct test { i64 p; }"\
+        "static test* x;"\
+        "static void main() {"\
+        "   i64 y = x.p;"\
+        "}"\
+        "}", true);
+    checkSyntax("Static Variable Test #5", "namespace Test {"\
+        "struct test { i64 p; }"\
+        "static test x;"\
+        "static void main() {"\
+        "   i64 y = x.p;"\
+        "}"\
+        "}", false);
 
 }

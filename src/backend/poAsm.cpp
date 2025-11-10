@@ -43,7 +43,7 @@ poAsmCall::poAsmCall(const int pos, const int arity, const std::string& symbol)
 
 poAsmConstant::poAsmConstant(const int initializedDataPos, const int programDataPos)
     :
-    _initializedDataPos(initializedDataPos),
+    _dataPos(initializedDataPos),
     _programDataPos(programDataPos)
 {
 }
@@ -177,6 +177,7 @@ void poAsm::ir_load(PO_ALLOCATOR& allocator, const poInstruction& ins)
     case TYPE_U16:
     case TYPE_I8:
     case TYPE_U8:
+    case TYPE_BOOLEAN:
         assert(dst != -1 && src != -1);
         _x86_64_lower.mc_mov_memory_to_reg_x64(dst, src, 0);
         break;
@@ -222,6 +223,7 @@ void poAsm::ir_store(PO_ALLOCATOR& allocator, const poInstruction& ins)
         break;
     case TYPE_I8:
     case TYPE_U8:
+    case TYPE_BOOLEAN:
         _x86_64_lower.mc_mov_reg_to_memory_8(dst, src, 0);
         break;
     case TYPE_F64:
@@ -827,6 +829,7 @@ void poAsm::ir_cmp(poModule& module, PO_ALLOCATOR& allocator, const poInstructio
     case TYPE_U16:
         _x86_64_lower.mc_cmp_reg_to_reg_16(src1, src2);
         break;
+    case TYPE_BOOLEAN:
     case TYPE_U8:
     case TYPE_I8:
         _x86_64_lower.mc_cmp_reg_to_reg_8(src1, src2);
@@ -889,6 +892,7 @@ void poAsm::ir_copy(PO_ALLOCATOR& allocator, const poInstruction& ins)
     case TYPE_U16:
     case TYPE_I8:
     case TYPE_U8:
+    case TYPE_BOOLEAN:
         if (dst != src)
         {
             _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
@@ -1372,6 +1376,229 @@ void poAsm::ir_shr(PO_ALLOCATOR& allocator, const poInstruction& ins)
     }
 }
 
+
+void poAsm::ir_load_global(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins)
+{
+    const int value = ins.constant();
+    const int dst = allocator.getRegisterByVariable(ins.name());
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+    case TYPE_U64:
+        _x86_64_lower.mc_mov_memory_to_reg_x64(dst, 0);
+        _x86_64_lower.cfg().getLast()->instructions().back().setId(value);
+        break;
+    case TYPE_I32:
+    case TYPE_U32:
+        _x86_64_lower.mc_mov_mem_to_reg_32(dst, 0);
+        _x86_64_lower.cfg().getLast()->instructions().back().setId(value);
+        break;
+    case TYPE_I16:
+    case TYPE_U16:
+        _x86_64_lower.mc_mov_mem_to_reg_16(dst, 0);
+        _x86_64_lower.cfg().getLast()->instructions().back().setId(value);
+        break;
+    case TYPE_I8:
+    case TYPE_U8:
+    case TYPE_BOOLEAN:
+        _x86_64_lower.mc_mov_memory_to_reg_8(dst, 0);
+        _x86_64_lower.cfg().getLast()->instructions().back().setId(value);
+        break;
+    default:
+        if (module.types()[ins.type()].isPointer())
+        {
+            _x86_64_lower.mc_mov_memory_to_reg_x64(dst, 0);
+            _x86_64_lower.cfg().getLast()->instructions().back().setId(value);
+            break;
+        }
+        setError("Internal Error: Malformed load global instruction");
+        break;
+    }
+}
+
+void poAsm::ir_store_global(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins)
+{
+    const int value = ins.constant();
+    const int right = allocator.getRegisterByVariable(ins.right());
+
+    switch (ins.type())
+    {
+    case TYPE_I64:
+    case TYPE_U64:
+        _x86_64_lower.mc_mov_reg_to_memory_x64(right, 0);
+        _x86_64_lower.cfg().getLast()->instructions().back().setId(value);
+        break;
+    case TYPE_I32:
+    case TYPE_U32:
+        _x86_64_lower.mc_mov_reg_to_mem_32(right, 0);
+        _x86_64_lower.cfg().getLast()->instructions().back().setId(value);
+        break;
+    case TYPE_I16:
+    case TYPE_U16:
+        _x86_64_lower.mc_mov_reg_to_mem_16(right, 0);
+        _x86_64_lower.cfg().getLast()->instructions().back().setId(value);
+        break;
+    case TYPE_I8:
+    case TYPE_U8:
+    case TYPE_BOOLEAN:
+        _x86_64_lower.mc_mov_reg_to_memory_8(right, 0);
+        _x86_64_lower.cfg().getLast()->instructions().back().setId(value);
+        break;
+    default:
+        if (module.types()[ins.type()].isPointer())
+        {
+            _x86_64_lower.mc_mov_reg_to_memory_x64(right, 0);
+            _x86_64_lower.cfg().getLast()->instructions().back().setId(value);
+            break;
+        }
+        setError("Internal Error: Malformed store global instruction");
+        break;
+    }
+}
+
+//================
+
+void poAsmDataBuffer::addData(const int id, const float f32, const size_t programDataSize, const int programDataOffset)
+{
+    if (!cache(id, programDataSize, programDataOffset))
+    {
+        const int32_t data = *reinterpret_cast<const int32_t*>(&f32);
+        _data.push_back(data & 0xFF);
+        _data.push_back((data >> 8) & 0xFF);
+        _data.push_back((data >> 16) & 0xFF);
+        _data.push_back((data >> 24) & 0xFF);
+    }
+}
+
+void poAsmDataBuffer::addData(const int id, const double f64, const size_t programDataSize, const int programDataOffset)
+{
+    if (!cache(id, programDataSize, programDataOffset))
+    {
+        const int64_t data = *reinterpret_cast<const int64_t*>(&f64);
+        _data.push_back(data & 0xFF);
+        _data.push_back((data >> 8) & 0xFF);
+        _data.push_back((data >> 16) & 0xFF);
+        _data.push_back((data >> 24) & 0xFF);
+        _data.push_back((data >> 32) & 0xFF);
+        _data.push_back((data >> 40) & 0xFF);
+        _data.push_back((data >> 48) & 0xFF);
+        _data.push_back((data >> 56) & 0xFF);
+    }
+}
+
+void poAsmDataBuffer::addData(const int id, const std::string& str, const size_t programDataSize, const int programDataOffset)
+{
+    if (!cache(id, programDataSize, programDataOffset))
+    {
+        for (char c : str)
+        {
+            _data.push_back(c);
+        }
+        _data.push_back(0); // null terminator
+    }
+}
+
+void poAsmDataBuffer::addData(const int id, const int64_t i64, const size_t programDataSize, const int programDataOffset)
+{
+    if (!cache(id, programDataSize, programDataOffset))
+    {
+        _data.push_back(i64 & 0xFF);
+        _data.push_back((i64 >> 8) & 0xFF);
+        _data.push_back((i64 >> 16) & 0xFF);
+        _data.push_back((i64 >> 24) & 0xFF);
+        _data.push_back((i64 >> 32) & 0xFF);
+        _data.push_back((i64 >> 40) & 0xFF);
+        _data.push_back((i64 >> 48) & 0xFF);
+        _data.push_back((i64 >> 56) & 0xFF);
+    }
+}
+
+void poAsmDataBuffer::addData(const int id, const uint64_t u64, const size_t programDataSize, const int programDataOffset)
+{
+    if (!cache(id, programDataSize, programDataOffset))
+    {
+        _data.push_back(u64 & 0xFF);
+        _data.push_back((u64 >> 8) & 0xFF);
+        _data.push_back((u64 >> 16) & 0xFF);
+        _data.push_back((u64 >> 24) & 0xFF);
+        _data.push_back((u64 >> 32) & 0xFF);
+        _data.push_back((u64 >> 40) & 0xFF);
+        _data.push_back((u64 >> 48) & 0xFF);
+        _data.push_back((u64 >> 56) & 0xFF);
+    }
+}
+
+void poAsmDataBuffer::addData(const int id, const int32_t i32, const size_t programDataSize, const int programDataOffset)
+{
+    if (!cache(id, programDataSize, programDataOffset))
+    {
+        _data.push_back(i32 & 0xFF);
+        _data.push_back((i32 >> 8) & 0xFF);
+        _data.push_back((i32 >> 16) & 0xFF);
+        _data.push_back((i32 >> 24) & 0xFF);
+    }
+}
+
+void poAsmDataBuffer::addData(const int id, const uint32_t u32, const size_t programDataSize, const int programDataOffset)
+{
+    if (!cache(id, programDataSize, programDataOffset))
+    {
+        _data.push_back(u32 & 0xFF);
+        _data.push_back((u32 >> 8) & 0xFF);
+        _data.push_back((u32 >> 16) & 0xFF);
+        _data.push_back((u32 >> 24) & 0xFF);
+    }
+}
+
+void poAsmDataBuffer::addData(const int id, const int16_t i16, const size_t programDataSize, const int programDataOffset)
+{
+    if (!cache(id, programDataSize, programDataOffset))
+    {
+        _data.push_back(i16 & 0xFF);
+        _data.push_back((i16 >> 8) & 0xFF);
+    }
+}
+
+void poAsmDataBuffer::addData(const int id, const uint16_t u16, const size_t programDataSize, const int programDataOffset)
+{
+    if (!cache(id, programDataSize, programDataOffset))
+    {
+        _data.push_back(u16 & 0xFF);
+        _data.push_back((u16 >> 8) & 0xFF);
+    }
+}
+
+void poAsmDataBuffer::addData(const int id, const int8_t i8, const size_t programDataSize, const int programDataOffset)
+{
+    if (!cache(id, programDataSize, programDataOffset))
+    {
+        _data.push_back(i8 & 0xFF);
+    }
+}
+
+void poAsmDataBuffer::addData(const int id, const uint8_t u8, const size_t programDataSize, const int programDataOffset)
+{
+    if (!cache(id, programDataSize, programDataOffset))
+    {
+        _data.push_back(u8 & 0xFF);
+    }
+}
+
+bool poAsmDataBuffer::cache(const int id, const size_t programDataSize, const int programDataOffset)
+{    
+    const auto& it = _constantMap.find(id);
+    if (it != _constantMap.end())
+    {
+        _constants.push_back(poAsmConstant(it->second, int(programDataSize) + programDataOffset));
+        return true;
+    }
+
+    _constants.push_back(poAsmConstant(int(_data.size()), int(programDataSize) + programDataOffset));
+    _constantMap.insert(std::pair<int, int>(id, int(_data.size())));
+    return false;
+}
+
 //================
 
 poAsm::poAsm()
@@ -1426,6 +1653,7 @@ bool poAsm::ir_jump(int jump, int imm, int type)
     case TYPE_U32:
     case TYPE_U16:
     case TYPE_U8:
+    case TYPE_BOOLEAN:
         switch (jump)
         {
         case IR_JUMP_EQUALS:
@@ -1442,6 +1670,31 @@ bool poAsm::ir_jump(int jump, int imm, int type)
             break;
         case IR_JUMP_LESS_EQUALS:
             _x86_64_lower.mc_jump_not_above(imm);
+            break;
+        case IR_JUMP_NOT_EQUALS:
+            _x86_64_lower.mc_jump_not_equals(imm);
+            break;
+        default:
+            return false;
+        }
+        break;
+    default:
+        switch (jump)
+        {
+        case IR_JUMP_EQUALS:
+            _x86_64_lower.mc_jump_equals(imm);
+            break;
+        case IR_JUMP_GREATER:
+            _x86_64_lower.mc_jump_greater(imm);
+            break;
+        case IR_JUMP_LESS:
+            _x86_64_lower.mc_jump_less(imm);
+            break;
+        case IR_JUMP_GREATER_EQUALS:
+            _x86_64_lower.mc_jump_greater_equal(imm);
+            break;
+        case IR_JUMP_LESS_EQUALS:
+            _x86_64_lower.mc_jump_less_equal(imm);
             break;
         case IR_JUMP_NOT_EQUALS:
             _x86_64_lower.mc_jump_not_equals(imm);
@@ -1816,6 +2069,12 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg, const int numArgs)
             case IR_STORE:
                 ir_store(allocator, ins);
                 break;
+            case IR_LOAD_GLOBAL:
+                ir_load_global(module, allocator,  ins);
+                break;
+            case IR_STORE_GLOBAL:
+                ir_store_global(module, allocator, ins);
+                break;
             case IR_SIGN_EXTEND:
                 ir_sign_extend(allocator, ins);
                 break;
@@ -1938,7 +2197,7 @@ void poAsm::generateMachineCode(poModule& module)
                     if (ins.id() != -1)
                     {
                         _x86_64.mc_movsd_memory_to_reg_x64(ins.dstReg(), 0);
-                        addInitializedData(constants.getF64(ins.id()), -int(sizeof(int32_t))); // insert patch
+                        _readOnlyData.addData(ins.id(), constants.getF64(ins.id()), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                     }
                     else
                     {
@@ -1949,7 +2208,7 @@ void poAsm::generateMachineCode(poModule& module)
                     if (ins.id() != -1)
                     {
                         _x86_64.mc_movss_memory_to_reg_x64(ins.dstReg(), 0);
-                        addInitializedData(constants.getF32(ins.id()), -int(sizeof(int32_t))); // insert patch
+                        _readOnlyData.addData(ins.id(), constants.getF32(ins.id()), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                     }
                     else
                     {
@@ -2011,12 +2270,169 @@ void poAsm::generateMachineCode(poModule& module)
                 case VMI_SUB8_SRC_IMM_DST_REG:
                     _x86_64.mc_sub_imm_to_reg_8(ins.dstReg(), ins.imm8());
                     break;
-                case VMI_MOV8_SRC_REG_DST_MEM:
-                    _x86_64.mc_mov_reg_to_memory_8(ins.dstReg(), ins.srcReg(), ins.imm32());
-                    break;
                 case VMI_LEA64_SRC_REG_DST_REG:
                     _x86_64.mc_lea_reg_to_reg_x64(ins.dstReg(), 0);
-                    addInitializedData(constants.getString(ins.id()), -int(sizeof(int32_t))); // insert patch
+                    _readOnlyData.addData(ins.id(), constants.getString(ins.id()), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                    break;
+                case VMI_MOV64_SRC_MEM_DST_REG:
+                    if (ins.id() != -1)
+                    {
+                        _x86_64.mc_mov_memory_to_reg_x64(ins.dstReg(), 0);
+                        const poStaticVariable& var = module.staticVariables()[(ins.id())];
+                        const int id = var.constantId();
+                        if (var.type() == TYPE_I64)
+                        {
+                            _initializedData.addData(id, constants.getI64(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                        }
+                        else
+                        {
+                            _initializedData.addData(id, constants.getU64(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                        }
+                    }
+                    else
+                    {
+                        _x86_64.mc_mov_memory_to_reg_x64(ins.dstReg(), ins.srcReg(), ins.imm32());
+                    }
+                    break;
+                case VMI_MOV64_SRC_REG_DST_MEM:
+                    if (ins.id() != -1)
+                    {
+                        _x86_64.mc_mov_reg_to_memory_x64(0, ins.srcReg());
+                        const poStaticVariable& var = module.staticVariables()[(ins.id())];
+                        const int id = var.constantId();
+                        if (var.type() == TYPE_I64)
+                        {
+                            _initializedData.addData(id, constants.getI64(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                        }
+                        else
+                        {
+                            _initializedData.addData(id, constants.getU64(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                        }
+                    }
+                    else
+                    {
+                        _x86_64.mc_mov_reg_to_memory_x64(ins.dstReg(), ins.imm32(), ins.srcReg());
+                    }
+                    break;
+                case VMI_MOV32_SRC_MEM_DST_REG:
+                    if (ins.id() != -1)
+                    {
+                        _x86_64.mc_mov_mem_to_reg_32(ins.dstReg(), 0);
+                        const poStaticVariable& var = module.staticVariables()[(ins.id())];
+                        const int id = var.constantId();
+                        if (var.type() == TYPE_I32)
+                        {
+                            _initializedData.addData(id, constants.getI32(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                        }
+                        else
+                        {
+                            _initializedData.addData(id, constants.getU32(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                        }
+                    }
+                    else
+                    {
+                        _x86_64.mc_mov_mem_to_reg_32(ins.dstReg(), ins.srcReg(), ins.imm32());
+                    }
+                    break;
+                case VMI_MOV32_SRC_REG_DST_MEM:
+                    if (ins.id() != -1)
+                    {
+                        _x86_64.mc_mov_reg_to_mem_32(ins.srcReg(), 0);
+                        const poStaticVariable& var = module.staticVariables()[(ins.id())];
+                        const int id = var.constantId();
+                        if (var.type() == TYPE_I32)
+                        {
+                            _initializedData.addData(id, constants.getI32(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                        }
+                        else
+                        {
+                            _initializedData.addData(id, constants.getU32(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                        }
+                    }
+                    else
+                    {
+                        _x86_64.mc_mov_reg_to_mem_32(ins.dstReg(), ins.srcReg(), ins.imm32());
+                    }
+                    break;
+                case VMI_MOV16_SRC_MEM_DST_REG:
+                    if (ins.id() != -1)
+                    {
+                        _x86_64.mc_mov_mem_to_reg_16(ins.dstReg(), 0);
+                        const poStaticVariable& var = module.staticVariables()[(ins.id())];
+                        const int id = var.constantId();
+                        if (var.type() == TYPE_I16)
+                        {
+                            _initializedData.addData(id, constants.getI16(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                        }
+                        else
+                        {
+                            _initializedData.addData(id, constants.getU16(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                        }
+                    }
+                    else
+                    {
+                        _x86_64.mc_mov_mem_to_reg_16(ins.dstReg(), ins.srcReg(), ins.imm32());
+                    }
+                    break;
+                case VMI_MOV16_SRC_REG_DST_MEM:
+                    if (ins.id() != -1)
+                    {
+                        _x86_64.mc_mov_reg_to_mem_16(ins.srcReg(), 0);
+                        const poStaticVariable& var = module.staticVariables()[(ins.id())];
+                        const int id = var.constantId();
+                        if (var.type() == TYPE_I16)
+                        {
+                            _initializedData.addData(id, constants.getI16(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                        }
+                        else
+                        {
+                            _initializedData.addData(id, constants.getU16(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                        }
+                    }
+                    else
+                    {
+                        _x86_64.mc_mov_reg_to_mem_16(ins.dstReg(), ins.srcReg(), ins.imm32());
+                    }
+                    break;
+                case VMI_MOV8_SRC_MEM_DST_REG:
+                    if (ins.id() != -1)
+                    {
+                        _x86_64.mc_mov_memory_to_reg_8(ins.dstReg(), 0);
+                        const poStaticVariable& var = module.staticVariables()[(ins.id())];
+                        const int id = var.constantId();
+                        if (var.type() == TYPE_I8)
+                        {
+                            _initializedData.addData(id, constants.getI8(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                        }
+                        else
+                        {
+                            _initializedData.addData(id, constants.getU8(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                        }
+                    }
+                    else
+                    {
+                        _x86_64.mc_mov_memory_to_reg_8(ins.dstReg(), ins.srcReg(), ins.imm32());
+                    }
+                    break;
+                case VMI_MOV8_SRC_REG_DST_MEM:
+                    if (ins.id() != -1)
+                    {
+                        _x86_64.mc_mov_reg_to_memory_8(ins.srcReg(), 0);
+                        const poStaticVariable& var = module.staticVariables()[(ins.id())];
+                        const int id = var.constantId();
+                        if (var.type() == TYPE_I8)
+                        {
+                            _initializedData.addData(id, constants.getI8(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                        }
+                        else
+                        {
+                            _initializedData.addData(id, constants.getU8(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                        }
+                    }
+                    else
+                    {
+                        _x86_64.mc_mov_reg_to_memory_8(ins.dstReg(), ins.srcReg(), ins.imm32());
+                    }
                     break;
                 case VMI_J8:
                 case VMI_JE8:
@@ -2073,10 +2489,17 @@ void poAsm::generate(poModule& module)
     patchCalls();
 
     std::string mainName;
+    std::string openName;
+    std::string closeName;
     for (const poFunction& function : functions) {
         if (function.name() == "main") {
             mainName = function.fullname();
-            break;
+        }
+        else if (function.name() == "pora_open") {
+            openName = function.fullname();
+        }
+        else if (function.name() == "pora_close") {
+            closeName = function.fullname();
         }
     }
 
@@ -2085,8 +2508,24 @@ void poAsm::generate(poModule& module)
     {
         _entryPoint = int(_x86_64.programData().size());
         _x86_64.mc_sub_imm_to_reg_x64(VM_REGISTER_EBP, 8);
+
+        const auto& open = _mapping.find(openName);
+        if (open != _mapping.end())
+        {
+            const int imm = open->second - int(_x86_64.programData().size());
+            _x86_64.mc_call(imm);
+        }
+
         const int mainImm = main->second - int(_x86_64.programData().size());
         _x86_64.mc_call(mainImm);
+
+        const auto& close = _mapping.find(closeName);
+        if (close != _mapping.end())
+        {
+            const int imm = close->second - int(_x86_64.programData().size());
+            _x86_64.mc_call(imm);
+        }
+
         _x86_64.mc_add_imm_to_reg_x64(VM_REGISTER_EBP, 8);
         _x86_64.mc_return();
     }
@@ -2103,43 +2542,6 @@ void poAsm::setError(const std::string& errorText)
         _isError = true;
         _errorText = errorText;
     }
-}
-
-void poAsm::addInitializedData(const float f32, const int programDataOffset)
-{
-    _constants.push_back(poAsmConstant(int(_initializedData.size()), int(_x86_64.programData().size()) + programDataOffset));
-
-    const int32_t data = *reinterpret_cast<const int32_t*>(&f32);
-    _initializedData.push_back(data & 0xFF);
-    _initializedData.push_back((data >> 8) & 0xFF);
-    _initializedData.push_back((data >> 16) & 0xFF);
-    _initializedData.push_back((data >> 24) & 0xFF);
-}
-
-void poAsm::addInitializedData(const double f64, const int programDataOffset)
-{
-    _constants.push_back(poAsmConstant(int(_initializedData.size()), int(_x86_64.programData().size() + programDataOffset)));
-
-    const int64_t data = *reinterpret_cast<const int64_t*>(&f64);
-    _initializedData.push_back(data & 0xFF);
-    _initializedData.push_back((data >> 8) & 0xFF);
-    _initializedData.push_back((data >> 16) & 0xFF);
-    _initializedData.push_back((data >> 24) & 0xFF);
-    _initializedData.push_back((data >> 32) & 0xFF);
-    _initializedData.push_back((data >> 40) & 0xFF);
-    _initializedData.push_back((data >> 48) & 0xFF);
-    _initializedData.push_back((data >> 56) & 0xFF);
-}
-
-void poAsm::addInitializedData(const std::string& str, const int programDataOffset)
-{
-    _constants.push_back(poAsmConstant(int(_initializedData.size()), int(_x86_64.programData().size() + programDataOffset)));
-
-    for (char c : str)
-    {
-        _initializedData.push_back(c);
-    }
-    _initializedData.push_back(0); // null terminator
 }
 
 void poAsm::patchCalls()
@@ -2167,15 +2569,24 @@ void poAsm::patchCalls()
     }
 }
 
-void poAsm::link(const int programDataPos, const int initializedDataPos)
+void poAsm::link(const int programDataPos, const int initializedDataPos, const int readOnlyDataPos)
 {
-    for (auto& constant : _constants)
+    for (auto& constant : _readOnlyData.constants())
     {
-        const int disp32 = (constant.getInitializedDataPos() + initializedDataPos) - (programDataPos + constant.getProgramDataPos() + int(sizeof(int32_t)));
+        const int disp32 = (constant.getDataPos() + readOnlyDataPos) - (programDataPos + constant.getProgramDataPos() + int(sizeof(int32_t)));
         _x86_64.programData()[constant.getProgramDataPos()] = disp32 & 0xFF;
         _x86_64.programData()[constant.getProgramDataPos() + 1] = (disp32 >> 8) & 0xFF;
         _x86_64.programData()[constant.getProgramDataPos() + 2] = (disp32 >> 16) & 0xFF;
         _x86_64.programData()[constant.getProgramDataPos() + 3] = (disp32 >> 24) & 0xFF;
+    }
+
+    for (auto& global : _initializedData.constants())
+    {
+        const int disp32 = (global.getDataPos() + initializedDataPos) - (programDataPos + global.getProgramDataPos() + int(sizeof(int32_t)));
+        _x86_64.programData()[global.getProgramDataPos()] = disp32 & 0xFF;
+        _x86_64.programData()[global.getProgramDataPos() + 1] = (disp32 >> 8) & 0xFF;
+        _x86_64.programData()[global.getProgramDataPos() + 2] = (disp32 >> 16) & 0xFF;
+        _x86_64.programData()[global.getProgramDataPos() + 3] = (disp32 >> 24) & 0xFF;
     }
 
     for (auto& externCall : _externCalls)

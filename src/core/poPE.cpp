@@ -238,6 +238,9 @@ void poPortableExecutable::addSection(const poSectionType type, const int size)
     case poSectionType::IDATA:
         _iData = int(_sections.size());
         break;
+    case poSectionType::READONLY:
+        _readonlySection = int(_sections.size());
+        break;
     }
 
     poPortableExecutableSection& section = _sections.emplace_back(type);
@@ -247,6 +250,16 @@ void poPortableExecutable::addSection(const poSectionType type, const int size)
 const int  poPortableExecutable::initializedDataImagePos() const
 {
     return _peImage->sectionData[_initializedSection]._imagePos;
+}
+
+const int poPortableExecutable::uninitializedDataImagePos() const
+{
+    return _peImage->sectionData[_uninitializedSection]._imagePos;
+}
+
+const int poPortableExecutable::readonlyDataImagePos() const
+{
+    return _peImage->sectionData[_readonlySection]._imagePos;
 }
 
 const int poPortableExecutable::addImportTable(const std::string& name)
@@ -402,7 +415,7 @@ static int RoundToAlignment(int size, int alignment)
 
 void poPortableExecutable::initializeSections()
 {
-    if (_textSection == -1 || _uninitializedSection == -1 || _initializedSection == -1 || _iData == -1)
+    if (_textSection == -1 || _uninitializedSection == -1 || _initializedSection == -1 || _iData == -1 || _readonlySection == -1)
     {
         return;
     }
@@ -536,6 +549,7 @@ void poPortableExecutable::write(const std::string& filename)
         const std::string initName = ".data";
         const std::string uninitializedName = ".bss";
         const std::string iDataName = ".idata";
+        const std::string rDataName = ".rdata";
 
         // Write section headers
         for (size_t i = 0; i < _sections.size(); i++)
@@ -552,7 +566,7 @@ void poPortableExecutable::write(const std::string& filename)
                 break;
             case poSectionType::INITIALIZED:
                 std::memcpy(table.mName, initName.data(), initName.size());
-                table.mCharacteristics = IMAGE_SCN_CNT_INITIALIZED_DATA /* | IMAGE_SCN_MEM_WRITE*/ | IMAGE_SCN_MEM_READ;
+                table.mCharacteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_READ;
                 break;
             case poSectionType::UNINITIALIZED:
                 std::memcpy(table.mName, uninitializedName.data(), uninitializedName.size());
@@ -561,6 +575,10 @@ void poPortableExecutable::write(const std::string& filename)
             case poSectionType::IDATA:
                 std::memcpy(table.mName, iDataName.data(), iDataName.size());
                 table.mCharacteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_READ;
+                break;
+            case poSectionType::READONLY:
+                std::memcpy(table.mName, rDataName.data(), rDataName.size());
+                table.mCharacteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ;
                 break;
             }
             table.mVirtualSize = uint32_t(section.data().size());
