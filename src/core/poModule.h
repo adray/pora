@@ -184,6 +184,7 @@ namespace po
         inline std::vector<poNamespace>& namespaces() { return _namespaces; }
         inline poConstantPool& constants() { return _constants; }
         inline std::vector<poType>& types() { return _types; }
+        inline const std::vector<poType>& types() const { return _types; }
         inline std::vector<poFunction>& functions() { return _functions; }
         inline const std::vector<poFunction>& functions() const { return _functions; }
         inline std::vector<poStaticVariable>& staticVariables() { return _staticVariables; }

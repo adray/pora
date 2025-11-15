@@ -10,7 +10,7 @@ bool poTypeValidator::validateModule(poModule& module)
     bool ok = true;
     for (const poType& type : module.types())
     {
-        if (!validateType(type))
+        if (!validateType(module, type))
         {
             ok = false;
             break;
@@ -33,7 +33,7 @@ bool poTypeValidator::validateModule(poModule& module)
     return ok;
 }
 
-bool poTypeValidator::validateType(const poType& type)
+bool poTypeValidator::validateType(const poModule& module, const poType& type)
 {
     bool ok = true;
 
@@ -62,6 +62,38 @@ bool poTypeValidator::validateType(const poType& type)
             break;
         }
         methodNames.insert(it, method.name());
+    }
+
+    // Check if the fields have constructors with zero arguments
+    for (const poField& field : type.fields())
+    {
+        int typeId = field.type();
+        const poType& fieldType = module.types()[field.type()];
+        if (fieldType.isPrimitive() || fieldType.isPointer())
+        {
+            continue;
+        }
+        if (fieldType.isArray())
+        {
+            const poType& baseType = module.types()[fieldType.baseType()];
+            if (baseType.isPrimitive() || baseType.isPointer())
+            {
+                continue;
+            }
+            typeId = baseType.id();
+        }
+
+        const poType& checkType = module.types()[typeId];
+        bool hasConstructor = int(checkType.constructors().size()) == 0;
+        for (const poConstructor& constructor : checkType.constructors())
+        {
+            if (int(constructor.arguments().size()) == 0)
+            {
+                hasConstructor = true;
+                break;
+            }
+        }
+        ok = ok && hasConstructor;
     }
 
     return ok;

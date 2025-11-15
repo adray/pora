@@ -25,11 +25,12 @@ poMemberFunction::poMemberFunction(const poAttributes attributes, const int retu
 {
 }
 
-poField::poField(const poAttributes attributes, const int offset, const int type, const std::string& name)
+poField::poField(const poAttributes attributes, const int offset, const int type, const int numElements, const std::string& name)
     :
     _attributes(attributes),
     _offset(offset),
     _type(type),
+    _numElements(numElements),
     _name(name)
 {
 }
@@ -41,6 +42,20 @@ poType::poType(const int id, const int baseType, const std::string& name)
     _isArray(false),
     _isPointer(false),
     _name(name),
+    _fullname(name),
+    _size(0),
+    _alignment(0)
+{
+}
+
+poType::poType(const int id, const int baseType, const std::string& name, const std::string& fullname)
+    :
+    _id(id),
+    _baseType(baseType),
+    _isArray(false),
+    _isPointer(false),
+    _name(name),
+    _fullname(fullname),
     _size(0),
     _alignment(0)
 {

@@ -107,12 +107,15 @@ namespace po
         void emitArrayCopy(const int src, const int dst, poBasicBlock* bb, const int size);
         void emitCopy(const int src, const int dst, poBasicBlock* bb);
         void emitFunction(poNode* node, poFunction& function);
+        void emitConstructor(poFlowGraph& cfg);
+        void emitDefaultConstructor(poFunction& function, const int type);
         void emitBody(poNode* node, poFlowGraph& cfg, poBasicBlock* loopHeader, poBasicBlock* loopEnd);
         void emitArgs(poNode* node, poFlowGraph& cfg);
         void emitParameter(const int type, poBasicBlock* bb, const int paramIndex, const int varName);
         void emitStatement(poNode* node, poFlowGraph& cfg);
         int emitPassByValue(const int expr, poFlowGraph& cfg);
         int emitPassByReference(const int expr, poFlowGraph& cfg);
+        int emitNew(poNode* node, poFlowGraph& cfg);
         int emitCall(poNode* node, poFlowGraph& cfg, const int instanceExpr);
         void emitCall(poNode* node, poFlowGraph& cfg, const int instanceExpr, const int64_t arraySize);
         int emitMemberCall(poNode* node, poFlowGraph& cfg);
@@ -138,6 +141,23 @@ namespace po
         int emitLoadThis(poFlowGraph& cfg);
         int emitLoadVariable(poNode* node, poFlowGraph& cfg);
         int emitSizeof(poNode* node, poFlowGraph& cfg);
+
+
+        void emitLoopPreHeader(poFlowGraph& cfg, const int instanceExpr, const int64_t arraySize);
+        void emitLoopHeader(poFlowGraph& cfg, const int instanceExpr);
+        void emitLoopEnd(poFlowGraph& cfg);
+
+        poBasicBlock* _preHeaderBB;
+        poBasicBlock* _headerBB;
+        poBasicBlock* _loopBodyBB;
+        poBasicBlock* _loopEndBB;
+        int _arrayConstant;
+        int _loopIndexVar;
+        int _loopIndexLoadBody;
+        int _loopIndexPtrBody;
+        int _incrementConstant;
+        int _pointerType;
+        int _elementPtr;
 
         poModule& _module;
         poConditionGraph _graph;

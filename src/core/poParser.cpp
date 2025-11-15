@@ -191,6 +191,56 @@ poNode* poFunctionParser::parsePrimary()
         _parser.advance();
         node = new poConstantNode(poNodeType::CONSTANT, token);
     }
+    else if (_parser.match(poTokenType::NEW))
+    {
+        _parser.advance();
+        
+        const poToken& token = _parser.peek();
+        _parser.advance();
+
+        if (_parser.match(poTokenType::OPEN_PARAN))
+        {
+            _parser.advance();
+
+            // constructor?
+            std::vector<poNode*> args;
+            if (!_parser.match(poTokenType::CLOSE_PARAN))
+            {
+                poNode* node = parseTerm();
+                if (node)
+                {
+                    args.push_back(node);
+                    while (_parser.match(poTokenType::COMMA))
+                    {
+                        _parser.advance();
+                        args.push_back(parseTerm());
+                    }
+                }
+            }
+
+            poListNode* argsNode = new poListNode(poNodeType::CALL, args, token);
+            std::vector<poNode*> constructor = {
+                argsNode
+            };
+
+            node = new poUnaryNode(poNodeType::NEW,
+                new poListNode(poNodeType::CONSTRUCTOR, constructor, token),
+                token);
+
+            if (_parser.match(poTokenType::CLOSE_PARAN))
+            {
+                _parser.advance();
+            }
+            else
+            {
+                _parser.setError("Expected closing parenthesis.");
+            }
+        }
+        else
+        {
+            _parser.setError("Expected opening parenthesis after 'new'.");
+        }
+    }
     else if (_parser.match(poTokenType::SIZEOF))
     {
         auto& token = _parser.peek();

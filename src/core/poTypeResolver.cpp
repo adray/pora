@@ -571,7 +571,8 @@ void poTypeResolver::resolveType(const std::string& name, poNamespace& ns, poLis
     const int id = int(_module.types().size());
     _module.addType(poType(id,
         TYPE_OBJECT,
-        name));
+        name,
+        ns.name() + "::" + name));
     ns.addType(id);
     int offset = 0;
     int sizeOfLargestField = 0;
@@ -625,7 +626,7 @@ void poTypeResolver::resolveType(const std::string& name, poNamespace& ns, poLis
             offset += padding;
 
             auto& type = _module.types()[id];
-            type.addField(poField(attributes, offset, fieldType, decl->token().string()));
+            type.addField(poField(attributes, offset, fieldType, 1, decl->token().string()));
 
             offset += size;
             sizeOfLargestField = std::max(sizeOfLargestField, alignment);
@@ -667,7 +668,7 @@ void poTypeResolver::resolveType(const std::string& name, poNamespace& ns, poLis
             offset += padding;
 
             auto& type = _module.types()[id];
-            type.addField(poField(poAttributes::PUBLIC, offset, arrayType, decl->token().string()));
+            type.addField(poField(poAttributes::PUBLIC, offset, arrayType, int(arrayNode->arraySize()), decl->token().string()));
             offset += totalSize;
             sizeOfLargestField = std::max(sizeOfLargestField, alignment);
         }
@@ -734,6 +735,46 @@ void poTypeResolver::resolveType(const std::string& name, poNamespace& ns, poLis
     auto& type = _module.types()[id];
     type.setSize(offset + padding);
     type.setAlignment(sizeOfLargestField);
+
+    // Add a default constructor (if required)
+    if (type.constructors().size() == 0)
+    {
+        bool needsDefaultConstructor = false;
+        for (poField field : type.fields())
+        {
+            // A default constructor is needed if any field has a constructor
+            const poType& fieldType = _module.types()[field.type()];
+            if (fieldType.constructors().size() > 0)
+            {
+                needsDefaultConstructor = true;
+                break;
+            }
+            if (fieldType.isArray())
+            {
+                const poType& arrayBaseType = _module.types()[fieldType.baseType()];
+                if (arrayBaseType.constructors().size() > 0)
+                {
+                    needsDefaultConstructor = true;
+                    break;
+                }
+            }
+        }
+
+        if (needsDefaultConstructor)
+        {
+            poConstructor constructor(poAttributes::PUBLIC);
+            constructor.setIsDefault(true);
+            constructor.setId(int(_module.functions().size()));
+            type.addConstructor(constructor);
+
+            _module.addFunction(poFunction(
+                type.name(),
+                type.fullname() + "::" + type.name(),
+                0,
+                poAttributes::PUBLIC,
+                poCallConvention::X86_64));
+        }
+    }
     _resolvedTypes.insert(std::pair<std::string, int>(name, id));
 }
 

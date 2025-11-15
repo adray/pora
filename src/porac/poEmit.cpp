@@ -207,6 +207,17 @@ poCodeGenerator::poCodeGenerator(poModule& module)
     _instructionCount(0),
     _returnInstruction(-1),
     _thisInstruction(-1),
+    _arrayConstant(-1),
+    _incrementConstant(-1),
+    _elementPtr(-1),
+    _preHeaderBB(nullptr),
+    _headerBB(nullptr),
+    _loopBodyBB(nullptr),
+    _loopEndBB(nullptr),
+    _pointerType(-1),
+    _loopIndexLoadBody(-1),
+    _loopIndexPtrBody(-1),
+    _loopIndexVar(-1),
     _isError(false)
 {
 }
@@ -262,9 +273,13 @@ void poCodeGenerator::generate(const std::vector<poNode*>& ast)
                 const std::vector<poConstructor>& constructors = typeData.constructors();
                 auto& constructor = constructors[i];
                 const std::string fullName = ns.name() + "::" + typeData.name() + "::" + typeData.name();
-                const auto& node = _functions.find(fullName);
-                if (node != _functions.end() &&
-                    node->second->type() == poNodeType::CONSTRUCTOR)
+
+                if (constructor.isDefault())
+                {
+                    _imports.clear();
+                    emitDefaultConstructor(_module.functions()[constructor.id()], type);
+                }
+                else
                 {
                     _imports.clear();
                     _imports.push_back(_namespace);
@@ -274,7 +289,12 @@ void poCodeGenerator::generate(const std::vector<poNode*>& ast)
                         _imports.push_back(importNode->token().string());
                     }
 
-                    emitFunction(node->second, _module.functions()[constructor.id()]);
+                    const auto& node = _functions.find(fullName);
+                    if (node != _functions.end() &&
+                        node->second->type() == poNodeType::CONSTRUCTOR)
+                    {
+                        emitFunction(node->second, _module.functions()[constructor.id()]);
+                    }
                 }
             }
 
@@ -510,6 +530,126 @@ void poCodeGenerator::emitCopy(const int src, const int dst, poBasicBlock* bb)
     }
 }
 
+void poCodeGenerator::emitConstructor(poFlowGraph& cfg)
+{
+    // This is called by emitFunction, we emit the constructor base operations here.
+
+    poBasicBlock* bb = cfg.getLast();
+
+    const int thisInstruction = emitLoadThis(cfg);
+
+    const int thisType = _types[thisInstruction];
+    poType& thisTypeData = _module.types()[thisType];
+    const int baseType = thisTypeData.baseType();
+    const poType& baseTypeData = _module.types()[baseType];
+
+    for (int i = 0; i < int(baseTypeData.fields().size()); i++)
+    {
+        // TODO: emit call to constructors for arrays
+        const poField& field = baseTypeData.fields()[i];
+        const poType& fieldTypeData = _module.types()[field.type()];
+        if (!fieldTypeData.isArray())
+        {
+            continue;
+        }
+
+        const poType& arrayBaseTypeData = _module.types()[fieldTypeData.baseType()];
+        int constructorId = -1;
+        for (const poConstructor& c : arrayBaseTypeData.constructors())
+        {
+            if (c.arguments().size() == 0)
+            {
+                constructorId = c.id();
+            }
+        }
+        if (constructorId != -1)
+        {
+            const int memberId = _instructionCount++;
+            emitInstruction(poInstruction(memberId, fieldTypeData.id(), _thisInstruction, -1, field.offset(), IR_PTR), bb);
+            emitLoopPreHeader(cfg, memberId, field.numElements());
+            emitLoopHeader(cfg, memberId);
+
+            const poType& baseTypeData = _module.types()[fieldTypeData.baseType()];
+            const int memberPtr = getPointerType(fieldTypeData.baseType());
+            const int symbolId = _module.addSymbol(baseTypeData.fullname() + "::" + baseTypeData.name());
+            emitInstruction(poInstruction(_instructionCount++, TYPE_VOID, 1, symbolId, IR_CALL), cfg.getLast());
+            emitInstruction(poInstruction(_instructionCount++, memberPtr, _elementPtr, -1, IR_ARG), cfg.getLast());
+
+            emitLoopEnd(cfg);
+        }
+        else
+        {
+            setError("No constructor with zero arguments found.");
+            break;
+        }
+    }
+
+    for (int i = 0; i < int(baseTypeData.fields().size()); i++)
+    {
+        const poField& field = baseTypeData.fields()[i];
+        const poType& fieldTypeData = _module.types()[field.type()];
+        if (fieldTypeData.constructors().size() == 0)
+        {
+            continue;
+        }
+
+        // Invoke the constructor for the field.
+        int constructorId = -1;
+        for (const poConstructor& c : fieldTypeData.constructors())
+        {
+            if (c.arguments().size() == 0)
+            {
+                constructorId = c.id();
+            }
+        }
+        if (constructorId != -1)
+        {
+            const int memberPtr = getPointerType(field.type());
+            const int symbolId = _module.addSymbol(fieldTypeData.fullname() + "::" + fieldTypeData.name());
+
+            const int memberId = _instructionCount++;
+            emitInstruction(poInstruction(memberId, memberPtr, _thisInstruction, -1, field.offset(), IR_PTR), bb);
+            emitInstruction(poInstruction(_instructionCount++, TYPE_VOID, 1, symbolId, IR_CALL), bb);
+            emitInstruction(poInstruction(_instructionCount++, memberPtr, memberId, -1, IR_ARG), bb);
+        }
+        else
+        {
+            setError("No constructor with zero arguments found.");
+            break;
+        }
+    }
+}
+
+void poCodeGenerator::emitDefaultConstructor(poFunction& function, const int type)
+{
+    // Reset the variable emitter.
+    _variables.clear();
+    _types.clear();
+    _instructionCount = 0;
+
+    poFlowGraph& cfg = function.cfg();
+
+    poBasicBlock* bb = new poBasicBlock();
+    cfg.addBasicBlock(bb);
+
+    _returnInstruction = -1;
+
+    const poType& typeData = _module.types()[type];
+    const int ptrType = getPointerType(getPointerType(type));
+    const int thisName = addVariable("this", ptrType, QUALIFIER_CONST, 8);
+    _thisInstruction = _instructionCount - 1;
+
+    // Emit the 'this' parameter
+    emitParameter(ptrType, bb, 0, _thisInstruction);
+
+    emitConstructor(cfg);
+
+    /* remove empty blocks before checking if for terminators */
+    cfg.optimize();
+
+    emitInstruction(poInstruction(_instructionCount++, TYPE_VOID, -1, -1, IR_RETURN), cfg.getLast());
+}
+
 void poCodeGenerator::emitFunction(poNode* node, poFunction& function)
 {
     // Reset the variable emitter.
@@ -604,6 +744,11 @@ void poCodeGenerator::emitFunction(poNode* node, poFunction& function)
     if (args)
     {
         emitArgs(args, cfg);
+    }
+
+    if (node->type() == poNodeType::CONSTRUCTOR)
+    {
+        emitConstructor(cfg);
     }
 
     if (body)
@@ -1038,6 +1183,82 @@ int poCodeGenerator::emitMemberCall(poNode* node, poFlowGraph& cfg)
     return emitCall(memberCall->right(), cfg, expr);
 }
 
+int poCodeGenerator::emitNew(poNode* node, poFlowGraph& cfg)
+{
+    poUnaryNode* newNode = static_cast<poUnaryNode*>(node);
+    poListNode* constructor = static_cast<poListNode*>(newNode->child());
+    poListNode* call = nullptr;
+    for (poNode* child : constructor->list())
+    {
+        if (child->type() == poNodeType::CALL)
+        {
+            call = static_cast<poListNode*>(child);
+            break;
+        }
+    }
+
+    if (call == nullptr)
+    {
+        setError("Constructor missing call node.");
+        return EMIT_ERROR;
+    }
+
+
+    const std::string& name = constructor->token().string();
+    const int type = _module.getTypeFromName(name);
+    if (type == -1)
+    {
+        setError("Undefined type '" + name + "' for 'new' operator.");
+        return EMIT_ERROR;
+    }
+
+    poType& typeData = _module.types()[type];
+    const int symbolMallocId = _module.addSymbol("std::malloc");
+    int symbolConstructorId = -1;
+    bool isDefaultConstructor = false;
+    const int numArgs = int(call->list().size());
+    for (const poConstructor& constructor : typeData.constructors())
+    {
+        if (constructor.arguments().size() == numArgs)
+        {
+            std::string fullName = typeData.fullname() + "::" + typeData.name();
+            symbolConstructorId = _module.addSymbol(fullName);
+            isDefaultConstructor = constructor.isDefault();
+            break;
+        }
+    }
+
+    int sizeConstant = _module.constants().getConstant(uint64_t(typeData.size()));
+    if (sizeConstant == -1)
+    {
+        sizeConstant = _module.constants().addConstant(uint64_t(typeData.size()));
+    }
+
+    const int sizeConstantInstruction = _instructionCount++;
+    emitInstruction(poInstruction(sizeConstantInstruction, TYPE_U64, sizeConstant, IR_CONSTANT), cfg.getLast());
+
+    const int ptrType = getPointerType(type);
+    const int newId = _instructionCount++;
+    emitInstruction(poInstruction(newId, ptrType, 1, int16_t(symbolMallocId), IR_CALL), cfg.getLast());
+    emitInstruction(poInstruction(_instructionCount++, TYPE_U64, int16_t(sizeConstantInstruction), -1, IR_ARG), cfg.getLast());
+
+    if (symbolConstructorId != -1)
+    {
+        // Call the constructor
+        if (isDefaultConstructor)
+        {
+            emitInstruction(poInstruction(_instructionCount++, TYPE_VOID, 1, int16_t(symbolConstructorId), IR_CALL), cfg.getLast());
+            emitInstruction(poInstruction(_instructionCount++, ptrType, int16_t(newId), -1, IR_ARG), cfg.getLast());
+        }
+        else
+        {
+            emitCall(call, cfg, newId);
+        }
+    }
+
+    return newId;
+}
+
 int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg, const int instanceExpr)
 {
     poListNode* call = static_cast<poListNode*>(node);
@@ -1272,35 +1493,36 @@ int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg, const int instance
     return retVariable;
 }
 
-void poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg, const int instanceExpr, const int64_t arraySize)
+void poCodeGenerator::emitLoopPreHeader(poFlowGraph& cfg, const int instanceExpr, const int64_t arraySize)
 {
+
     // Generate a loop to call a function for each element in the array (generally the constructor)
     const int type = _types[instanceExpr];
     const poType& typeData = _module.types()[type];
     assert(typeData.isArray());
-    const int pointerType = getPointerType(typeData.baseType());
+    _pointerType = getPointerType(typeData.baseType());
 
-    poBasicBlock* preHeaderBB = cfg.getLast();
-    poBasicBlock* headerBB = new poBasicBlock();
-    poBasicBlock* loopBodyBB = new poBasicBlock();
-    poBasicBlock* loopEndBB = new poBasicBlock();
-    headerBB->setBranch(loopEndBB, false);
-    loopEndBB->addIncoming(headerBB);
-    loopBodyBB->setBranch(headerBB, true);
-    headerBB->addIncoming(loopBodyBB);
+    _preHeaderBB = cfg.getLast();
+    _headerBB = new poBasicBlock();
+    _loopBodyBB = new poBasicBlock();
+    _loopEndBB = new poBasicBlock();
+    _headerBB->setBranch(_loopEndBB, false);
+    _loopEndBB->addIncoming(_headerBB);
+    _loopBodyBB->setBranch(_headerBB, true);
+    _headerBB->addIncoming(_loopBodyBB);
 
     // Get the size of the array
-    int arrayConstant = _module.constants().getConstant(arraySize);
-    if (arrayConstant == -1)
+    _arrayConstant = _module.constants().getConstant(arraySize);
+    if (_arrayConstant == -1)
     {
-        arrayConstant = _module.constants().addConstant(arraySize);
+        _arrayConstant = _module.constants().addConstant(arraySize);
     }
 
     // Get the increment value
-    int incrementConstant = _module.constants().getConstant(int64_t(1));
-    if (incrementConstant == -1)
+    _incrementConstant = _module.constants().getConstant(int64_t(1));
+    if (_incrementConstant == -1)
     {
-        incrementConstant = _module.constants().addConstant(int64_t(1));
+        _incrementConstant = _module.constants().addConstant(int64_t(1));
     }
 
     // Get the loop index default value
@@ -1310,50 +1532,67 @@ void poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg, const int instanc
         zeroConstant = _module.constants().addConstant(int64_t(0));
     }
 
-    // Emit pre-header
-    const int loopIndexVar = emitAlloca(TYPE_I64, cfg.getLast());
-    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, loopIndexVar, -1, IR_PTR), cfg.getLast());
-    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, zeroConstant, loopIndexVar, IR_STORE), cfg.getLast());
+    const int zeroConstantId = _instructionCount++;
+    emitInstruction(poInstruction(zeroConstantId, TYPE_I64, zeroConstant, IR_CONSTANT), _preHeaderBB);
 
+    // Emit pre-header
+    _loopIndexVar = emitAlloca(TYPE_I64, cfg.getLast());
+    const int loopIndexPtrPreHeader = _instructionCount;
+    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, _loopIndexVar, -1, IR_PTR), cfg.getLast());
+    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, loopIndexPtrPreHeader, zeroConstantId, IR_STORE), cfg.getLast());
+}
+void poCodeGenerator::emitLoopHeader(poFlowGraph& cfg, const int instanceExpr)
+{
     // Emit header
-    cfg.addBasicBlock(headerBB);
+    cfg.addBasicBlock(_headerBB);
     const int arraySizeVar = _instructionCount;
-    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, arrayConstant, IR_CONSTANT), cfg.getLast());
+    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, _arrayConstant, IR_CONSTANT), cfg.getLast());
 
     const int loopIndexPtr = _instructionCount;
-    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, loopIndexVar, -1, IR_PTR), cfg.getLast());
+    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, _loopIndexVar, -1, IR_PTR), cfg.getLast());
 
     const int loopIndexLoad = _instructionCount;
     emitInstruction(poInstruction(_instructionCount++, TYPE_I64, loopIndexPtr, -1, IR_LOAD), cfg.getLast());
-    
+
     const int cmpVar = _instructionCount;
     emitInstruction(poInstruction(_instructionCount++, TYPE_I64, loopIndexLoad, arraySizeVar, IR_CMP), cfg.getLast());
     emitInstruction(poInstruction(_instructionCount++, TYPE_I64, IR_JUMP_GREATER_EQUALS, -1, IR_BR), cfg.getLast());
 
     // Emit loop body
-    cfg.addBasicBlock(loopBodyBB);
-    const int loopIndexPtrBody = _instructionCount;
-    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, loopIndexVar, -1, IR_PTR), cfg.getLast());
+    cfg.addBasicBlock(_loopBodyBB);
+    _loopIndexPtrBody = _instructionCount;
+    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, _loopIndexVar, -1, IR_PTR), cfg.getLast());
 
-    const int loopIndexLoadBody = _instructionCount;
-    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, loopIndexPtrBody, -1, IR_LOAD), cfg.getLast());
+    _loopIndexLoadBody = _instructionCount;
+    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, _loopIndexPtrBody, -1, IR_LOAD), cfg.getLast());
 
-    const int elementPtr = _instructionCount;
-    emitInstruction(poInstruction(_instructionCount++, pointerType, instanceExpr, loopIndexLoadBody, IR_ELEMENT_PTR), cfg.getLast());
+    _elementPtr = _instructionCount;
+    emitInstruction(poInstruction(_instructionCount++, _pointerType, instanceExpr, _loopIndexLoadBody, IR_ELEMENT_PTR), cfg.getLast());
 
-    emitCall(node, cfg, elementPtr);
-
+}
+void poCodeGenerator::emitLoopEnd(poFlowGraph& cfg)
+{
     // Increment loop index
     const int loopIndexInc = _instructionCount;
-    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, incrementConstant, IR_CONSTANT), cfg.getLast());
+    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, _incrementConstant, IR_CONSTANT), cfg.getLast());
 
     const int loopIndexNew = _instructionCount;
-    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, loopIndexLoadBody, loopIndexInc, IR_ADD), cfg.getLast());
-    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, loopIndexPtrBody, loopIndexNew, IR_STORE), cfg.getLast());
+    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, _loopIndexLoadBody, loopIndexInc, IR_ADD), cfg.getLast());
+    emitInstruction(poInstruction(_instructionCount++, TYPE_I64, _loopIndexPtrBody, loopIndexNew, IR_STORE), cfg.getLast());
     emitInstruction(poInstruction(_instructionCount++, 0, IR_JUMP_UNCONDITIONAL, -1, IR_BR), cfg.getLast());
 
     // Emit loop end
-    cfg.addBasicBlock(loopEndBB);
+    cfg.addBasicBlock(_loopEndBB);
+}
+
+void poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg, const int instanceExpr, const int64_t arraySize)
+{
+    emitLoopPreHeader(cfg, instanceExpr, arraySize);
+    emitLoopHeader(cfg, instanceExpr);
+
+    emitCall(node, cfg, _elementPtr);
+
+    emitLoopEnd(cfg);
 }
 
 void poCodeGenerator::emitAssignment(poNode* node, poFlowGraph& cfg)
@@ -1717,7 +1956,7 @@ void poCodeGenerator::emitDecl(poNode* node, poFlowGraph& cfg)
                 emitCall(call, cfg, var);
             }
         }
-        else
+        else if (!arrayNode)
         {
             emitDefaultValue(baseType.id(), cfg, type, var);
         }
@@ -1821,6 +2060,9 @@ int poCodeGenerator::emitExpr(poNode* node, poFlowGraph& cfg)
         break;
     case poNodeType::CONSTANT:
         instructionId = emitConstantExpr(node, cfg);
+        break;
+    case poNodeType::NEW:
+        instructionId = emitNew(node, cfg);
         break;
     case poNodeType::VARIABLE:
         instructionId = emitLoadVariable(node, cfg);
@@ -2082,10 +2324,9 @@ int poCodeGenerator::emitLoadVariable(poNode* node, poFlowGraph& cfg)
             const poType& thisTypeData = _module.types()[thisType];
             if (thisTypeData.isPointer())
             {
-                const int thisVar = emitLoadThis(cfg);
                 const poType& ptrType = _module.types()[thisTypeData.baseType()];
-
                 const poType& baseType = _module.types()[ptrType.baseType()];
+
                 int offset = 0;
                 int fieldType = -1;
                 for (const auto& field : baseType.fields())
@@ -2104,8 +2345,17 @@ int poCodeGenerator::emitLoadVariable(poNode* node, poFlowGraph& cfg)
                     return EMIT_ERROR;
                 }
 
+                auto& fieldTypeData = _module.types()[fieldType];
+                if (fieldTypeData.baseType() == TYPE_OBJECT)
+                {
+                    const int ptr = _instructionCount; /* result of IR_PTR */
+                    emitInstruction(poInstruction(_instructionCount++, getPointerType(fieldType), _thisInstruction, -1, offset, IR_PTR), cfg.getLast());
+                    return ptr;
+                }
+
+                const int thisVar = emitLoadThis(cfg);
                 const int ptr = _instructionCount; /* result of IR_PTR */
-                emitInstruction(poInstruction(_instructionCount++, ptrType.id(), thisVar, -1, offset, IR_PTR), cfg.getLast());
+                emitInstruction(poInstruction(_instructionCount++, getPointerType(fieldType), thisVar, -1, offset, IR_PTR), cfg.getLast());
 
                 const int instructionId = _instructionCount;
                 emitInstruction(poInstruction(_instructionCount++, fieldType, ptr, -1, IR_LOAD), cfg.getLast());
@@ -2137,13 +2387,10 @@ int poCodeGenerator::emitLoadVariable(poNode* node, poFlowGraph& cfg)
     }
 
     assert(typeData.isPointer());
-    if (typeData.isPointer())
+    auto& baseType = _module.types()[typeData.baseType()];
+    if (baseType.baseType() == TYPE_OBJECT)
     {
-        auto& baseType = _module.types()[typeData.baseType()];
-        if (baseType.baseType() == TYPE_OBJECT)
-        {
-            return varName;
-        }
+        return varName;
     }
 
     poBasicBlock* bb = cfg.getLast();

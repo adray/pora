@@ -1,0 +1,29 @@
+import std;
+
+namespace Test {
+    class foo {
+        foo();
+        private i64 _x;
+        void print();
+    }
+    
+    foo::foo() {
+        _x = 10;
+        println("foo::foo", (u32)9);
+    }
+    void foo::print() {
+        print_64(_x);
+    }
+
+    class myClass {
+       private foo f;
+       myClass();
+    }
+    myClass::myClass() {
+        println("myClass::myClass", (u32)17);
+        f.print();
+    }
+    static void main() {
+       myClass* c = new myClass();
+    }
+}

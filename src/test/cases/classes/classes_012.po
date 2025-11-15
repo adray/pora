@@ -1,0 +1,18 @@
+import std;
+
+namespace Test {
+    class foo {
+        foo();
+    }
+    
+    foo::foo() {
+        println("foo::foo", (u32)9);
+    }
+
+    class myClass {
+       private foo f;
+    }
+    static void main() {
+       myClass* c = new myClass();
+    }
+}

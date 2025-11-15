@@ -211,25 +211,31 @@ void poAsm::ir_store(PO_ALLOCATOR& allocator, const poInstruction& ins)
     {
     case TYPE_I64:
     case TYPE_U64:
+        assert(dst != -1 && src != -1);
         _x86_64_lower.mc_mov_reg_to_memory_x64(dst, 0, src);
         break;
     case TYPE_I32:
     case TYPE_U32:
+        assert(dst != -1 && src != -1);
         _x86_64_lower.mc_mov_reg_to_mem_32(dst, src, 0);
         break;
     case TYPE_I16:
     case TYPE_U16:
+        assert(dst != -1 && src != -1);
         _x86_64_lower.mc_mov_reg_to_mem_16(dst, src, 0);
         break;
     case TYPE_I8:
     case TYPE_U8:
     case TYPE_BOOLEAN:
+        assert(dst != -1 && src != -1);
         _x86_64_lower.mc_mov_reg_to_memory_8(dst, src, 0);
         break;
     case TYPE_F64:
+        assert(dst != -1 && src_sse != -1);
         _x86_64_lower.mc_movsd_reg_to_memory_x64(dst, src_sse, 0);
         break;
     case TYPE_F32:
+        assert(dst != -1 && src_sse != -1);
         _x86_64_lower.mc_movss_reg_to_memory_x64(dst, src_sse, 0);
         break;
     default:
@@ -1586,16 +1592,16 @@ void poAsmDataBuffer::addData(const int id, const uint8_t u8, const size_t progr
 }
 
 bool poAsmDataBuffer::cache(const int id, const size_t programDataSize, const int programDataOffset)
-{    
-    const auto& it = _constantMap.find(id);
-    if (it != _constantMap.end())
+{
+    const auto& it = _dataMap.find(id);
+    if (it != _dataMap.end())
     {
-        _constants.push_back(poAsmConstant(it->second, int(programDataSize) + programDataOffset));
+        _patchPoints.push_back(poAsmConstant(it->second, int(programDataSize) + programDataOffset));
         return true;
     }
 
-    _constants.push_back(poAsmConstant(int(_data.size()), int(programDataSize) + programDataOffset));
-    _constantMap.insert(std::pair<int, int>(id, int(_data.size())));
+    _patchPoints.push_back(poAsmConstant(int(_data.size()), int(programDataSize) + programDataOffset));
+    _dataMap.insert(std::pair<int, int>(id, int(_data.size())));
     return false;
 }
 
@@ -2282,11 +2288,11 @@ void poAsm::generateMachineCode(poModule& module)
                         const int id = var.constantId();
                         if (var.type() == TYPE_I64)
                         {
-                            _initializedData.addData(id, constants.getI64(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                            _initializedData.addData(ins.id(), constants.getI64(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                         }
                         else
                         {
-                            _initializedData.addData(id, constants.getU64(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                            _initializedData.addData(ins.id(), constants.getU64(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                         }
                     }
                     else
@@ -2302,11 +2308,11 @@ void poAsm::generateMachineCode(poModule& module)
                         const int id = var.constantId();
                         if (var.type() == TYPE_I64)
                         {
-                            _initializedData.addData(id, constants.getI64(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                            _initializedData.addData(ins.id(), constants.getI64(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                         }
                         else
                         {
-                            _initializedData.addData(id, constants.getU64(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                            _initializedData.addData(ins.id(), constants.getU64(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                         }
                     }
                     else
@@ -2322,11 +2328,11 @@ void poAsm::generateMachineCode(poModule& module)
                         const int id = var.constantId();
                         if (var.type() == TYPE_I32)
                         {
-                            _initializedData.addData(id, constants.getI32(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                            _initializedData.addData(ins.id(), constants.getI32(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                         }
                         else
                         {
-                            _initializedData.addData(id, constants.getU32(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                            _initializedData.addData(ins.id(), constants.getU32(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                         }
                     }
                     else
@@ -2342,11 +2348,11 @@ void poAsm::generateMachineCode(poModule& module)
                         const int id = var.constantId();
                         if (var.type() == TYPE_I32)
                         {
-                            _initializedData.addData(id, constants.getI32(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                            _initializedData.addData(ins.id(), constants.getI32(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                         }
                         else
                         {
-                            _initializedData.addData(id, constants.getU32(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                            _initializedData.addData(ins.id(), constants.getU32(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                         }
                     }
                     else
@@ -2362,11 +2368,11 @@ void poAsm::generateMachineCode(poModule& module)
                         const int id = var.constantId();
                         if (var.type() == TYPE_I16)
                         {
-                            _initializedData.addData(id, constants.getI16(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                            _initializedData.addData(ins.id(), constants.getI16(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                         }
                         else
                         {
-                            _initializedData.addData(id, constants.getU16(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                            _initializedData.addData(ins.id(), constants.getU16(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                         }
                     }
                     else
@@ -2382,11 +2388,11 @@ void poAsm::generateMachineCode(poModule& module)
                         const int id = var.constantId();
                         if (var.type() == TYPE_I16)
                         {
-                            _initializedData.addData(id, constants.getI16(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                            _initializedData.addData(ins.id(), constants.getI16(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                         }
                         else
                         {
-                            _initializedData.addData(id, constants.getU16(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                            _initializedData.addData(ins.id(), constants.getU16(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                         }
                     }
                     else
@@ -2402,11 +2408,11 @@ void poAsm::generateMachineCode(poModule& module)
                         const int id = var.constantId();
                         if (var.type() == TYPE_I8)
                         {
-                            _initializedData.addData(id, constants.getI8(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                            _initializedData.addData(ins.id(), constants.getI8(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                         }
                         else
                         {
-                            _initializedData.addData(id, constants.getU8(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                            _initializedData.addData(ins.id(), constants.getU8(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                         }
                     }
                     else
@@ -2422,11 +2428,11 @@ void poAsm::generateMachineCode(poModule& module)
                         const int id = var.constantId();
                         if (var.type() == TYPE_I8)
                         {
-                            _initializedData.addData(id, constants.getI8(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                            _initializedData.addData(ins.id(), constants.getI8(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                         }
                         else
                         {
-                            _initializedData.addData(id, constants.getU8(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
+                            _initializedData.addData(ins.id(), constants.getU8(id), _x86_64.programData().size(), -int(sizeof(int32_t))); // insert patch
                         }
                     }
                     else
@@ -2571,7 +2577,7 @@ void poAsm::patchCalls()
 
 void poAsm::link(const int programDataPos, const int initializedDataPos, const int readOnlyDataPos)
 {
-    for (auto& constant : _readOnlyData.constants())
+    for (auto& constant : _readOnlyData.patchPoints())
     {
         const int disp32 = (constant.getDataPos() + readOnlyDataPos) - (programDataPos + constant.getProgramDataPos() + int(sizeof(int32_t)));
         _x86_64.programData()[constant.getProgramDataPos()] = disp32 & 0xFF;
@@ -2580,7 +2586,7 @@ void poAsm::link(const int programDataPos, const int initializedDataPos, const i
         _x86_64.programData()[constant.getProgramDataPos() + 3] = (disp32 >> 24) & 0xFF;
     }
 
-    for (auto& global : _initializedData.constants())
+    for (auto& global : _initializedData.patchPoints())
     {
         const int disp32 = (global.getDataPos() + initializedDataPos) - (programDataPos + global.getProgramDataPos() + int(sizeof(int32_t)));
         _x86_64.programData()[global.getProgramDataPos()] = disp32 & 0xFF;

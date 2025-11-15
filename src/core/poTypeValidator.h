@@ -8,7 +8,7 @@ namespace po {
     class poTypeValidator {
     public:
         bool validateModule(poModule& module);
-        bool validateType(const poType& type);
+        bool validateType(const poModule& module, const poType& type);
 
         inline const std::string& errorText() const { return _errorText; }
 

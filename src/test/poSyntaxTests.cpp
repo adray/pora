@@ -1042,6 +1042,39 @@ void po::syntaxTest()
         "   v1.setX((u16)60);"
         "}"\
         "}", false);
+    checkSyntax("Class Test #19", "namespace Test {"\
+        "class myClass {"\
+        "   private u16 _x;"\
+        "   myClass(u16 x);"\
+        "}"\
+        "void myClass::myClass(u16 x) { _x = x; }"
+        "static void main() {"\
+        "   myClass* v1 = new myClass((u16)56);"\
+        "}"\
+        "}", true);
+    checkSyntax("Class Test #20", "namespace Test {"\
+        "class myClass {"\
+        "   private u16 _x;"\
+        "   myClass(u16 x);"\
+        "}"\
+        "void myClass::myClass(u16 x) { _x = x; }"
+        "static void main() {"\
+        "   myClass* v1 = new myClass(78);"\
+        "}"\
+        "}", false);
+    checkSyntax("Class Test #21", "namespace Test {"\
+        "class bar {"\
+        "   private u16 _x;"\
+        "   bar(u16 x);"\
+        "}"\
+        "class foo {"\
+        "   private bar _b;"\
+        "}"\
+        "void bar::bar(u16 x) { _x = x; }"
+        "static void main() {"\
+        "   foo* v1 = new foo();"\
+        "}"\
+        "}", false);
     checkSyntax("Array Test #1", "namespace Test {"\
         "static void main() {"\
         "   i64[10] myArray;"\

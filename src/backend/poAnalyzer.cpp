@@ -7,19 +7,16 @@
 
 using namespace po;
 
+// Align to 16 bytes stack, with a 8 byte offset.
 static const int align(const int size)
 {
     const int remainder = size % 16;
-    if (remainder == 8)
+    if (remainder <= 8)
     {
-        return 0;
-    }
-    else if (remainder == 4)
-    {
-        return 4;
+        return 8 - remainder;
     }
 
-    return 8;
+    return 24 - remainder;
 }
 
 void poAnalyzer:: checkCallSites(poModule& module, po_x86_64_flow_graph& cfg)

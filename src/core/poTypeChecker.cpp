@@ -709,6 +709,106 @@ int poTypeChecker::getType(const poToken& token)
     return type;
 }
 
+void poTypeChecker::checkConstructorCall(poNode* decl)
+{
+    poListNode* constructor = static_cast<poListNode*>(
+        static_cast<poUnaryNode*>(decl)->child()
+        );
+    poListNode* call = nullptr;
+    poArrayNode* arrayNode = nullptr;
+    poNode* variable = nullptr;
+
+    for (poNode* node : constructor->list())
+    {
+        if (node->type() == poNodeType::VARIABLE)
+        {
+            variable = static_cast<poUnaryNode*>(node);
+        }
+        else if (node->type() == poNodeType::ARRAY)
+        {
+            arrayNode = static_cast<poArrayNode*>(node);
+            variable = arrayNode->child();
+        }
+        else if (node->type() == poNodeType::CALL)
+        {
+            call = static_cast<poListNode*>(node);
+        }
+    }
+
+    if (call)
+    {
+        // We need to check the call args match
+        // a constructor args.
+
+        int baseType = getType(decl->token());
+        int type = baseType;
+        if (variable && variable->type() == poNodeType::POINTER)
+        {
+            poPointerNode* pointerNode = static_cast<poPointerNode*>(variable);
+            variable = pointerNode->child();
+            type = getPointerType(type, pointerNode->count());
+        }
+
+        if (type != -1)
+        {
+            if (variable)
+            {
+                const std::string& varName = variable->token().string();
+                if (arrayNode)
+                {
+                    const int arrayType = getArrayType(type, 1);
+                    addVariable(varName, arrayType);
+                }
+                else
+                {
+                    addVariable(varName, type);
+                }
+            }
+
+            bool success = false;
+            const poType& typeData = _module.types()[baseType];
+            if (call->list().size() > 0 ||
+                typeData.constructors().size() > 0)
+            {
+                for (const poConstructor& constructor : typeData.constructors())
+                {
+                    const auto& constructorArgs = constructor.arguments();
+                    if (constructorArgs.size() != call->list().size())
+                    {
+                        continue;
+                    }
+
+                    success = true;
+                    for (int i = 0; i < int(constructorArgs.size()); i++)
+                    {
+                        if (!checkEquivalence(constructorArgs[i],
+                            checkExpr(call->list()[i])))
+                        {
+                            success = false;
+                            break;
+                        }
+                    }
+
+                    if (success) { break; }
+                }
+
+                if (!success)
+                {
+                    setError("Invalid arguments supplied in constructor.", decl->token());
+                }
+            }
+        }
+        else
+        {
+            setError("Invalid type for variable.", constructor->token());
+        }
+    }
+    else
+    {
+        setError("Malformed constructor call.", decl->token());
+    }
+}
+
 void poTypeChecker::checkDecl(poNode* node)
 {
     poUnaryNode* decl = static_cast<poUnaryNode*>(node);
@@ -818,97 +918,7 @@ void poTypeChecker::checkDecl(poNode* node)
     }
     else if (decl->child()->type() == poNodeType::CONSTRUCTOR)
     {
-        poListNode* constructor = static_cast<poListNode*>(decl->child());
-        poListNode* call = nullptr;
-        poArrayNode* arrayNode = nullptr;
-        poNode* variable = nullptr;
-
-        for (poNode* node : constructor->list())
-        {
-            if (node->type() == poNodeType::VARIABLE)
-            {
-                variable = static_cast<poUnaryNode*>(node);
-            }
-            else if (node->type() == poNodeType::ARRAY)
-            {
-                arrayNode = static_cast<poArrayNode*>(node);
-                variable = arrayNode->child();
-            }
-            else if (node->type() == poNodeType::CALL)
-            {
-                call = static_cast<poListNode*>(node);
-            }
-        }
-
-        if (call && variable)
-        {
-            // We need to check the call args match
-            // a constructor args.
-
-            int baseType = getType(decl->token());
-            int type = baseType;
-            if (variable->type() == poNodeType::POINTER)
-            {
-                poPointerNode* pointerNode = static_cast<poPointerNode*>(variable);
-                variable = pointerNode->child();
-                type = getPointerType(type, pointerNode->count());
-            }
-
-            if (type != -1)
-            {
-                const std::string& varName = variable->token().string();
-                if (arrayNode)
-                {
-                    const int arrayType = getArrayType(type, 1);
-                    addVariable(varName, arrayType);
-                }
-                else
-                {
-                    addVariable(varName, type);
-                }
-
-                bool success = false;
-                const poType& typeData = _module.types()[baseType];
-                if (call->list().size() > 0 ||
-                    typeData.constructors().size() > 0)
-                {
-                    for (const poConstructor& constructor : typeData.constructors())
-                    {
-                        const auto& constructorArgs = constructor.arguments();
-                        if (constructorArgs.size() != call->list().size())
-                        {
-                            continue;
-                        }
-
-                        success = true;
-                        for (int i = 0; i < int(constructorArgs.size()); i++)
-                        {
-                            if (!checkEquivalence(constructorArgs[i],
-                                checkExpr(call->list()[i])))
-                            {
-                                success = false;
-                                break;
-                            }
-                        }
-
-                        if (success) { break; }
-                    }
-
-                    if (!success)
-                    {
-                        setError("Invalid arguments supplied in constructor.", variable->token());
-                    }
-                }
-            }
-            else
-            {
-                setError("Invalid type for variable.", constructor->token());
-            }
-        }
-        else
-        {
-            setError("Malformed constructor call.", node->token());
-        }
+        checkConstructorCall(decl);
     }
     else if (decl->child()->type() == poNodeType::VARIABLE)
     {
@@ -1122,6 +1132,9 @@ int poTypeChecker::checkExpr(poNode* node)
             type = getPointerType(TYPE_U8, 1);
             break;
         }
+        break;
+    case poNodeType::NEW:
+        type = checkNew(node);
         break;
     case poNodeType::CALL:
         type = checkCall(node);
@@ -1595,6 +1608,17 @@ poListNode* poTypeChecker::getFunction(const std::string& name)
     }
 
     return function;
+}
+
+int poTypeChecker::checkNew(poNode* node)
+{
+    poUnaryNode* newNode = static_cast<poUnaryNode*>(node);
+    assert(newNode->type() == poNodeType::NEW);
+
+    checkConstructorCall(newNode);
+
+    const int type = getType(newNode->token());
+    return getPointerType(type, 1);
 }
 
 int poTypeChecker::checkCall(poNode* node)

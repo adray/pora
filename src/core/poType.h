@@ -65,17 +65,19 @@ namespace po
     class poField
     {
     public:
-        poField(const poAttributes attributes, const int offset, const int type, const std::string& name);
+        poField(const poAttributes attributes, const int offset, const int type, const int numElements, const std::string& name);
 
         inline const poAttributes attributes() const { return _attributes; }
         inline const int offset() const { return _offset; }
         inline const int type() const { return _type; }
+        inline const int numElements() const { return _numElements; }
         inline const std::string& name() const { return _name; }
 
     private:
         poAttributes _attributes;
         int _offset;
         int _type;
+        int _numElements;
         std::string _name;
     };
 
@@ -122,6 +124,7 @@ namespace po
     {
     public:
         poType(const int id, const int baseType, const std::string& name);
+        poType(const int id, const int baseType, const std::string& name, const std::string& fullname);
 
         inline void addField(const poField& field) { _fields.push_back(field); }
         inline void addMethod(const poMemberFunction& method) { _methods.push_back(method); }
@@ -147,6 +150,7 @@ namespace po
         inline const bool isPrimitive() const { return _id < TYPE_OBJECT; }
         inline const bool isObject() const { return _id == TYPE_OBJECT; }
         inline const std::string& name() const { return _name; }
+        inline const std::string& fullname() const { return _fullname; }
 
     private:
         int _id;
@@ -156,6 +160,7 @@ namespace po
         bool _isArray;
         bool _isPointer;
         std::string _name;
+        std::string _fullname;
         std::vector<poField> _fields;
         std::vector<poMemberFunction> _methods;
         std::vector<poConstructor> _constructors;

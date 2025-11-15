@@ -10,6 +10,7 @@ namespace po
         REFERENCE, /* poUnaryNode */
         DEREFERENCE, /* poUnaryNode */
         NULLPTR, /* poNode */
+        NEW, /* poUnaryNode */
         INCREMENT, /* poUnaryNode */
         DECREMENT, /* poUnaryNode */
         LEFT_SHIFT, /* poBinaryNode */

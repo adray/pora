@@ -36,6 +36,7 @@ namespace po
         void checkConstructor(poNode* node);
         void checkBody(poNode* node, const int returnType);
         void checkStatement(poNode* node, const int returnType);
+        void checkConstructorCall(poNode* decl);
         void checkDecl(poNode* node);
         void checkAssignment(poNode* node);
         void checkReturn(poNode* node, const int returnType);
@@ -44,12 +45,13 @@ namespace po
         int checkMemberCall(poNode* node);
         int checkArray(poNode* node);
         int checkCall(poNode* node);
+        int checkNew(poNode* node);
         int checkCast(poNode* node);
         int getArrayType(const int baseType, const int arrayRank);
         int getPointerType(const int baseType, const int count);
         int getType(const poToken& token);
-        void checkIfStatement(po::poNode* node, const int returnType);
-        void checkWhileStatement(po::poNode* node, const int returnType);
+        void checkIfStatement(poNode* node, const int returnType);
+        void checkWhileStatement(poNode* node, const int returnType);
 
         poListNode* getFunction(const std::string& name);
         int getVariable(const std::string& name);

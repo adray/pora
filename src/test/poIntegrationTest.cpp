@@ -182,6 +182,9 @@ static void runIntegrationTest(const std::string& name, const std::string& path,
         " \"" << std << "\\string.po" << "\""
         " \"" << std << "\\string_class.po" << "\""
         " \"" << std << "\\clock.po" << "\""
+        " \"" << std << "\\memory.po" << "\""
+        " \"" << std << "\\pora.po" << "\""
+        " \"" << std << "\\control.po" << "\""
         ;
     if (!executeCommand(ss.str(), false))
     {

@@ -1,6 +1,6 @@
 namespace std
 {
-    struct small_alloc
+    struct small_bin
     {
         u8* data;
         u64 size;
@@ -9,7 +9,7 @@ namespace std
     struct memory
     {
         i64 heap;
-        i64 pageSize;
+        small_bin[8] sbins; // 1, 2, 4, 8, 16, 32, 64, 128
     }
 
     static memory* mem;
@@ -24,7 +24,7 @@ namespace std
         if (mem == null) {
             return (u8*)null;
         }
-        
+
         u8* bytes;
         u64 limit = (u64)(256*1024);
         if (numBytes <= limit) {
@@ -35,7 +35,7 @@ namespace std
             // No caching apply the memory directly.
             bytes = HeapAlloc(mem.heap, (i32)0, numBytes);
         }
-        
+
         if (numBytes <= (u64)248)  {
             // Small memory allocation
             

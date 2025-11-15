@@ -117,14 +117,14 @@ namespace po
         void addData(const int id, const uint8_t u8, const size_t programDataSize, const int programDataOffset);
 
         inline const std::vector<unsigned char>& data() const { return _data; }
-        inline const std::vector<poAsmConstant>& constants() const { return _constants; }
+        inline const std::vector<poAsmConstant>& patchPoints() const { return _patchPoints; }
 
     private:
         bool cache(const int id, const size_t programDataSize, const int programDataOffset);
 
         std::vector<unsigned char> _data;
-        std::vector<poAsmConstant> _constants;
-        std::unordered_map<int, int> _constantMap;
+        std::vector<poAsmConstant> _patchPoints;
+        std::unordered_map<int, int> _dataMap;
     };
 
     class poAsm
