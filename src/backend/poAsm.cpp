@@ -1611,7 +1611,8 @@ poAsm::poAsm()
     :
     _entryPoint(-1),
     _isError(false),
-    _prologueSize(0)
+    _prologueSize(0),
+    _debugDump(false)
 {
 }
 
@@ -2026,7 +2027,10 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg, const int numArgs)
     scanBasicBlocks(cfg);
     
     allocator.iterator().reset();
-    dump(allocator, allocator.iterator(), cfg);
+    if (_debugDump)
+    {
+        dump(allocator, allocator.iterator(), cfg);
+    }
 
     allocator.iterator().reset();
 
@@ -2177,7 +2181,10 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg, const int numArgs)
     // Generate the machine code
     //
 
-    _x86_64_lower.dump();
+    if (_debugDump)
+    {
+        _x86_64_lower.dump();
+    }
     generateMachineCode(module);
 }
 

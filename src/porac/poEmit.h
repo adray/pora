@@ -80,6 +80,69 @@ namespace po
         std::vector<poConditionGraphNode> _nodes;
     };
 
+    class poEmitter
+    {
+    public:
+        poEmitter(poModule& module);
+        void emitInstruction(const poInstruction& instruction, poBasicBlock* bb);
+        int emitConstant(const int64_t i64, poFlowGraph& cfg);
+        int emitConstant(const uint64_t u64, poFlowGraph& cfg);
+        int emitConstant(const int32_t i32, poFlowGraph& cfg);
+        int emitConstant(const uint32_t u32, poFlowGraph& cfg);
+        int emitConstant(const int16_t i16, poFlowGraph& cfg);
+        int emitConstant(const uint16_t u16, poFlowGraph& cfg);
+        int emitConstant(const int8_t i8, poFlowGraph& cfg);
+        int emitConstant(const uint8_t u8, poFlowGraph& cfg);
+        int emitConstant(const float f32, poFlowGraph& cfg);
+        int emitConstant(const double f64, poFlowGraph& cfg);
+        int emitConstant(const std::string& str, poFlowGraph& cfg);
+        int emitConstant(const int type, const int constantId, poFlowGraph& cfg);
+        int emitAdd(const int type, const int left, const int right, poFlowGraph& cfg);
+        int emitSub(const int type, const int left, const int right, poFlowGraph& cfg);
+        int emitMul(const int type, const int left, const int right, poFlowGraph& cfg);
+        int emitDiv(const int type, const int left, const int right, poFlowGraph& cfg);
+        int emitLeftShift(const int type, const int left, const int right, poFlowGraph& cfg);
+        int emitRightShift(const int type, const int left, const int right, poFlowGraph& cfg);
+        int emitModulo(const int type, const int left, const int right, poFlowGraph& cfg);
+        int emitAnd(const int type, const int left, const int right, poFlowGraph& cfg);
+        int emitOr(const int type, const int left, const int right, poFlowGraph& cfg);
+        int emitUnaryMinus(const int type, const int left, poFlowGraph& cfg);
+        int emitCmp(const int type, const int left, const int right, poFlowGraph& cfg);
+        int emitCall(const int returnType, const int numArgs, const int symbolId, poFlowGraph& cfg);
+        int emitArg(const int type, const int arg, poFlowGraph& cfg);
+        int emitReturn(const int type, const int value, poFlowGraph& cfg);
+        int emitReturn(poFlowGraph& cfg);
+        int emitSignExtend(const int dstType, const int srcType, const int value, poFlowGraph& cfg);
+        int emitZeroExtend(const int dstType, const int srcType, const int value, poFlowGraph& cfg);
+        int emitBitwiseCast(const int dstType, const int srcType, const int value, poFlowGraph& cfg);
+        int emitConvert(const int dstType, const int srcType, const int value, poFlowGraph& cfg);
+        int emitAlloca(const int type, poBasicBlock* bb);
+        int emitAlloca(const int type, const int varName, poBasicBlock* bb);
+        int emitPtr(const int type, const int value, const int offset, poFlowGraph& cfg);
+        int emitPtr(const int type, const int value, const int dynamicOffset, const int offset, poFlowGraph& cfg);
+        int emitElementPtr(const int type, const int value, const int element, poFlowGraph& cfg);
+        int emitLoad(const int type, const int ptr, poFlowGraph& cfg);
+        int emitStore(const int type, const int ptr, const int value, poFlowGraph& cfg);
+        int emitBranch(const int branchType, poFlowGraph& cfg);
+        int emitBranch(const int type, const int branchType, poFlowGraph& cfg);
+        int emitParam(const int type, const int paramIndex, poFlowGraph& cfg);
+        int emitStoreGlobal(const int type, const int value, const int globalId, poFlowGraph& cfg);
+        int emitLoadGlobal(const int type, const int globalId, poFlowGraph& cfg);
+
+        void reset();
+        int addVariable(const int type, const int qualifier);
+
+        int getArrayType(const int baseType, const int arrayRank);
+        int getPointerType(const int baseType);
+
+        inline const int getType(const int id) const { return _types[id]; }
+    private:
+        poModule& _module;
+        std::vector<int> _types;
+        std::vector<int> _qualifiers;
+        int _instructionCount;
+    };
+
     class poCodeGenerator
     {
     public:
@@ -101,17 +164,14 @@ namespace po
         int getPointerType(const int baseType);
         void getModules(poNode* node);
         void getNamespaces(poNode* node, const std::vector<poNode*>& importNodes);
-        void emitInstruction(const poInstruction& instruction, poBasicBlock* bb);
-        int emitAlloca(const int type, poBasicBlock* bb);
-        int emitAlloca(const int type, const int varName, poBasicBlock* bb);
-        void emitArrayCopy(const int src, const int dst, poBasicBlock* bb, const int size);
-        void emitCopy(const int src, const int dst, poBasicBlock* bb);
+        void emitArrayCopy(const int src, const int dst, poFlowGraph& cfg, const int size);
+        void emitCopy(const int src, const int dst, poFlowGraph& cfg);
         void emitFunction(poNode* node, poFunction& function);
         void emitConstructor(poFlowGraph& cfg);
         void emitDefaultConstructor(poFunction& function, const int type);
         void emitBody(poNode* node, poFlowGraph& cfg, poBasicBlock* loopHeader, poBasicBlock* loopEnd);
         void emitArgs(poNode* node, poFlowGraph& cfg);
-        void emitParameter(const int type, poBasicBlock* bb, const int paramIndex, const int varName);
+        void emitParameter(const int type, poFlowGraph& cfg, const int paramIndex, const int varName);
         void emitStatement(poNode* node, poFlowGraph& cfg);
         int emitPassByValue(const int expr, poFlowGraph& cfg);
         int emitPassByReference(const int expr, poFlowGraph& cfg);
@@ -161,14 +221,12 @@ namespace po
 
         poModule& _module;
         poConditionGraph _graph;
+        poEmitter _emitter;
         std::unordered_map<std::string, poNode*> _functions;
         std::unordered_map<std::string, poVariable> _variables;
         std::unordered_map<std::string, std::vector<poNode*>> _functionImports;
-        std::vector<int> _types;
-        std::vector<int> _qualifiers;
         std::vector<std::string> _imports;
         std::string _namespace;
-        int _instructionCount;
         int _returnInstruction;
         int _thisInstruction;
         bool _isError;

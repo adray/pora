@@ -19,8 +19,25 @@ namespace std
         mem = (memory*)HeapAlloc(heap, (i32)0, sizeof(memory));
         mem.heap = heap;
     }
-
+    
     static u8* malloc(u64 numBytes) {
+        if (mem == null) {
+            return (u8*)null;
+        }
+        
+        return HeapAlloc(mem.heap, (i32)0, numBytes);
+    }
+    
+    static void free(u8* bytes) {
+        if (mem == null ||
+            bytes == null) {
+            return;
+        }
+        
+        HeapFree(mem.heap, (i32)0, bytes);
+    }
+
+    static u8* malloc2(u64 numBytes) {
         if (mem == null) {
             return (u8*)null;
         }

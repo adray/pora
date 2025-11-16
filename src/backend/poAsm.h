@@ -141,6 +141,7 @@ namespace po
         inline const int entryPoint() const { return _entryPoint; }
         inline bool isError() const { return _isError; }
         inline const std::string& errorText() const { return _errorText; }
+        inline void setDebugDump(const bool debugDump) { _debugDump = debugDump; }
 
     private:
         void dump(const PO_ALLOCATOR& linear, poRegLinearIterator& iterator, poFlowGraph& cfg);
@@ -206,5 +207,6 @@ namespace po
         bool _isError;
         std::string _errorText;
         int _prologueSize;
+        bool _debugDump;
     };
 }

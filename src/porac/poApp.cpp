@@ -109,9 +109,16 @@ int main(const int numArgs, const char** const args)
 
         for (int i = 2; i < numArgs; i++)
         {
-            const std::string file = args[i];
-            std::cout << "Compiling " << file << std::endl;
-            compiler.addFile(file);
+            const std::string arg = args[i];
+            if (arg == "/dump")
+            {
+                compiler.setDebugDump(true);
+            }
+            else
+            {
+                std::cout << "Compiling " << arg << std::endl;
+                compiler.addFile(arg);
+            }
         }
 
         if (compiler.compile() == 0)

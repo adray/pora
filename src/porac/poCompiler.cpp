@@ -104,13 +104,13 @@ int poCompiler:: compile()
         _errors.push_back(ss.str());
         return 0;
     }
-    module.dump();
+    if (_debugDump) { module.dump(); }
 
     // Convert to SSA form and insert PHI nodes
     poSSA ssa;
     ssa.construct(module);
     //module.dump();
-    module.dumpTypes();
+    if (_debugDump) { module.dumpTypes(); }
 
     // Convert unnecessary memory accesses to registers
     poOptMemToReg regToMem;
@@ -124,9 +124,10 @@ int poCompiler:: compile()
     // Eliminate any dead code
     poOptDCE dce;
     dce.optimize(module);
-    module.dump();
+    if (_debugDump) { module.dump(); }
 
     // Convert the basic blocks/cfg to machine code
+    _assembler.setDebugDump(_debugDump);
     _assembler.generate(module);
     //module.dump();
 

@@ -79,13 +79,11 @@ namespace std
     static SharedMemoryController* ctrl;
 
     static void startController() {
-        i64 heap = GetProcessHeap();
-        ctrl = (SharedMemoryController*)HeapAlloc(heap, (i32)0, (u64)sizeof(SharedMemoryController));
+        ctrl = new SharedMemoryController();
         ctrl.init();
     }
     
     static void shutdownController() {
-        i64 heap = GetProcessHeap();
-        HeapFree(heap, (i32)0, (u8*)ctrl);
+        free((u8*)ctrl);
     }
 }
