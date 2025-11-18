@@ -90,17 +90,29 @@ void poTypeResolver::resolve(const std::vector<poNode*>& nodes)
         }
     }
 
-    for (poNode* node : nodes)
+    resolveTypes();
+
+    if (_unresolvedTypes.size() > 0)
     {
-        if (node->type() == poNodeType::MODULE)
+        // TODO: If the worklist still contains items
+        // then we need to a raise an error for each of the items that
+        // cannot be resolved and terminate the build
+        setError("Could not resolve type '" + _unresolvedTypes[0]->token().string() + "'");
+    }
+    else
+    {
+        for (poNode* node : nodes)
         {
-            poListNode* moduleNode = static_cast<poListNode*>(node);
-            for (poNode* child : moduleNode->list())
+            if (node->type() == poNodeType::MODULE)
             {
-                if (child->type() == poNodeType::NAMESPACE)
+                poListNode* moduleNode = static_cast<poListNode*>(node);
+                for (poNode* child : moduleNode->list())
                 {
-                    updateArgs(child);
-                    resolveStatics(child);
+                    if (child->type() == poNodeType::NAMESPACE)
+                    {
+                        updateArgs(child);
+                        resolveStatics(child);
+                    }
                 }
             }
         }
@@ -256,6 +268,7 @@ void poTypeResolver::getNamespaces(poNode* node)
 {
     poListNode* namespaceNode = static_cast<poListNode*>(node);
     assert(namespaceNode->type() == poNodeType::NAMESPACE);
+    const int id = int(_module.namespaces().size());
     poNamespace ns(namespaceNode->token().string());
     for (poNode* child : namespaceNode->list())
     {
@@ -269,33 +282,48 @@ void poTypeResolver::getNamespaces(poNode* node)
         }
         else if (child->type() == poNodeType::STRUCT)
         {
-            getStruct(child, ns);
+            getStruct(child, ns, id);
         }
         else if (child->type() == poNodeType::CLASS)
         {
-            getClass(child, ns);
+            getClass(child, ns, id);
         }
         else if (child->type() == poNodeType::EXTERN)
         {
             getExtern(child, ns);
         }
     }
-    resolveTypes(ns);
     _module.addNamespace(ns);
 
-    _namespaces.insert(std::pair<poNode*, int>(node, int(_module.namespaces().size() - 1)));
+    _namespaces.insert(std::pair<poNode*, int>(node, id));
 }
 
-void poTypeResolver::getClass(poNode* node, poNamespace& ns)
+void poTypeResolver::addType(poNode* node, poNamespace& ns, const int nsId)
+{
+    const std::string& name = node->token().string();
+    const int id = int(_module.types().size());
+    _module.addType(poType(id,
+        TYPE_OBJECT,
+        name,
+        ns.name() + "::" + name));
+    ns.addType(id);
+    _namespaceForTypes.insert(std::pair<poNode*, int>(node, nsId));
+}
+
+void poTypeResolver::getClass(poNode* node, poNamespace& ns, const int nsId)
 {
     assert(node->type() == poNodeType::CLASS);
     _userTypes.push_back(node);
+
+    addType(node, ns, nsId);
 }
 
-void poTypeResolver::getStruct(poNode* node, poNamespace& ns)
+void poTypeResolver::getStruct(poNode* node, poNamespace& ns, const int nsId)
 {
     assert(node->type() == poNodeType::STRUCT);
     _userTypes.push_back(node);
+
+    addType(node, ns, nsId);
 }
 
 void poTypeResolver::getExtern(poNode* node, poNamespace& ns)
@@ -443,23 +471,29 @@ int poTypeResolver::getPointerType(const int baseType, const int count)
     return pointerType;
 }
 
-bool poTypeResolver::isTypeResolved(poNode* node)
+bool poTypeResolver::isTypeResolved(poNode* node, bool isPointer)
 {
     bool resolved = true;
     const int type = getType(node->token());
     if (type == -1) /* is not a primitive */
     {
-        const auto& entry = _resolvedTypes.find(node->token().string());
-        if (entry == _resolvedTypes.end())
+        const std::string& name = node->token().string();
+        if (isPointer)
         {
-            // unable to resolve yet..
-            resolved = false;
+            // A pointer is resolved if the base class is a known type
+            resolved = _module.getTypeFromName(name);
+        }
+        else
+        {
+            // unable to resolve yet?
+            const auto& entry = _resolvedTypes.find(name);
+            resolved = entry != _resolvedTypes.end(); 
         }
     }
     return resolved;
 }
 
-void poTypeResolver::resolveTypes(poNamespace& ns)
+void poTypeResolver::resolveTypes()
 {
     //
     // Loop over the unresolved types attempting to resolve them.
@@ -484,6 +518,7 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
         {
             bool resolved = true;
             poListNode* typeNode = static_cast<poListNode*>(node);
+            const std::string& name = typeNode->token().string();
             for (poNode* child : typeNode->list())
             {
                 if (child->type() != poNodeType::DECL)
@@ -500,10 +535,12 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
                     decl = attributeNode;
                 }
 
+                bool isPointer = false;
                 if (decl->child()->type() == poNodeType::POINTER)
                 {
                     poPointerNode* pointerNode = static_cast<poPointerNode*>(decl->child());
                     decl = pointerNode;
+                    isPointer = true;
                 }
 
                 if (decl->child()->type() == poNodeType::ARRAY)
@@ -513,12 +550,12 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
                     poArrayNode* arrayNode = static_cast<poArrayNode*>(decl->child());
                     poNode* typeNode = arrayNode->child();
 
-                    resolved &= isTypeResolved(typeNode);
+                    resolved &= isTypeResolved(typeNode, isPointer);
                 }
 
                 else if (decl->child()->type() == poNodeType::TYPE)
                 {
-                    resolved &= isTypeResolved(decl->child());
+                    resolved &= isTypeResolved(decl->child(), isPointer);
                 }
                 else if (decl->child()->type() == poNodeType::EXTERN)
                 {
@@ -534,7 +571,7 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
                             for (poNode* argument : args->list())
                             {
                                 poUnaryNode* argNode = static_cast<poUnaryNode*>(argument);
-                                resolved &= isTypeResolved(argNode->child());
+                                resolved &= isTypeResolved(argNode->child(), isPointer);
                             }
                         }
                     }
@@ -543,13 +580,19 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
 
             if (resolved)
             {
-                const std::string& name = typeNode->token().string();
                 const auto& entry = _resolvedTypes.find(name);
                 if (entry != _resolvedTypes.end())
                 {
                     continue;
                 }
 
+                const auto& namespaceIt = _namespaceForTypes.find(node);
+                if (namespaceIt == _namespaceForTypes.end())
+                {
+                    continue;
+                }
+
+                poNamespace& ns = _module.namespaces()[namespaceIt->second];
                 resolveType(name, ns, typeNode);
 
                 changes = true;
@@ -561,19 +604,12 @@ void poTypeResolver::resolveTypes(poNamespace& ns)
         }
     }
 
-    // TODO: If the worklist still contains items
-    // then we need to a raise an error for each of the items that
-    // cannot be resolved and terminate the build
+    _unresolvedTypes = worklist;
 }
 
 void poTypeResolver::resolveType(const std::string& name, poNamespace& ns, poListNode* typeNode)
 {
-    const int id = int(_module.types().size());
-    _module.addType(poType(id,
-        TYPE_OBJECT,
-        name,
-        ns.name() + "::" + name));
-    ns.addType(id);
+    const int id = _module.getTypeFromName(name);
     int offset = 0;
     int sizeOfLargestField = 0;
     for (poNode* child : typeNode->list())
@@ -603,20 +639,24 @@ void poTypeResolver::resolveType(const std::string& name, poNamespace& ns, poLis
         if (decl->child()->type() == poNodeType::TYPE)
         {
             poNode* typeNode = decl->child();
-            int fieldType = getPointerType(getType(typeNode->token()), pointerCount);
+            int fieldType = getType(typeNode->token());
             int size = 0;
             if (fieldType == -1)
             {
-                const auto& userType = _resolvedTypes.find(typeNode->token().string());
-                if (userType != _resolvedTypes.end())
+                const std::string& typeName = typeNode->token().string();
+                if (name == typeName)
                 {
-                    auto& typeData = _module.types()[userType->second];
+                    fieldType = id;
+                }
+                else {
+                    auto& typeData = _module.types()[_module.getTypeFromName(typeName)];
                     size = typeData.size();
                     fieldType = typeData.id();
                 }
             }
             else
             {
+                fieldType = getPointerType(fieldType, pointerCount);
                 size = getTypeSize(fieldType);
             }
 
@@ -635,20 +675,17 @@ void poTypeResolver::resolveType(const std::string& name, poNamespace& ns, poLis
         {
             poArrayNode* arrayNode = static_cast<poArrayNode*>(decl->child());
             poNode* typeNode = arrayNode->child();
-            int fieldType = getPointerType(getType(typeNode->token()), pointerCount);
+            int fieldType = getType(typeNode->token());
             int size = 0;
             if (fieldType == -1)
             {
-                const auto& userType = _resolvedTypes.find(typeNode->token().string());
-                if (userType != _resolvedTypes.end())
-                {
-                    auto& typeData = _module.types()[userType->second];
-                    size = typeData.size();
-                    fieldType = typeData.id();
-                }
+                auto& typeData = _module.types()[_module.getTypeFromName(typeNode->token().string())];
+                size = typeData.size();
+                fieldType = typeData.id();
             }
             else
             {
+                fieldType = getPointerType(fieldType, pointerCount);
                 size = getTypeSize(fieldType);
             }
 

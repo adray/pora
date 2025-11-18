@@ -21,13 +21,14 @@ namespace po
         inline const bool isError() const { return _isError; }
 
     private:
-        void resolveTypes(poNamespace& ns);
+        void addType(poNode* node, poNamespace& ns, const int nsId);
+        void resolveTypes();
         void resolveType(const std::string& name, poNamespace& ns, poListNode* typeNode);
         void resolveStatics(poNode* namespaceNode);
         void getPrototypeArgs(poListNode* prototypeNode, std::vector<int>& argTypes);
         void getNamespaces(poNode* node);
-        void getStruct(poNode* node, poNamespace& ns);
-        void getClass(poNode* node, poNamespace& ns);
+        void getStruct(poNode* node, poNamespace& ns, const int nsId);
+        void getClass(poNode* node, poNamespace& ns, const int nsId);
         void getExtern(poNode* node, poNamespace& ns);
         void getFunction(poNode* node, poNamespace& ns);
         void getConstructor(poNode* node, poNamespace& ns);
@@ -39,7 +40,7 @@ namespace po
         int align(const int size, const int alignment) const;
 
         void updateArgs(poNode* node);
-        bool isTypeResolved(poNode* node);
+        bool isTypeResolved(poNode* node, bool isPointer);
 
         void setError(const std::string& errorText);
 
@@ -48,6 +49,8 @@ namespace po
 
         poModule& _module;
         std::vector<poNode*> _userTypes;
+        std::vector<poNode*> _unresolvedTypes;
+        std::unordered_map<poNode*, int> _namespaceForTypes;
         std::unordered_map<std::string, int> _resolvedTypes;
         std::unordered_map<poNode*, int> _namespaces;
         std::unordered_map<std::string, int> _memberFunctions;
