@@ -644,15 +644,10 @@ void poTypeResolver::resolveType(const std::string& name, poNamespace& ns, poLis
             if (fieldType == -1)
             {
                 const std::string& typeName = typeNode->token().string();
-                if (name == typeName)
-                {
-                    fieldType = id;
-                }
-                else {
-                    auto& typeData = _module.types()[_module.getTypeFromName(typeName)];
-                    size = typeData.size();
-                    fieldType = typeData.id();
-                }
+                
+                auto& typeData = _module.types()[_module.getTypeFromName(typeName)];
+                fieldType = getPointerType(typeData.id(), pointerCount);
+                size = getTypeSize(fieldType);
             }
             else
             {
@@ -680,8 +675,8 @@ void poTypeResolver::resolveType(const std::string& name, poNamespace& ns, poLis
             if (fieldType == -1)
             {
                 auto& typeData = _module.types()[_module.getTypeFromName(typeNode->token().string())];
-                size = typeData.size();
-                fieldType = typeData.id();
+                fieldType = getPointerType(typeData.id(), pointerCount);
+                size = getTypeSize(fieldType);
             }
             else
             {

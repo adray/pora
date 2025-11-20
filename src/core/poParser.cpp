@@ -249,14 +249,30 @@ poNode* poFunctionParser::parsePrimary()
         if (_parser.match(poTokenType::OPEN_PARAN))
         {
             _parser.advance();
+
             if (_parser.match(poTokenType::IDENTIFIER) || _parser.matchPrimitiveType())
             {
                 auto& typeToken = _parser.peek();
                 _parser.advance();
+                const int pointerCount = _parser.parsePointer();
+
                 if (_parser.match(poTokenType::CLOSE_PARAN))
                 {
                     _parser.advance();
-                    node = new poUnaryNode(poNodeType::SIZEOF, new poNode(poNodeType::TYPE, typeToken), token);
+
+                    if (pointerCount == 0)
+                    {
+                        node = new poUnaryNode(poNodeType::SIZEOF, new poNode(poNodeType::TYPE, typeToken), token);
+                    }
+                    else
+                    {
+                        node = new poUnaryNode(poNodeType::SIZEOF,
+                            new poPointerNode(poNodeType::POINTER,
+                                new poNode(poNodeType::TYPE, typeToken),
+                                typeToken,
+                                pointerCount),
+                            token);
+                    }
                 }
                 else
                 {

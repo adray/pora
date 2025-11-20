@@ -1598,7 +1598,8 @@ int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg, const int instance
     std::vector<int> argTypes;
     int returnType = 0;
     poListNode* argsNode = nullptr;
-
+    
+    //int instance = instanceExpr;
     std::string name = call->token().string();
     if (instanceExpr != -1)
     {
@@ -1621,10 +1622,12 @@ int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg, const int instance
             }
 
             name = classType.name() + "::" + name;
+
+            // TODO: we can't overwrite _thisInstruction...
             _thisInstruction = emitLoadThis(cfg);
             break;
         }
-    }
+    } 
 
     std::string fullName = name;
     poListNode* functionNode = nullptr;
@@ -2545,13 +2548,25 @@ int poCodeGenerator::emitSizeof(poNode* node, poFlowGraph& cfg)
 {
     poUnaryNode* sizeofNode = static_cast<poUnaryNode*>(node);
     poNode* child = sizeofNode->child();
+    int pointerCount = 0;
+    if (child->type() == poNodeType::POINTER)
+    {
+        poPointerNode* ptr = static_cast<poPointerNode*>(child);
+        child = ptr->child();
+        pointerCount = ptr->count();
+    }
+
     if (child->type() != poNodeType::TYPE)
     {
         setError("Sizeof can only be applied to a type.");
         return EMIT_ERROR;
     }
 
-    const int type = getType(child->token());
+    int type = getType(child->token());
+    if (pointerCount > 0)
+    {
+        type = getPointerType(type);
+    }
     const poType& typeData = _module.types()[type];
 
     const uint64_t size = typeData.size();
@@ -2973,6 +2988,11 @@ int poCodeGenerator::emitBinaryExpr(poNode* node, poFlowGraph& cfg)
     poBinaryNode* binary = static_cast<poBinaryNode*>(node);
     const int left = emitExpr(binary->left(), cfg);
     const int right = emitExpr(binary->right(), cfg);
+    if (left == -1 || right == -1)
+    {
+        return EMIT_ERROR;
+    }
+
     const int type = _emitter.getType(left);
 
     switch (node->type())

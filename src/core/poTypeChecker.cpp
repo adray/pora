@@ -1329,6 +1329,10 @@ int poTypeChecker::checkExpr(poNode* node)
     {
         poUnaryNode* sizeofNode = static_cast<poUnaryNode*>(node);
         poNode* typeNode = sizeofNode->child();
+        if (typeNode->type() == poNodeType::POINTER)
+        {
+            typeNode = static_cast<poUnaryNode*>(typeNode)->child();
+        }
         if (getType(typeNode->token()) != -1)
         {
             type = TYPE_U64; // sizeof returns size

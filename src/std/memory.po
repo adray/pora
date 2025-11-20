@@ -1,15 +1,66 @@
 namespace std
 {
-    struct small_bin
+    struct typeAllocChunk
     {
+        u32 freeCount;
+        u32 bumpIndex;
         u8* data;
+        typeAllocChunk* next;
+        typeAlloc* owner;
+    }
+
+    struct typeAlloc
+    {
         u64 size;
+        u64 slotsPerChunk;
+        typeAllocChunk* chunks;
+    }
+    
+    class typeAllocList
+    {
+        private typeAlloc* _data;
+        private u64 _capacity;
+        private i64 _heap;
+        
+        void init(i64 heap);
+        void reserve(u64 capacity);
+        typeAlloc* get(u64 typeId);
+    }
+    
+    void typeAllocList::init(i64 heap, u64 capacity) {
+        _heap = heap;
+        _data = (typeAlloc*)null;
+        _capacity = (u64)0;
+        reserve(capacity);
+    }
+    
+    void typeAllocList::reserve(u64 capacity) {
+        typeAlloc* data = (typeAlloc*)HeapAlloc(_heap, (i32)0, sizeof(typeAlloc*) * capacity);
+        if (_capacity > (u64)0) {
+            CopyMemory((u8*)data, (u8*)_data, sizeof(typeAlloc*) * _capacity);
+        }
+        _data = data;
+        _capacity = capacity;
+    }
+    
+    typeAlloc* typeAllocList::get(u64 typeId) {
+        if (typeId >= _capacity) {
+            u64 newCapacity = _capacity * (u64)2;
+            if (newCapacity < typeId) {
+                newCapacity = typeId;
+            }
+            reserve(newCapacity);
+        }
+        
+        //typeAlloc[] data = (typeAlloc[1])_data;
+        //return _data;//data[(i64)typeId];
+        return (typeAlloc*)null;
     }
 
     struct memory
     {
-        i64 heap;
-        small_bin[8] sbins; // 1, 2, 4, 8, 16, 32, 64, 128
+        i64 heap;           // The heap to allocate upon
+        typeAllocList al;   // A list of type allocators
     }
 
     static memory* mem;
@@ -17,7 +68,7 @@ namespace std
     static void initializeMemory() {        
         i64 heap = GetProcessHeap();
         mem = (memory*)HeapAlloc(heap, (i32)0, sizeof(memory));
-        mem.heap = heap;
+        //mem.al.init(heap, (u64)128);
     }
     
     static u8* malloc(u64 numBytes) {
@@ -37,7 +88,7 @@ namespace std
         HeapFree(mem.heap, (i32)0, bytes);
     }
 
-    static u8* malloc2(u64 numBytes) {
+    static u8* malloc2(u64 numBytes, u64 typeId) {
         if (mem == null) {
             return (u8*)null;
         }
