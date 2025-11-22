@@ -166,6 +166,13 @@ poNode* poFunctionParser::parseMember(poNode* variable, const poToken& token)
             node = new poUnaryNode(poNodeType::MEMBER, node, next);
         }
     }
+
+    if (node->type() == poNodeType::ARRAY_ACCESSOR)
+    {
+        poArrayAccessor* accessor = static_cast<poArrayAccessor*>(node);
+        accessor->setDereference(true);
+    }
+
     return node;
 }
 
@@ -324,7 +331,9 @@ poNode* poFunctionParser::parsePrimary()
             {
                 _parser.advance();
 
-                node = new poArrayAccessor(accessor, new poNode(poNodeType::VARIABLE, token), poNodeType::ARRAY_ACCESSOR, token);
+                poArrayAccessor* arrayNode= new poArrayAccessor(accessor, new poNode(poNodeType::VARIABLE, token), poNodeType::ARRAY_ACCESSOR, token);
+                arrayNode->setDereference(true);
+                node = arrayNode;
             }
             else
             {
@@ -478,11 +487,9 @@ poNode* poFunctionParser::parseUnary()
         _parser.advance();
         if (_parser.match(poTokenType::IDENTIFIER))
         {
-            poToken variable = _parser.peek();
-            _parser.advance();
-
+            poNode* node = parsePrimary();
             return new poUnaryNode(poNodeType::REFERENCE, 
-                new poNode(poNodeType::VARIABLE, variable),
+                node,
                 token);
         }
         else
@@ -1067,7 +1074,7 @@ poNode* poFunctionParser::parseDecl(const poToken& type)
             else
             {
                 // end
-                if (type.token() == poTokenType::IDENTIFIER)
+                if (type.token() == poTokenType::IDENTIFIER && pointerCount == 0)
                 {
                     poListNode* argsNode = new poListNode(poNodeType::CALL, std::vector<poNode*>(), type);
                     std::vector<poNode*> constructor = {
@@ -1399,8 +1406,9 @@ poNode* poFunctionParser::parseStatement()
                 _parser.match(poTokenType::STAR_EQUALS) ||
                 _parser.match(poTokenType::SLASH_EQUALS))
             {
-                poNode* lhs = new poArrayAccessor(accessor, new poNode(poNodeType::VARIABLE, id), poNodeType::ARRAY_ACCESSOR, id);
-                
+                poArrayAccessor* lhs = new poArrayAccessor(accessor, new poNode(poNodeType::VARIABLE, id), poNodeType::ARRAY_ACCESSOR, id);
+                lhs->setDereference(true);
+
                 // assignment
                 poNode* assign = parseRH(lhs);
                 statement = new poUnaryNode(poNodeType::STATEMENT, assign, id);

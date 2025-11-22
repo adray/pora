@@ -939,10 +939,17 @@ void poTypeChecker::checkDecl(poNode* node)
     {
         poArrayNode* arrayNode = static_cast<poArrayNode*>(decl->child());
 
-        const int type = getType(decl->token());
+        int type = getType(decl->token());
         if (type == -1)
         {
             setError("Undefined type.", decl->token());
+        }
+
+        if (arrayNode->child()->type() == poNodeType::POINTER)
+        {
+            poPointerNode* pointer = static_cast<poPointerNode*>(arrayNode->child());
+            const int pointerCount = pointer->count();
+            type = getPointerType(type, pointerCount);
         }
 
         const int arrayType = getArrayType(type, 1);

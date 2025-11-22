@@ -25,6 +25,11 @@ namespace std
         void init(i64 heap);
         void reserve(u64 capacity);
         typeAlloc* get(u64 typeId);
+        i64 getHeap();
+    }
+    
+    i64 typeAllocList::getHeap() {
+        return _heap;
     }
     
     void typeAllocList::init(i64 heap, u64 capacity) {
@@ -36,8 +41,9 @@ namespace std
     
     void typeAllocList::reserve(u64 capacity) {
         typeAlloc* data = (typeAlloc*)HeapAlloc(_heap, (i32)0, sizeof(typeAlloc*) * capacity);
-        if (_capacity > (u64)0) {
+        if (_capacity > (u64)0 && _data != null) {
             CopyMemory((u8*)data, (u8*)_data, sizeof(typeAlloc*) * _capacity);
+            HeapFree(_heap, (i32)0, (u8*)_data);
         }
         _data = data;
         _capacity = capacity;
@@ -52,9 +58,8 @@ namespace std
             reserve(newCapacity);
         }
         
-        //typeAlloc[] data = (typeAlloc[1])_data;
-        //return _data;//data[(i64)typeId];
-        return (typeAlloc*)null;
+        typeAlloc[] data = (typeAlloc[1])_data;
+        return &data[(i64)typeId];
     }
 
     struct memory
@@ -68,7 +73,9 @@ namespace std
     static void initializeMemory() {        
         i64 heap = GetProcessHeap();
         mem = (memory*)HeapAlloc(heap, (i32)0, sizeof(memory));
-        //mem.al.init(heap, (u64)128);
+        mem.heap = heap;
+        mem.al.init(heap, (u64)128);
+        //print_64(mem.al.getHeap());
     }
     
     static u8* malloc(u64 numBytes) {

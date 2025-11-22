@@ -157,10 +157,13 @@ namespace po
         poArrayAccessor(poNode* accessor, poNode* child, const poNodeType type, const poToken& token);
         inline poNode* accessor() const { return _accessor; }
         inline poNode* child() const { return _child; }
+        inline bool dereference() const { return _dereference; }
+        inline void setDereference(const bool dereference) { _dereference = dereference; }
 
     private:
         poNode* _accessor;
         poNode* _child;
+        bool _dereference;
     };
 
     class poPointerNode : public poUnaryNode

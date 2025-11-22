@@ -127,6 +127,7 @@ poArrayAccessor::poArrayAccessor(poNode* accessor, poNode* child, const poNodeTy
     :
     _child(child),
     _accessor(accessor),
+    _dereference(false),
     poNode(type, token)
 {
 }

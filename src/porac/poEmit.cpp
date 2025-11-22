@@ -1513,10 +1513,18 @@ int poCodeGenerator::emitMemberCall(poNode* node, poFlowGraph& cfg)
     poBinaryNode* memberCall = static_cast<poBinaryNode*>(node);
     assert(memberCall->type() == poNodeType::MEMBER_CALL);
 
-    const int expr = emitExpr(memberCall->left(), cfg);
+    int expr = emitExpr(memberCall->left(), cfg);
     if (expr == EMIT_ERROR)
     {
         return EMIT_ERROR;
+    }
+
+    const int typeId = _emitter.getType(expr);
+    const poType& typeData = _module.types()[typeId];
+    const poType& baseTypeData = _module.types()[typeData.baseType()];
+    if (baseTypeData.isPointer())
+    {
+        expr = _emitter.emitLoad(typeData.baseType(), expr, cfg);
     }
 
     return emitCall(memberCall->right(), cfg, expr);
@@ -1599,7 +1607,7 @@ int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg, const int instance
     int returnType = 0;
     poListNode* argsNode = nullptr;
     
-    //int instance = instanceExpr;
+    int instance = instanceExpr;
     std::string name = call->token().string();
     if (instanceExpr != -1)
     {
@@ -1622,9 +1630,7 @@ int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg, const int instance
             }
 
             name = classType.name() + "::" + name;
-
-            // TODO: we can't overwrite _thisInstruction...
-            _thisInstruction = emitLoadThis(cfg);
+            instance = emitLoadThis(cfg);
             break;
         }
     } 
@@ -1739,10 +1745,10 @@ int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg, const int instance
     int numArgs = int(call->list().size());
 
     /* Insert instance param */
-    if (instanceExpr != -1)
+    if (instance != -1)
     {
-        args.insert(args.begin(), instanceExpr);
-        argTypes.insert(argTypes.begin(), _emitter.getType(instanceExpr));
+        args.insert(args.begin(), instance);
+        argTypes.insert(argTypes.begin(), _emitter.getType(instance));
         numArgs++;
     }
 
@@ -1979,7 +1985,8 @@ void poCodeGenerator::emitAssignment(poNode* node, poFlowGraph& cfg)
         }
 
         const poType& typeData = _module.types()[type];
-        if (typeData.isPointer() && _module.types()[typeData.baseType()].baseType() == TYPE_OBJECT)
+        if (typeData.isPointer() && _module.types()[typeData.baseType()].baseType() == TYPE_OBJECT &&
+            _emitter.getType(variable) == type)
         {
             emitCopy(right, variable, cfg);
         }
@@ -2176,9 +2183,17 @@ void poCodeGenerator::emitDecl(poNode* node, poFlowGraph& cfg)
         assert(arrayNode->type() == poNodeType::ARRAY);
 
         poNode* variable = arrayNode->child();
+        int pointerCount = 0;
+        if (variable->type() == poNodeType::POINTER)
+        {
+            poPointerNode* pointerNode = static_cast<poPointerNode*>(variable);
+            variable = pointerNode->child();
+            pointerCount = pointerNode->count();
+        }
+
         assert(variable->type() == poNodeType::VARIABLE);
 
-        const int arrayType = getArrayType(type, 1);
+        const int arrayType = getArrayType(getPointerType(type), 1);
         const std::string name = variable->token().string();
         const int var = addVariable(name, arrayType, QUALIFIER_NONE, int(arrayNode->arraySize()));
 
@@ -2488,13 +2503,17 @@ int poCodeGenerator::emitReference(poNode* node, poFlowGraph& cfg)
 {
     poUnaryNode* refNode = static_cast<poUnaryNode*>(node);
     poNode* child = static_cast<poNode*>(refNode->child());
-    if (child->type() != poNodeType::VARIABLE)
+
+    int expr = -1;
+    if (child->type() == poNodeType::VARIABLE)
     {
-        setError("Reference can only be applied to a variable.");
-        return EMIT_ERROR;
+        expr = getVariable(child->token().string());
+    }
+    else if (child->type() == poNodeType::ARRAY_ACCESSOR)
+    {
+        expr = emitLoadArray(child, cfg);
     }
 
-    const int expr = getVariable(child->token().string());
     if (expr == EMIT_ERROR)
     {
         setError("Reference failed, variable not found.");
@@ -2668,7 +2687,7 @@ void poCodeGenerator::emitStoreArray(poNode* node, poFlowGraph& cfg, const int i
     poNode* child = array->child();
     const int expr = emitExpr(child, cfg);
     const int arrayType = _emitter.getType(expr);
-    poType type = _module.types()[arrayType];
+    const poType type = _module.types()[arrayType];
 
     if (type.isArray())
     {
@@ -2704,7 +2723,7 @@ int poCodeGenerator::emitLoadArray(poNode* node, poFlowGraph& cfg)
 
         const int ptr = _emitter.emitElementPtr(pointerType, expr, accessor, cfg);
 
-        if (baseType.baseType() == TYPE_OBJECT)
+        if (!array->dereference() || baseType.baseType() == TYPE_OBJECT)
         {
             return ptr; // Return the pointer to the object
         }
@@ -2716,6 +2735,13 @@ int poCodeGenerator::emitLoadArray(poNode* node, poFlowGraph& cfg)
         const int accessor = emitExpr(array->accessor(), cfg);
 
         const int ptr = _emitter.emitElementPtr(type.id(), expr, accessor, cfg);
+
+        poType baseType = _module.types()[type.baseType()];
+        if (!array->dereference() || baseType.baseType() == TYPE_OBJECT)
+        {
+            return ptr; // Return the pointer to the object
+        }
+
         return _emitter.emitLoad(type.baseType(), ptr, cfg);
     }
 
@@ -2932,14 +2958,22 @@ int poCodeGenerator::emitLoadMember(poNode* node, poFlowGraph& cfg)
 
     if (dynamicOffsetIns == -1)
     {
-        const int storePtr = getPointerType(fieldType);
-        const int ptr = _emitter.emitPtr(storePtr, expr, offset, cfg);
+        const int loadPtr = getPointerType(fieldType);
+        const int ptr = _emitter.emitPtr(loadPtr, expr, offset, cfg);
+        if (_module.types()[fieldType].baseType() == TYPE_OBJECT)
+        {
+            return ptr;
+        }
         return _emitter.emitLoad(fieldType, ptr, cfg);
     }
     else
     {
-        const int storePtr = getPointerType(fieldType);
-        const int finalPtr = _emitter.emitPtr(storePtr, expr, dynamicOffsetIns, offset, cfg);
+        const int loadPtr = getPointerType(fieldType);
+        const int finalPtr = _emitter.emitPtr(loadPtr, expr, dynamicOffsetIns, offset, cfg);
+        if (_module.types()[fieldType].baseType() == TYPE_OBJECT)
+        {
+            return finalPtr;
+        }
         return _emitter.emitLoad(fieldType, finalPtr, cfg);
     }
 }

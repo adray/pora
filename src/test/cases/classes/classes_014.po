@@ -1,0 +1,20 @@
+import std;
+
+namespace Test {
+    class myClass {
+       void print(i64 a);
+    }
+    void myClass::print(i64 a) {
+        print_64(a);
+    }
+    
+    static void main() {
+       myClass* c;
+       c = new myClass();
+       c.print(10);
+       
+       myClass* d;
+       d = c;
+       d.print(22);
+    }
+}
