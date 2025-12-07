@@ -5,8 +5,13 @@ namespace std
         u32 len;
         u32 pid;
     }
-    
-    static u32 findProcesses(process* processes, u32 maxCount) {
+
+    struct process_list {
+        process process;
+        process_list* next;
+    }
+
+    static u32 findProcesses(process_list* processes) {
         i32 error;
         i64 handle = CreateToolhelp32Snapshot((i32)2, (i32)0);
         if (handle == 0) {
@@ -22,16 +27,18 @@ namespace std
         }
 
         i64 heap = GetProcessHeap();
-        process[] procs = (process[0])processes;
         i64 index = 0;
+        process_list* list = processes;
 
-        while (ok && index < (i64)maxCount){
+        while (ok){
+            process* p = &list.process;
+
             u64 size = (u64)strlen((u8*)entry.szExeFile, (u32)128);
-            procs[index].name = HeapAlloc(heap, (i32)0, size+(u64)1);
-            procs[index].len = (u32)size+(u32)1;
-            procs[index].pid = (u32)entry.th32ProcessID;
+            p.name = HeapAlloc(heap, (i32)0, size+(u64)1);
+            p.len = (u32)size+(u32)1;
+            p.pid = (u32)entry.th32ProcessID;
 
-            u8* str = procs[index].name;
+            u8* str = p.name;
             u8[] arr = (u8[0])str;
             for (i64 i = 0; i < (i64)size; i+=1) {
                 arr[i] = entry.szExeFile[i];
@@ -39,17 +46,22 @@ namespace std
             arr[(i64)size] = 0b;
             index += 1;
             ok = Process32Next(handle, &entry);
+
+            process_list* next = new process_list();
+            list.next = next;
+            list = next;
         }
 
         return (u32)index;
     }
 
-    static void freeProcesses(process* processes, u32 count) {
-        process[] procs = (process[0])processes;
+    static void freeProcesses(process_list* processes) {
         i64 heap = GetProcessHeap();
-        for (i64 i = 0; i < (i64)count; i += (i64)1) {
-            u8* name = procs[i].name;
-            HeapFree(heap, (i32)0, name);
+        while (processes.next != null) {
+            process_list* next = processes.next;
+            HeapFree(heap, (i32)0, next.process.name);
+            // delete processes;
+            processes = next;
         }
     }
 }

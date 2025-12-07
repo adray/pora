@@ -1,0 +1,10 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        u8 x = 10b % 3b;
+        print_64((i64)x);
+    }
+}

@@ -66,6 +66,7 @@ void poAsm::ir_element_ptr(poModule& module, PO_ALLOCATOR& allocator, const poIn
     // We need to get the pointer to the variable (left) optionally adding the variable (right) and a memory offset.
 
     const int dst = allocator.getRegisterByVariable(ins.name());
+    const int src = allocator.getRegisterByVariable(ins.left());
     const int slot = allocator.getStackSlotByVariable(ins.left()); /* assume the pointer is the stack position */
 
     const poType& type = module.types()[ins.type()];
@@ -74,7 +75,7 @@ void poAsm::ir_element_ptr(poModule& module, PO_ALLOCATOR& allocator, const poIn
     const poType& baseType = module.types()[type.baseType()];
     const int size = baseType.size();
 
-    if (slot != -1)
+    if (src == -1 && slot != -1)
     {
         const int offset = slot * 8;
         if (ins.right() != -1)
@@ -103,7 +104,6 @@ void poAsm::ir_element_ptr(poModule& module, PO_ALLOCATOR& allocator, const poIn
         if (ins.right() != -1)
         {
             const int operand = allocator.getRegisterByVariable(ins.right());
-            const int left = allocator.getRegisterByVariable(ins.left());
 
             // TODO: change to LEA? (load effective address)
             // left + operand * size
@@ -111,13 +111,12 @@ void poAsm::ir_element_ptr(poModule& module, PO_ALLOCATOR& allocator, const poIn
             _x86_64_lower.mc_mov_imm_to_reg_x64(dst, size);
             _x86_64_lower.mc_mul_reg_to_reg_x64(dst, operand);
 
-            _x86_64_lower.mc_add_reg_to_reg_x64(dst, left);
+            _x86_64_lower.mc_add_reg_to_reg_x64(dst, src);
         }
         else
         {
-            const int left = allocator.getRegisterByVariable(ins.left());
             _x86_64_lower.mc_mov_imm_to_reg_x64(dst, size);
-            _x86_64_lower.mc_add_reg_to_reg_x64(dst, left);
+            _x86_64_lower.mc_add_reg_to_reg_x64(dst, src);
         }
     }
 }
@@ -789,13 +788,15 @@ void poAsm::ir_mod(PO_ALLOCATOR& allocator, const poInstruction& ins)
         _x86_64_lower.mc_mov_imm_to_reg_x64(VM_REGISTER_EAX, 0); // TODO: replace with XOR?
         _x86_64_lower.mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
         _x86_64_lower.mc_div_reg_8(src2);
-        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EDX);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX);
+        _x86_64_lower.mc_sar_imm_to_reg_16(dst, 8);
         break;
     case TYPE_U8:
         _x86_64_lower.mc_mov_imm_to_reg_x64(VM_REGISTER_EAX, 0); // TODO: replace with XOR?
         _x86_64_lower.mc_mov_reg_to_reg_8(VM_REGISTER_EAX, src1);
         _x86_64_lower.mc_udiv_reg_8(src2);
-        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EDX);
+        _x86_64_lower.mc_mov_reg_to_reg_x64(dst, VM_REGISTER_EAX);
+        _x86_64_lower.mc_sar_imm_to_reg_16(dst, 8);
         break;
     //case TYPE_F32:
     //    if (sse_dst != sse_src1) { _x86_64_lower.mc_movss_reg_to_reg_x64(sse_dst, sse_src1); }
@@ -872,7 +873,7 @@ void poAsm::ir_br(PO_ALLOCATOR& allocator, const poInstruction& ins, poBasicBloc
     ir_jump(ins.left(), 0, ins.type());
 }
 
-void poAsm::ir_copy(PO_ALLOCATOR& allocator, const poInstruction& ins)
+void poAsm::ir_copy(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
     const int dst = allocator.getRegisterByVariable(ins.name());
     const int src = allocator.getRegisterByVariable(ins.left());
@@ -917,6 +918,11 @@ void poAsm::ir_copy(PO_ALLOCATOR& allocator, const poInstruction& ins)
         }
         break;
     default:
+        if (module.types()[ins.type()].isPointer())
+        {
+            _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
+            break;
+        }
         std::stringstream ss;
         ss << "Internal Error: Malformed copy instruction " << ins.name();
         setError(ss.str());
@@ -961,6 +967,7 @@ void poAsm::ir_constant(poModule& module, poConstantPool& constants, PO_ALLOCATO
         _x86_64_lower.mc_mov_imm_to_reg_8(dst, constants.getI8(ins.constant()));
         break;
     case TYPE_U8:
+    case TYPE_BOOLEAN:
         _x86_64_lower.mc_mov_imm_to_reg_8(dst, char(constants.getU8(ins.constant())));
         break;
     case TYPE_F32:
@@ -996,6 +1003,7 @@ void poAsm::ir_ret(poModule& module, PO_ALLOCATOR& allocator, const poInstructio
     {
         switch (ins.type())
         {
+        case TYPE_BOOLEAN:
         case TYPE_I64:
         case TYPE_U64:
         case TYPE_I32:
@@ -2130,7 +2138,7 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg, const int numArgs)
                 ir_constant(module, module.constants(), allocator, ins);
                 break;
             case IR_COPY:
-                ir_copy(allocator, ins);
+                ir_copy(module, allocator, ins);
                 break;
             case IR_DIV:
                 ir_div(allocator, ins);
@@ -2250,6 +2258,15 @@ void poAsm::generateMachineCode(poModule& module)
                     _x86_64.mc_call(0); // Placeholder for the call
                 }
                 break;
+                case VMI_SAR8_SRC_IMM_DST_REG:
+                    _x86_64.mc_sar_imm_to_reg_8(ins.dstReg(), ins.imm8());
+                    break;
+                case VMI_SAR16_SRC_IMM_DST_REG:
+                    _x86_64.mc_sar_imm_to_reg_16(ins.dstReg(), ins.imm8());
+                    break;
+                case VMI_CDQE:
+                    _x86_64.mc_cdqe();
+                    break;
                 case VMI_PUSH_REG:
                     _x86_64.mc_push_reg(ins.dstReg());
                     break;

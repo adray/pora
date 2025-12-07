@@ -3,16 +3,19 @@ import std;
 namespace ProcApp {
     static void main() {
         println("Proceses:", (u32)10);
-        process[32] procs;
-        u32 count = findProcesses((process*)procs, (u32)32);
-        for (u32 i = (u32)0; i < count; i += (u32)1) {
-            process p = procs[(i64)i];
+        process_list procs;        
+        u32 count = findProcesses(&procs);
+        
+        process_list* item = procs.next;
+        while (item != null) {
+            process p = item.process;
             u8* name = p.name;
             u32 len = p.len;
             print_64((i64)p.pid);
             println(name, len);
+            item = item.next;
         }
-        freeProcesses((process*)procs, count);
+        freeProcesses(&procs);
         
         println("Done", (u32)5);
     }

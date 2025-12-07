@@ -55,6 +55,31 @@ namespace std
            i32 flags, //[in] DWORD dwFlags
            u8* mem // [in] LPVOID lpMem
         );
+        
+
+    struct SYSTEM_INFO {
+        u32 dwDemID;   //     union {
+                        //    DWORD dwOemId;
+                        //    struct {
+                        //      WORD wProcessorArchitecture;
+                        //      WORD wReserved;
+                        //    } DUMMYSTRUCTNAME;
+                        //  } DUMMYUNIONNAME;
+        u32 dwPageSize;    //  DWORD     dwPageSize;
+        u8* lpMinimumApplicationAddress;    //  LPVOID    lpMinimumApplicationAddress;
+        u8* lpMaximumApplicationAddress;    //  LPVOID    lpMaximumApplicationAddress;
+        u32* dwActiveProcessorMask;   //  DWORD_PTR dwActiveProcessorMask;
+        u32 dwNumberOfProcessors;    //  DWORD     dwNumberOfProcessors;
+        u32 dwProcessorType;    //  DWORD     dwProcessorType;
+        u32 dwAllocationGranularity;    //  DWORD     dwAllocationGranularity;
+        u16 wProcessorLevel;    //  WORD      wProcessorLevel;
+        u16 wProcessorRevision;    //  WORD      wProcessorRevision;
+    }
+    
+    extern void GetNativeSystemInfo(
+        SYSTEM_INFO* lpSystemInfo // [out] LPSYSTEM_INFO lpSystemInfo
+    );
+
     extern i64 CreateToolhelp32Snapshot(
         i32 dwFlags,
         i32 th32ProcessID

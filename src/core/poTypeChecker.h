@@ -20,9 +20,9 @@ namespace po
         inline const std::string& errorText() const { return _errorText; }
         inline int errorLine() const { return _errorLine; }
         inline int errorCol() const { return _errorCol; }
+        inline int errorFile() const { return _errorFile; }
     private:
         inline bool isError() const { return _isError; }
-        void setError(const std::string& text, const int line, const int col);
         void setError(const std::string& text, const poToken& token);
 
         void getModules(poNode* node);
@@ -33,6 +33,7 @@ namespace po
         void checkModules(poNode* node);
         void checkNamespaces(poNode* node, const std::vector<poNode*> importNodes);
         void checkFunctions(poNode* node);
+        void checkExpression(poNode* classNode, poNode* node);
         void checkConstructor(poNode* node);
         void checkBody(poNode* node, const int returnType);
         void checkStatement(poNode* node, const int returnType);
@@ -67,6 +68,7 @@ namespace po
         std::string _errorText;
         int _errorLine;
         int _errorCol;
+        int _errorFile;
         bool _isError;
     };
 }

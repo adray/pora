@@ -182,7 +182,7 @@ namespace po
         void ir_cmp(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins);
         void ir_br(PO_ALLOCATOR& allocator, const poInstruction& ins, poBasicBlock* bb);
         void ir_constant(poModule& module, poConstantPool& constants, PO_ALLOCATOR& allocator, const poInstruction& ins);
-        void ir_copy(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_copy(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins);
         void ir_ret(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins);
         void ir_unary_minus(PO_ALLOCATOR& allocator, const poInstruction& ins);
         void ir_call(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins, const int pos, const std::vector<poInstruction>& args);

@@ -15,9 +15,9 @@ namespace std
         void addSeconds(u16 seconds);
         void addMinutes(u16 minutes);
         void addHours(u16 hours);
-        u16 getSecond();
-        u16 getMinute();
-        u16 getHour();
+        u16 getSecond => _seconds;
+        u16 getMinute => _minutes;
+        u16 getHour => _hours;
         void getTime(clock_time* time);
         private void update();
     }
@@ -72,15 +72,11 @@ namespace std
         update();
     }
     
-    u16 clock::getSecond() { return _seconds; }
-    u16 clock::getMinute() { return _minutes; }
-    u16 clock::getHour() { return _hours; }
-    
     // Formats the time in text format.
     void clock::getTime(clock_time* time) {
-        //if (time == null) {
-        //    return;
-        //}
+        if (time == null) {
+            return;
+        }
         
         time.text[0] = '0' + (u8)(_hours / (u16)10);
         time.text[1] = '0' + (u8)(_hours % (u16)10);        

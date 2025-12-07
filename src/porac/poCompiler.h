@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include "poAsm.h"
+#include "poFile.h"
 
 namespace po
 {
@@ -20,7 +21,9 @@ namespace po
         inline poAsm& assembler() { return _assembler; }
 
     private:
-        std::vector<std::string> _files;
+        void reportError(const std::string& errorPhase, const std::string& errorText, const int fileId, const int colNum, const int lineNum);
+
+        std::vector<poFile> _files;
         std::vector<std::string> _errors;
 
         poAsm _assembler;

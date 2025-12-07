@@ -10,14 +10,18 @@ using namespace po;
 poTypeResolver::poTypeResolver(poModule& module)
     :
     _module(module),
-    _isError(false)
+    _isError(false),
+    _errorLine(0),
+    _errorFile(0)
 {
 }
 
-void poTypeResolver::setError(const std::string& errorText)
+void poTypeResolver::setError(const std::string& errorText, const poToken& token)
 {
     _isError = true;
     _errorText = errorText;
+    _errorLine = token.line();
+    _errorFile = token.fileId();
 }
 
 int poTypeResolver::getTypeSize(const int type)
@@ -97,7 +101,8 @@ void poTypeResolver::resolve(const std::vector<poNode*>& nodes)
         // TODO: If the worklist still contains items
         // then we need to a raise an error for each of the items that
         // cannot be resolved and terminate the build
-        setError("Could not resolve type '" + _unresolvedTypes[0]->token().string() + "'");
+        poToken& token = _unresolvedTypes[0]->token();
+        setError("Could not resolve type '" + token.string() + "'", token);
     }
     else
     {
@@ -256,7 +261,7 @@ void poTypeResolver::resolveStatics(poNode* namespaceNode)
                 }
                 else
                 {
-                    setError("Unable to resolve constant for static variable: " + declNode->token().string());
+                    setError("Unable to resolve constant for static variable: " + declNode->token().string(), declNode->token());
                 }
                 ns.addStaticVariable(int(_module.staticVariables().size()) - 1);
             }
@@ -366,7 +371,7 @@ void poTypeResolver::getFunction(poNode* node, poNamespace& ns)
                 fullname = ns.name() + "::" + resolver->path()[0] + "::" + node->token().string();
                 if (_memberFunctions.find(fullname) != _memberFunctions.end())
                 {
-                    setError("Duplicate member function: " + fullname);
+                    setError("Duplicate member function: " + fullname, node->token());
                     return;
                 }
                 _memberFunctions.insert(std::pair<std::string, int>(fullname, id));
@@ -408,7 +413,7 @@ void poTypeResolver::getConstructor(poNode* node, poNamespace& ns)
                 fullname = ns.name() + "::" + resolver->path()[0] + "::" + node->token().string();
                 if (_memberFunctions.find(fullname) != _memberFunctions.end())
                 {
-                    setError("Duplicate constructor: " + fullname);
+                    setError("Duplicate constructor: " + fullname, node->token());
                     return;
                 }
                 _memberFunctions.insert(std::pair<std::string, int>(fullname, id));
@@ -475,7 +480,7 @@ bool poTypeResolver::isTypeResolved(poNode* node, bool isPointer)
 {
     bool resolved = true;
     const int type = getType(node->token());
-    if (type == -1) /* is not a primitive */
+    if (type == -1) /* is not a primitive or a pointer to a primitive type */
     {
         const std::string& name = node->token().string();
         if (isPointer)
@@ -573,6 +578,25 @@ void poTypeResolver::resolveTypes()
                                 poUnaryNode* argNode = static_cast<poUnaryNode*>(argument);
                                 resolved &= isTypeResolved(argNode->child(), isPointer);
                             }
+                        }
+                    }
+                }
+                else if (decl->child()->type() == poNodeType::EXPRESSION)
+                {
+                    poListNode* expressionNode = static_cast<poListNode*>(decl->child());
+                    for (poNode* node : expressionNode->list())
+                    {
+                        if (node->type() == poNodeType::RETURN_TYPE)
+                        {
+                            poUnaryNode* returnTypeNode = static_cast<poUnaryNode*>(node);
+                            if (returnTypeNode->child()->type() == poNodeType::POINTER)
+                            {
+                                poPointerNode* pointerNode = static_cast<poPointerNode*>(returnTypeNode->child());
+                                returnTypeNode = pointerNode;
+                                isPointer = true;
+                            }
+
+                            resolved &= isTypeResolved(returnTypeNode, isPointer);
                         }
                     }
                 }
@@ -694,7 +718,7 @@ void poTypeResolver::resolveType(const std::string& name, poNamespace& ns, poLis
                 _module.addType(type);
             }
 
-            const int alignment = size * _module.types()[fieldType].alignment();
+            const int alignment = /*size **/ _module.types()[fieldType].alignment();
             const int totalSize = size * int(arrayNode->arraySize());
             const int padding = align(offset, alignment);
             offset += padding;
@@ -758,6 +782,45 @@ void poTypeResolver::resolveType(const std::string& name, poNamespace& ns, poLis
                 }
 
                 type.addConstructor(constructor);
+            }
+        }
+        else if (decl->child()->type() == poNodeType::EXPRESSION)
+        {
+            poListNode* expressionNode = static_cast<poListNode*>(decl->child());
+            poUnaryNode* returnTypeNode = nullptr;
+            poUnaryNode* variableNode = nullptr;
+            for (poNode* node : expressionNode->list())
+            {
+                if (node->type() == poNodeType::RETURN_TYPE)
+                {
+                    returnTypeNode = static_cast<poUnaryNode*>(node);
+                }
+                else if (node->type() == poNodeType::VARIABLE)
+                {
+                    variableNode = static_cast<poUnaryNode*>(node);
+                }
+            }
+
+            if (returnTypeNode && variableNode)
+            {
+                poPointerNode* pointerNode = nullptr;
+                if (returnTypeNode->child()->type() == poNodeType::POINTER)
+                {
+                    pointerNode = static_cast<poPointerNode*>(returnTypeNode->child());
+                    returnTypeNode = pointerNode;
+                }
+
+                int returnType = getType(returnTypeNode->token());
+                if (returnType == -1)
+                {
+                    const std::string& typeName = returnTypeNode->token().string();
+                    auto& typeData = _module.types()[_module.getTypeFromName(typeName)];
+                    returnType = typeData.id();
+                }
+                returnType = getPointerType(returnType, pointerNode->count());
+                poType& type = _module.types()[id];
+                poMemberProperty memberProperty(attributes, returnType, expressionNode->token().string(), variableNode->token().string());
+                type.addProperty(memberProperty);
             }
         }
     }

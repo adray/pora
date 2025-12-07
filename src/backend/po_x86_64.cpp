@@ -995,7 +995,7 @@ void po_x86_64_Lower::mc_movzx_16_to_32_reg_to_reg(char dst, char src) { binop(s
 void po_x86_64_Lower::mc_movzx_16_to_32_mem_to_reg(char dst, char src, int src_offset) { binop(src, dst, VMI_MOVZX_16_TO_32_SRC_MEM_DST_REG, src_offset); }
 void po_x86_64_Lower::mc_movzx_16_to_64_reg_to_reg(char dst, char src) { binop(src, dst, VMI_MOVZX_16_TO_64_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_movzx_16_to_64_mem_to_reg(char dst, char src, int src_offset) { binop(src, dst, VMI_MOVZX_16_TO_64_SRC_MEM_DST_REG, src_offset); }
-void po_x86_64_Lower::mc_cdqe() { }
+void po_x86_64_Lower::mc_cdqe() { _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, VMI_CDQE, -1, -1)); }
 
 /* Floating point operations */
 

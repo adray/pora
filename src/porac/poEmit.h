@@ -154,6 +154,7 @@ namespace po
 
     private:
         void setError(const std::string& errorText);
+        void setError(const std::string& errorText, const poToken& token);
 
         int getType(const poToken& token);
         int getTypeSize(const int type);
@@ -176,6 +177,7 @@ namespace po
         int emitPassByValue(const int expr, poFlowGraph& cfg);
         int emitPassByReference(const int expr, poFlowGraph& cfg);
         int emitNew(poNode* node, poFlowGraph& cfg);
+        int emitNewArray(poNode* node, poFlowGraph& cfg);
         int emitCall(poNode* node, poFlowGraph& cfg, const int instanceExpr);
         void emitCall(poNode* node, poFlowGraph& cfg, const int instanceExpr, const int64_t arraySize);
         int emitMemberCall(poNode* node, poFlowGraph& cfg);
@@ -204,8 +206,12 @@ namespace po
 
 
         void emitLoopPreHeader(poFlowGraph& cfg, const int instanceExpr, const int64_t arraySize);
+        void emitLoopPreHeader(poFlowGraph& cfg, const int instanceExpr);
         void emitLoopHeader(poFlowGraph& cfg, const int instanceExpr);
+        void emitLoopHeader(poFlowGraph& cfg, const int instanceExpr, const int loopSizeExpr);
         void emitLoopEnd(poFlowGraph& cfg);
+
+        // Loop related members
 
         poBasicBlock* _preHeaderBB;
         poBasicBlock* _headerBB;
@@ -219,6 +225,8 @@ namespace po
         int _pointerType;
         int _elementPtr;
 
+        // End loop related members
+
         poModule& _module;
         poConditionGraph _graph;
         poEmitter _emitter;
@@ -229,7 +237,11 @@ namespace po
         std::string _namespace;
         int _returnInstruction;
         int _thisInstruction;
+        int _returnType;
         bool _isError;
+        int _errorLine;
+        int _errorCol;
+        int _errorFile;
         std::string _errorText;
     };
 }

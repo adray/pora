@@ -1,0 +1,16 @@
+import std;
+namespace CalendarApp {
+    static void main() {        
+        date d;
+        d.setNow();
+        
+        date_text t;
+        d.format(&t);
+        
+        print((u8*)t.text, (u32)11);
+        
+        //print_64((i64)d.getYear);
+        //print_64((i64)d.getMonth);
+        //print_64((i64)d.getDay);
+    }
+}

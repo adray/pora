@@ -1,0 +1,65 @@
+//
+// A Gregorian calendar class
+//
+
+namespace std {
+    class calendar {
+        private u16[12] _daysInMonths;
+        calendar();
+        boolean validate(u16 year, u16 month, u16 day);
+        boolean isLeapYear(u16 year);
+    }
+    
+    calendar::calendar() {
+        _daysInMonths[0] = (u16)31;    // January
+        _daysInMonths[1] = (u16)28;    // Feburary (29 in a leap year)
+        _daysInMonths[2] = (u16)31;    // March
+        _daysInMonths[3] = (u16)30;    // April
+        _daysInMonths[4] = (u16)31;    // May
+        _daysInMonths[5] = (u16)30;    // June
+        _daysInMonths[6] = (u16)31;    // July
+        _daysInMonths[7] = (u16)31;    // August
+        _daysInMonths[8] = (u16)30;    // September
+        _daysInMonths[9] = (u16)31;    // October
+        _daysInMonths[10] = (u16)30;    // November
+        _daysInMonths[11] = (u16)31;    // December
+    }
+    
+    boolean calendar::validate(u16 year, u16 month, u16 day) {
+        if (year == (u16)0 ||
+            month == (u16)0 ||
+            day == (u16)0) {
+                return false;
+         }
+         
+         if (month > (u16)12) {
+            return false;
+         }
+         
+         if (month == (u16)2 &&
+            isLeapYear(year) &&
+            day == (u16)29) {
+            return true;
+         }
+         
+         if (day > _daysInMonths[(i64)month - 1]) {
+            return false;
+         }
+         
+         return true;
+    }
+    
+    boolean calendar::isLeapYear(u16 year) {
+        boolean isLeapYear = false;
+        if (year % (u16)4 == (u16)0) {
+            if (year % (u16)100 == (u16)0) {
+                if (year % (u16)400 == (u16)0) {
+                    isLeapYear = true;
+                }
+            } else {
+                isLeapYear = true;
+            }
+        }
+        return isLeapYear;
+    }
+}

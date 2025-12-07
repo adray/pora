@@ -89,7 +89,7 @@ static void checkSyntax(const std::string& testName, const std::string& program,
     std::cout << testName << " ";
 
     poLexer lexer;
-    lexer.tokenizeText(program);
+    lexer.tokenizeText(program, 0);
     if (lexer.isError())
     {
         if (success)
@@ -1215,6 +1215,11 @@ void po::syntaxTest()
         "   i64[-1] arr;"\
         "}"\
         "}", false);
+    checkSyntax("Array Test #19", "namespace Test {"\
+        "static void main() {"\
+        "   i64[] arr = new i64[4];"\
+        "}"\
+        "}", true);
     checkSyntax("Pointers Test #1", "namespace Test {"\
         "static void main() {"\
         "   i64 x = 900;"\
@@ -1424,6 +1429,27 @@ void po::syntaxTest()
         "static test x;"\
         "static void main() {"\
         "   i64 y = x.p;"\
+        "}"\
+        "}", false);
+    checkSyntax("Get Expression #1", "namespace Test {"\
+        "class test { private i64 p; i64 P => p; }"\
+        "static void main() {"\
+        "   test t;"\
+        "   i64 p = t.P;"\
+        "}"\
+        "}", true);
+    checkSyntax("Get Expression #2", "namespace Test {"\
+        "class test { private i64* p; i64* P => p; }"\
+        "static void main() {"\
+        "   test t;"\
+        "   i64* p = t.P;"\
+        "}"\
+        "}", true);
+    checkSyntax("Get Expression #3", "namespace Test {"\
+        "class test { private i32 p; i64 P => p; }"\
+        "static void main() {"\
+        "   test t;"\
+        "   i64 p = t.P;"\
         "}"\
         "}", false);
 

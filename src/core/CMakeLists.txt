@@ -13,6 +13,8 @@ set (PORACORE_SOURCES
     "poDom.cpp"
     "poELF.h"
     "poELF.cpp"
+    "poFile.h"
+    "poFile.cpp"
     "poPE.h"
     "poPE.cpp"
     "poPhiWeb.h"

@@ -1,0 +1,62 @@
+
+namespace std {
+    struct date_text {
+        u8[11] text;
+    }
+
+    class date {
+        private u16 _day;
+        private u16 _month;
+        private u16 _year;
+        private boolean _isLeapYear;
+        
+        u16 getDay => _day;
+        u16 getMonth => _month;
+        u16 getYear => _year;
+        boolean isLeapYear => _isLeapYear;        
+        
+        void reset();
+        void setNow();
+        void setDate(u16 year, u16 month, u16 day);
+        void format(date_text* text);
+    }
+    
+    void date::reset() {
+        setDate((u16)1, (u16)1, (u16)1);
+    }
+    
+    void date::setNow() {
+        SYSTEMTIME date;
+        GetLocalTime(&date);
+        setDate(date.wYear, date.wMonth, date.wDay);
+    }
+    
+    void date::setDate(u16 year, u16 month, u16 day) {
+        calendar c;
+        if (c.validate(year, month, day)) {
+            _day = day;
+            _year = year;
+            _month = month;
+            _isLeapYear = c.isLeapYear(_year);
+        }
+    }
+    
+    void date::format(date_text* text) {
+        if (text == null) {
+            return;
+        }
+        
+        // GB format
+        text.text[0] = '0' + (u8)(_day / (u16)10);
+        text.text[1] = '0' + (u8)(_day % (u16)10);
+        text.text[2] = '/';
+        text.text[3] = '0' + (u8)(_month / (u16)10);
+        text.text[4] = '0' + (u8)(_month % (u16)10);
+        text.text[5] = '/';
+        text.text[6] = '0' + (u8)(_year / (u16)1000);
+        text.text[7] = '0' + (u8)((_year / (u16)100) % (u16)10);
+        text.text[8] = '0' + (u8)((_year / (u16)10) % (u16)10);
+        text.text[9] = '0' + (u8)(_year % (u16)10);
+        text.text[10] = 0b;
+    }
+}

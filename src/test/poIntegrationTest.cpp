@@ -185,6 +185,8 @@ static void runIntegrationTest(const std::string& name, const std::string& path,
         " \"" << std << "\\memory.po" << "\""
         " \"" << std << "\\pora.po" << "\""
         " \"" << std << "\\control.po" << "\""
+        " \"" << std << "\\calendar.po" << "\""
+        " \"" << std << "\\date.po" << "\""
         ;
     if (!executeCommand(ss.str(), false))
     {

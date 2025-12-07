@@ -1,0 +1,11 @@
+import std;
+
+namespace Example
+{
+    static void main()
+    {
+        u32 a = (u32)4096;
+        u64 b = (u64)a;
+        print_64((i64)b);
+    }
+}

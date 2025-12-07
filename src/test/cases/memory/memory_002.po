@@ -1,0 +1,33 @@
+import std;
+
+namespace Test {
+    struct Foo {
+        i64[3] x;
+        i64 i;
+        i64[4] y;
+        i64[4] z;
+        i64[4] w;
+    }
+
+    static void main() {
+
+        Foo[] arr = new Foo[40];
+        for (i64 i = 0; i < 40; i += 1) {
+            arr[i].x[0] = i;
+        }
+        for (i64 i = 0; i < 40; i += 1) {
+            i64 x = arr[i].x[0];
+            print_64(x);
+            println("", (u32)1);
+        }
+
+        for (i64 i = 0; i < 40; i += 1) {
+            if (i != arr[i].x[0]) {
+                println("Error", (u32)6);
+                return;
+            }
+        }
+
+        println("Complete", (u32)9);
+    }
+}

@@ -20,7 +20,24 @@ using namespace po;
 
 void poCompiler:: addFile(const std::string& file)
 {
-    _files.push_back(file);
+    _files.push_back(poFile(file, int(_files.size())));
+}
+
+void poCompiler::reportError(const std::string& errorPhase, const std::string& errorText, const int fileId, const int colNum, const int lineNum)
+{
+    poFile& file = _files[fileId];
+
+    std::stringstream ss;
+    ss << errorPhase << " " << file.filename() << ": " << errorText << " Line " << lineNum << ":" << colNum << std::endl;
+
+    std::vector<std::string> lines;
+    file.getErrorLines(lineNum, 2, lines);
+    for (int i = 0; i < int(lines.size()); i++)
+    {
+        ss << "Line " << (lineNum - 2 + i) << ":" << lines[i] << std::endl;
+    }
+
+    _errors.push_back(ss.str());
 }
 
 int poCompiler:: compile()
@@ -30,29 +47,14 @@ int poCompiler:: compile()
     std::vector<poNode*> nodes;
     for (auto& file : _files)
     {
-        // Lexer
-        lexer.tokenizeFile(file);
-        if (lexer.isError())
+        file.load(lexer);
+        if (file.isError())
         {
-            std::stringstream ss;
-            ss << "Failed building " << file << ": " << lexer.errorText() << " Line :" << lexer.lineNum();
-            _errors.push_back(ss.str());
+            reportError("Lex/Parse Error:", file.errorText(), file.fileId(), file.colNum(), file.lineNum());
             return 0;
         }
 
-        // Parse tokens into Abstract syntax tree
-        poParser parser(lexer.tokens());
-        poModuleParser moduleParser(parser);
-        poNode* node = moduleParser.parse();
-        if (parser.isError())
-        {
-            std::stringstream ss;
-            ss << "Failed building " << file << ": " << parser.error() << " Line: " << parser.errorLine();
-            _errors.push_back(ss.str());
-            return 0;
-        }
-
-        nodes.push_back(node);
+        nodes.push_back(file.ast());
 
         // Reset the lexer
         lexer.reset();
@@ -64,9 +66,7 @@ int poCompiler:: compile()
     typeResolver.resolve(nodes);
     if (typeResolver.isError())
     {
-        std::stringstream ss;
-        ss << "Type resolution failed: " << typeResolver.errorText() << std::endl;
-        _errors.push_back(ss.str());
+        reportError("Type Resolution Error:", typeResolver.errorText(), typeResolver.errorFile(), 0, typeResolver.errorLine());
         return 0;
     }
 
@@ -74,9 +74,7 @@ int poCompiler:: compile()
     poTypeValidator typeValidator;
     if (!typeValidator.validateModule(module))
     {
-        std::stringstream ss;
-        ss << "Type validation failed: " << typeValidator.errorText() << std::endl;
-        _errors.push_back(ss.str());
+        reportError("Type Validation Error:", typeValidator.errorText(), typeValidator.errorFile(), typeValidator.errorCol(), typeValidator.errorLine());
         return 0;
     }
 
@@ -84,9 +82,7 @@ int poCompiler:: compile()
     poTypeChecker typeChecker(module);
     if (!typeChecker.check(nodes))
     {
-        std::stringstream ss;
-        ss << typeChecker.errorText() << " Line:" << typeChecker.errorLine() << ":" << typeChecker.errorCol() << std::endl;
-        _errors.push_back(ss.str());
+        reportError("Type Checking Error:", typeChecker.errorText(), typeChecker.errorFile(), typeChecker.errorCol(), typeChecker.errorLine());
         return 0;
     }
 
@@ -99,9 +95,7 @@ int poCompiler:: compile()
     generator.generate(nodes);
     if (generator.isError())
     {
-        std::stringstream ss;
-        ss << generator.errorText() << std::endl;
-        _errors.push_back(ss.str());
+        reportError("Code Generation Error:", generator.errorText(), 0, 0, 0);
         return 0;
     }
     if (_debugDump) { module.dump(); }

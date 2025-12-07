@@ -25,6 +25,15 @@ poMemberFunction::poMemberFunction(const poAttributes attributes, const int retu
 {
 }
 
+poMemberProperty::poMemberProperty(const poAttributes attributes, const int type, const std::string& name, const std::string& backingFieldName)
+    :
+    _attributes(attributes),
+    _type(type),
+    _name(name),
+    _backingFieldName(backingFieldName)
+{
+}
+
 poField::poField(const poAttributes attributes, const int offset, const int type, const int numElements, const std::string& name)
     :
     _attributes(attributes),

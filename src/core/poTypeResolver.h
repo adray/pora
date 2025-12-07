@@ -19,6 +19,8 @@ namespace po
 
         inline const std::string& errorText() const { return _errorText; }
         inline const bool isError() const { return _isError; }
+        inline const int errorFile() const { return _errorFile; }
+        inline const int errorLine() const { return _errorLine; }
 
     private:
         void addType(poNode* node, poNamespace& ns, const int nsId);
@@ -42,10 +44,12 @@ namespace po
         void updateArgs(poNode* node);
         bool isTypeResolved(poNode* node, bool isPointer);
 
-        void setError(const std::string& errorText);
+        void setError(const std::string& errorText, const poToken& token);
 
         std::string _errorText;
         bool _isError;
+        int _errorFile;
+        int _errorLine;
 
         poModule& _module;
         std::vector<poNode*> _userTypes;

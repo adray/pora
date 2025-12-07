@@ -5,6 +5,13 @@
 
 using namespace po;
 
+poTypeValidator::poTypeValidator() :
+    _errorCol(0),
+    _errorLine(0),
+    _errorFile(0)
+{
+}
+
 bool poTypeValidator::validateModule(poModule& module)
 {
     bool ok = true;

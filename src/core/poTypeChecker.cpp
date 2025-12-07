@@ -14,6 +14,7 @@ poTypeChecker::poTypeChecker(poModule& module)
     _isError(false),
     _errorCol(0),
     _errorLine(0),
+    _errorFile(0),
     _module(module)
 {
 }
@@ -26,17 +27,7 @@ void poTypeChecker::setError(const std::string& text, const poToken& token)
         _errorText = text;
         _errorLine = token.line();
         _errorCol = token.column();
-    }
-}
-
-void poTypeChecker::setError(const std::string& text, const int line, const int col)
-{
-    if (!_isError)
-    {
-        _isError = true;
-        _errorText = text;
-        _errorLine = line;
-        _errorCol = col;
+        _errorFile = token.fileId();
     }
 }
 
@@ -307,8 +298,23 @@ void poTypeChecker::checkNamespaces(poNode* node, const std::vector<poNode*> imp
                 break;
             }
         }
+        else if (child->type() == poNodeType::CLASS)
+        {
+            poListNode* classNode = static_cast<poListNode*>(child);
+            for (poNode* node : classNode->list())
+            {
+                if (node->type() == poNodeType::DECL)
+                {
+                    poUnaryNode* decl = static_cast<poUnaryNode*>(node);
+                    poAttributeNode* attributes = static_cast<poAttributeNode*>(decl->child());
+                    if (attributes->child()->type() == poNodeType::EXPRESSION)
+                    {
+                        checkExpression(classNode, attributes->child());
+                    }
+                }
+            }
+        }
         else if (child->type() == poNodeType::STRUCT ||
-            child->type() == poNodeType::CLASS ||
             child->type() == poNodeType::EXTERN ||
             child->type() == poNodeType::STATEMENT)
         {
@@ -321,6 +327,76 @@ void poTypeChecker::checkNamespaces(poNode* node, const std::vector<poNode*> imp
         }
     }
     popScope();
+}
+
+void poTypeChecker::checkExpression(poNode* classNode, poNode* node)
+{
+    assert(node->type() == poNodeType::EXPRESSION);
+    poListNode* expr = static_cast<poListNode*>(node);
+
+    poUnaryNode* returnNode = nullptr;
+    poNode* variableNode = nullptr;
+    for (poNode* child : expr->list())
+    {
+        if (child->type() == poNodeType::RETURN_TYPE)
+        {
+            assert(returnNode == nullptr);
+            returnNode = static_cast<poUnaryNode*>(child);
+        }
+        else if (child->type() == poNodeType::VARIABLE)
+        {
+            assert(variableNode == nullptr);
+            variableNode = child;
+        }
+        else
+        {
+            setError("Unexpected type in expression AST.", child->token());
+            break;
+        }
+    }
+
+    if (!isError() && returnNode && variableNode)
+    {
+        // Check that the variable type matches the return type
+
+        if (returnNode->child()->type() != poNodeType::POINTER)
+        {
+            setError("Expression return type is not a type.", returnNode->token());
+            return;
+        }
+
+        poPointerNode* pointerNode = static_cast<poPointerNode*>(returnNode->child());
+        if (pointerNode->child()->type() != poNodeType::TYPE)
+        {
+            setError("Expression return type is not a type.", returnNode->token());
+            return;
+        }
+
+        poNode* typeNode = pointerNode->child();
+        const std::string& className = classNode->token().string();
+        const int type = _module.getTypeFromName(className);
+        const poType& classType = _module.types()[type];
+        const int returnType = getPointerType(getType(typeNode->token()), pointerNode->count());
+        const std::string& varName = variableNode->token().string();
+        bool found = false;
+        for (const auto& field : classType.fields())
+        {
+            if (field.name() == varName)
+            {
+                found = true;
+                if (!checkEquivalence(field.type(), returnType))
+                {
+                    setError("Expression return type does not match variable type.", returnNode->token());
+                }
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            setError("Variable not found in class for expression.", variableNode->token());
+        }
+    }
 }
 
 void poTypeChecker::checkConstructor(poNode* node)
@@ -1371,6 +1447,10 @@ int poTypeChecker::checkCast(poNode* node)
     }
 
     const int srcType = checkExpr(typeNode->child());
+    if (srcType == -1 || dstType == -1)
+    {
+        return -1;
+    }
 
     if (dstType == srcType)
     {
@@ -1569,6 +1649,14 @@ int poTypeChecker::checkMember(poNode* node)
                 return field.type();
             }
         }
+        for (const poMemberProperty& property : baseType.properties())
+        {
+            if (property.name() == memberName &&
+                ((int)property.attributes() & (int)poAttributes::PUBLIC) == (int)poAttributes::PUBLIC)
+            {
+                return property.type();
+            }
+        }
     }
 
     return -1;
@@ -1626,10 +1714,28 @@ int poTypeChecker::checkNew(poNode* node)
     poUnaryNode* newNode = static_cast<poUnaryNode*>(node);
     assert(newNode->type() == poNodeType::NEW);
 
-    checkConstructorCall(newNode);
-
-    const int type = getType(newNode->token());
-    return getPointerType(type, 1);
+    if (newNode->child()->type() == poNodeType::CONSTRUCTOR)
+    {
+        checkConstructorCall(newNode);
+        const int type = getType(newNode->token());
+        return getPointerType(type, 1);
+    }
+    else if (newNode->child()->type() == poNodeType::DYNAMIC_ARRAY)
+    {
+        poArrayNode* arrayNode = static_cast<poArrayNode*>(newNode->child());
+        if (checkExpr(arrayNode->child()) != TYPE_I64)
+        {
+            setError("Array size expression must evaluate to i64.", arrayNode->child()->token());
+            return -1;
+        }
+        const int type = getType(newNode->token());
+        return getArrayType(type, 1);
+    }
+    else
+    {
+        setError("Malformed new syntax tree node.", newNode->token());
+        return -1;
+    }
 }
 
 int poTypeChecker::checkCall(poNode* node)

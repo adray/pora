@@ -243,9 +243,28 @@ poNode* poFunctionParser::parsePrimary()
                 _parser.setError("Expected closing parenthesis.");
             }
         }
+        else if (_parser.match(poTokenType::OPEN_BRACKET))
+        {
+            _parser.advance();
+
+            poNode* sizeExpr = parseExpression();
+            if (_parser.match(poTokenType::CLOSE_BRACKET))
+            {
+                _parser.advance();
+                node = new poUnaryNode(poNodeType::NEW,
+                    new poUnaryNode(poNodeType::DYNAMIC_ARRAY,
+                        sizeExpr,
+                        token),
+                    token);
+            }
+            else
+            {
+                _parser.setError("Expected closing bracket.");
+            }
+        }
         else
         {
-            _parser.setError("Expected opening parenthesis after 'new'.");
+            _parser.setError("Ill formed 'new' keyword usage.");
         }
     }
     else if (_parser.match(poTokenType::SIZEOF))
@@ -488,6 +507,12 @@ poNode* poFunctionParser::parseUnary()
         if (_parser.match(poTokenType::IDENTIFIER))
         {
             poNode* node = parsePrimary();
+            if (node->type() == poNodeType::ARRAY_ACCESSOR)
+            {
+                poArrayAccessor* accessor = static_cast<poArrayAccessor*>(node);
+                accessor->setDereference(false);
+            }
+
             return new poUnaryNode(poNodeType::REFERENCE, 
                 node,
                 token);
@@ -843,7 +868,12 @@ poNode* poFunctionParser::insertCompare(poNode* node)
     poToken expr = node->token();
     poNode* compare = new poBinaryNode(poNodeType::CMP_EQUALS,
         node,
-        new poConstantNode(poNodeType::CONSTANT, poToken(poTokenType::TRUE, expr.string(), expr.line(), expr.column())),
+        new poConstantNode(poNodeType::CONSTANT, poToken(
+            poTokenType::TRUE,
+            expr.string(),
+            expr.line(),
+            expr.column(),
+            expr.fileId())),
         expr);
     return compare;
 }
@@ -2049,6 +2079,11 @@ poNode* poClassParser::parse()
             if (_parser.lookahead(poTokenType::OPEN_PARAN, 1) ||
                 _parser.lookahead(poTokenType::OPEN_PARAN, 2))
             {
+                // TODO: I'm assuming we are expected the OPEN_PARAN in two positions
+                // in case there is pointer - this won't work for more than one pointer level.
+                // If so then we need to extract the pointer parsing code from with function prototype parser.
+                // And do it before the lookahead.
+
                 poFunctionParser funcParser(_parser);
                 poNode* prototype = funcParser.parsePrototype(type);
                 children.push_back(new poUnaryNode(poNodeType::DECL,
@@ -2060,6 +2095,47 @@ poNode* poClassParser::parse()
             _parser.advance();
 
             const int pointerCount = parsePointer();
+
+            if (_parser.match(poTokenType::IDENTIFIER) && _parser.lookahead(poTokenType::ARROW, 0))
+            {
+                poToken name = _parser.peek();
+                assert(_parser.match(poTokenType::IDENTIFIER));
+                _parser.advance();
+                assert(_parser.match(poTokenType::ARROW));
+
+                _parser.advance();
+                if (!_parser.match(poTokenType::IDENTIFIER))
+                {
+                    _parser.setError("Expected identifier.");
+                    break;
+                }
+
+                poToken variable = _parser.peek();
+                _parser.advance();
+                if (!_parser.match(poTokenType::SEMICOLON))
+                {
+                    _parser.setError("Expected semicolon.");
+                    break;
+                }
+                _parser.advance();
+
+                std::vector<poNode*> elements;
+                elements.push_back(new poNode(poNodeType::VARIABLE, variable));
+                elements.push_back(new poUnaryNode(poNodeType::RETURN_TYPE,
+                    new poPointerNode(poNodeType::POINTER,
+                        new poNode(poNodeType::TYPE, type),
+                        type, pointerCount),
+                    type));
+
+                children.push_back(new poUnaryNode(poNodeType::DECL,
+                    new poAttributeNode(attributes, name,
+                        new poListNode(poNodeType::EXPRESSION,
+                            elements,
+                            name)),
+                    name));
+
+                continue;
+            }
 
             if (_parser.match(poTokenType::IDENTIFIER))
             {

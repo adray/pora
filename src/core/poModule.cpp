@@ -529,7 +529,6 @@ void poModule::addExplicitCastOperators()
                 auto& srcType = types[j];
                 int flags = OPERATOR_FLAG_ZERO_EXTEND;
                 if (dstType.size() < srcType.size())
-                if (dstType.size() < srcType.size())
                 {
                     flags = OPERATOR_FLAG_NONE;
                 }

@@ -120,6 +120,22 @@ namespace po
         std::vector<int> _arguments;
     };
 
+    class poMemberProperty
+    {
+    public:
+        poMemberProperty(const poAttributes attributes, const int type, const std::string& name, const std::string& backingFieldName);
+        inline int type() const { return _type; }
+        inline const std::string& name() const { return _name; }
+        inline const std::string& backingFieldName() const { return _backingFieldName; }
+        inline const poAttributes& attributes() const { return _attributes; }
+
+    private:
+        poAttributes _attributes;
+        int _type;
+        std::string _name;
+        std::string _backingFieldName;
+    };
+
     class poType
     {
     public:
@@ -130,6 +146,7 @@ namespace po
         inline void addMethod(const poMemberFunction& method) { _methods.push_back(method); }
         inline void addOperator(const poOperator& operator_) { _operators.push_back(operator_); }
         inline void addConstructor(const poConstructor& constructor) { _constructors.push_back(constructor); }
+        inline void addProperty(const poMemberProperty& property) { _properties.push_back(property); }
         inline void setSize(const int size) { _size = size; }
         inline void setAlignment(const int alignment) { _alignment = alignment; }
 
@@ -140,6 +157,7 @@ namespace po
         inline const std::vector<poMemberFunction>& functions() const { return _methods; }
         inline const std::vector<poConstructor>& constructors() const { return _constructors; }
         inline const std::vector<poOperator>& operators() const { return _operators; }
+        inline const std::vector<poMemberProperty>& properties() const { return _properties; }
 
         inline const int id() const { return _id; }
         inline const int baseType() const { return _baseType; }
@@ -165,5 +183,6 @@ namespace po
         std::vector<poMemberFunction> _methods;
         std::vector<poConstructor> _constructors;
         std::vector<poOperator> _operators;
+        std::vector<poMemberProperty> _properties;
     };
 }

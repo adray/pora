@@ -1,3 +1,17 @@
+//
+// A memory allocator based on bump allocation.
+// The C-style 'malloc' generally only takes the number of bytes 
+// to allocate. This means 'malloc' is unable to know the context
+// it is called in, we can instead provide more information
+// such as the type-id which allows the allocator to
+// in theory be simpler and quicker.
+// 
+// The design is fairly basic, there is a list of
+// allocators for each type. Each allocator contains
+// a linked list of chunks which contain a page
+// worth of bytes to be bump allocated.
+// 
+
 namespace std
 {
     struct typeAllocChunk
@@ -20,35 +34,42 @@ namespace std
     {
         private typeAlloc* _data;
         private u64 _capacity;
-        private i64 _heap;
+        private i64 _heap;          // The heap to allocate upon
+        private u32 _pageSize;       // The size of the pages in bytes
         
-        void init(i64 heap);
+        void init(i64 heap, u64 capacity, u32 pageSize);
         void reserve(u64 capacity);
         typeAlloc* get(u64 typeId);
-        i64 getHeap();
+        i64 getHeap => _heap;
+        u32 getPageSize => _pageSize;
     }
-    
-    i64 typeAllocList::getHeap() {
-        return _heap;
-    }
-    
-    void typeAllocList::init(i64 heap, u64 capacity) {
+
+    void typeAllocList::init(i64 heap, u64 capacity, u32 pageSize) {
         _heap = heap;
         _data = (typeAlloc*)null;
         _capacity = (u64)0;
+        _pageSize = pageSize;
         reserve(capacity);
+        
+        typeAlloc[] array = (typeAlloc[1])_data;
+        for (u64 i = 0u; i < capacity; i += 1u) {
+            typeAlloc* type = &array[(i64)i];
+            type.chunks = (typeAllocChunk*)null;
+            type.size = 0u;
+            type.slotsPerChunk = 0u;
+        }
     }
-    
+
     void typeAllocList::reserve(u64 capacity) {
-        typeAlloc* data = (typeAlloc*)HeapAlloc(_heap, (i32)0, sizeof(typeAlloc*) * capacity);
+        typeAlloc* data = (typeAlloc*)HeapAlloc(_heap, (i32)0, sizeof(typeAlloc) * capacity);
         if (_capacity > (u64)0 && _data != null) {
-            CopyMemory((u8*)data, (u8*)_data, sizeof(typeAlloc*) * _capacity);
+            CopyMemory((u8*)data, (u8*)_data, sizeof(typeAlloc) * _capacity);
             HeapFree(_heap, (i32)0, (u8*)_data);
         }
         _data = data;
         _capacity = capacity;
     }
-    
+
     typeAlloc* typeAllocList::get(u64 typeId) {
         if (typeId >= _capacity) {
             u64 newCapacity = _capacity * (u64)2;
@@ -57,69 +78,176 @@ namespace std
             }
             reserve(newCapacity);
         }
-        
+
         typeAlloc[] data = (typeAlloc[1])_data;
         return &data[(i64)typeId];
     }
 
-    struct memory
-    {
-        i64 heap;           // The heap to allocate upon
-        typeAllocList al;   // A list of type allocators
-    }
+    static typeAllocList* al;   // A list of type allocators
 
-    static memory* mem;
-
-    static void initializeMemory() {        
-        i64 heap = GetProcessHeap();
-        mem = (memory*)HeapAlloc(heap, (i32)0, sizeof(memory));
-        mem.heap = heap;
-        mem.al.init(heap, (u64)128);
-        //print_64(mem.al.getHeap());
-    }
+    static void initializeMemory() {
+        SYSTEM_INFO info;
+        GetNativeSystemInfo(&info);
     
+        i64 heap = GetProcessHeap();        
+        al = (typeAllocList*)HeapAlloc(heap, (i32)0, sizeof(typeAllocList));
+        al.init(heap, (u64)128, info.dwPageSize);
+    }
+
     static u8* malloc(u64 numBytes) {
-        if (mem == null) {
+        if (al == null) {
             return (u8*)null;
         }
         
-        return HeapAlloc(mem.heap, (i32)0, numBytes);
+        return HeapAlloc(al.getHeap, (i32)0, numBytes);
     }
-    
+
     static void free(u8* bytes) {
-        if (mem == null ||
+        if (al == null ||
             bytes == null) {
             return;
         }
         
-        HeapFree(mem.heap, (i32)0, bytes);
+        HeapFree(al.getHeap, (i32)0, bytes);
+    }
+    
+    //static void free2(u8* bytes, u64 typeId) {
+    //    if (al == null ||
+    //        bytes == null) {
+    //        return;
+    //    }
+        
+    //    typeAlloc* type = al.get(typeId);
+    //    if (type == null) {
+    //        println("FATAL ERROR", (u32)12);
+    //        ExitProcess((u32)0);
+   //     }
+
+    //    if (type.chunks == null) {            
+    //        println("FATAL ERROR", (u32)12);
+    //        ExitProcess((u32)0);
+    //    }
+        
+        
+    //}
+
+    static typeAllocChunk* initChunk() {       
+        typeAllocChunk* chunk =  (typeAllocChunk*)HeapAlloc(al.getHeap, (i32)0, sizeof(typeAllocChunk));
+        u8* data = HeapAlloc(al.getHeap, (i32)0, (u64)al.getPageSize);
+        chunk.freeCount = (u32)0;
+        chunk.data = data;
+        chunk.next = (typeAllocChunk*)null;
+        return chunk;
     }
 
-    static u8* malloc2(u64 numBytes, u64 typeId) {
-        if (mem == null) {
+    static u8* malloc2(u64 numBytes, u64 typeId, u64 flags) {
+        if (al == null || numBytes == 0u) {
             return (u8*)null;
         }
 
+        if (numBytes > (u64)al.getPageSize) {
+            return HeapAlloc(al.getHeap, (i32)0, numBytes);
+        }
+
+        typeAlloc* type = al.get(typeId);
+        if (type == null) {
+            println("FATAL ERROR", (u32)12);
+            ExitProcess((u32)0);
+        }
+
         u8* bytes;
-        u64 limit = (u64)(256*1024);
-        if (numBytes <= limit) {
-            // Here we cache it and we won't free it, only mark it.
-            bytes = HeapAlloc(mem.heap, (i32)0, limit);
+        if (type.chunks == null) {
+            // Initialize
+            type.size = numBytes;
+            type.slotsPerChunk = (u64)al.getPageSize / numBytes;
             
+            // Allocate chunk
+            typeAllocChunk* chunk = initChunk();
+            chunk.bumpIndex = (u32)1;        
+            chunk.owner = type;
+            type.chunks = chunk;
+
+            bytes = chunk.data;          
+
         } else {
-            // No caching apply the memory directly.
-            bytes = HeapAlloc(mem.heap, (i32)0, numBytes);
+            typeAllocChunk* cur = type.chunks;
+            while (cur != null && (u64)cur.bumpIndex == type.slotsPerChunk) {
+                cur = cur.next;
+            }
+
+            if (cur == null) {
+                // Allocate new chunk
+                typeAllocChunk* chunk = initChunk();
+                chunk.bumpIndex = (u32)1;        
+                chunk.owner = type;
+                chunk.next = type.chunks;
+                type.chunks = chunk;
+
+                bytes = chunk.data;
+            } else {
+                u8[] data = (u8[1])cur.data;
+                u32 index = (u32)numBytes * cur.bumpIndex;
+                bytes = &data[(i64)index];
+                cur.bumpIndex = cur.bumpIndex + (u32)1;
+            }
         }
 
-        if (numBytes <= (u64)248)  {
-            // Small memory allocation
+        return bytes;
+    }
+    
+    static u8* malloc3(u64 numBytes, u64 numElements, u64 typeId, u64 flags) {
+        if (al == null || numBytes == 0u || numElements == 0u) {
+            return (u8*)null;
+        }
+        
+        u64 totalSize = numBytes * numElements;
+        if (totalSize > (u64)al.getPageSize) {
+            return HeapAlloc(al.getHeap, (i32)0, totalSize);
+        }
+        
+        typeAlloc* type = al.get(typeId);
+        if (type == null) {
+            println("FATAL ERROR", (u32)12);
+            ExitProcess((u32)0);
+        }
+        
+        u8* bytes;
+        if (type.chunks == null) {
+            // Initialize
+            type.size = numBytes;
+            type.slotsPerChunk = (u64)al.getPageSize / numBytes;
             
-        }
-        else
-        {
-            // Large memory allocation
-        }
+            // Allocate chunk
+            typeAllocChunk* chunk = initChunk();
+            chunk.bumpIndex = (u32)numElements;
+            chunk.owner = type;
+            type.chunks = chunk;
 
+            bytes = chunk.data;
+
+        } else {
+            typeAllocChunk* cur = type.chunks;
+            while (cur != null && (u64)cur.bumpIndex + numElements >= type.slotsPerChunk) {
+                cur = cur.next;
+            }
+
+            if (cur == null) {
+                // Allocate new chunk
+                typeAllocChunk* chunk = initChunk();
+                chunk.bumpIndex = (u32)numElements;       
+                chunk.owner = type;
+                chunk.next = type.chunks;
+                type.chunks = chunk;
+
+                bytes = chunk.data;
+            } else {
+                u8[] data = (u8[1])cur.data;
+                u32 index = (u32)numBytes * cur.bumpIndex;
+                bytes = &data[(i64)index];
+                cur.bumpIndex = cur.bumpIndex + (u32)numElements;
+            }
+        }
+        
         return bytes;
     }
 }

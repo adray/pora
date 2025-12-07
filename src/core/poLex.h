@@ -36,6 +36,7 @@ namespace po
         NOT,
         LESS,
         GREATER,
+        ARROW,
         COLON,
         SEMICOLON,
         COMMA,
@@ -70,6 +71,7 @@ namespace po
         CLASS,
         STRUCT,
         NEW,
+        DELETE,
         PUBLIC,
         PRIVATE,
         PROTECTED,
@@ -103,7 +105,7 @@ namespace po
     class poToken
     {
     public:
-        poToken(poTokenType token, const std::string& value, int line, int col);
+        poToken(poTokenType token, const std::string& value, const int line, const int col, const int fileId);
         inline poTokenType token() const { return _tok; }
         inline long long i64() const { return std::atoll(_value.c_str()); }
         inline int i32() const { return std::atol(_value.c_str()); }
@@ -120,26 +122,29 @@ namespace po
 
         inline int line() const { return _line; }
         inline int column() const { return _col; }
+        inline int fileId() const { return _fileId; }
     private:
 
         poTokenType _tok;
         std::string _value;
         int _line;
         int _col;
+        int _fileId;
     };
 
     class poLexer
     {
     public:
         poLexer();
-        void tokenizeFile(const std::string& filename);
-        void tokenizeText(const std::string& text);
+        void tokenizeFile(const std::string& filename, const int fileId);
+        void tokenizeText(const std::string& text, const int fileId);
         void reset();
         
         inline bool isError() { return _isError; }
         inline const std::string& errorText() { return _errorText; }
         inline int lineNum() const { return _lineNum; }
         inline const std::vector<poToken>& tokens() const { return _tokens; }
+        inline const std::vector<int>& lineStartPositions() const { return _lineStartPositions; }
 
     private:
         void scanLine(const std::string& line);
@@ -162,10 +167,13 @@ namespace po
         std::vector<poToken> _tokens;
         std::string _errorText;
         std::string _line;
+        std::vector<int> _lineStartPositions;
         bool _isError;
         bool _scanning;
         int _pos;
+        int _filePos;
         int _lineNum;
         int _colNum;
+        int _fileId;
     };
 }

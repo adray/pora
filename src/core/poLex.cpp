@@ -10,12 +10,13 @@ using namespace po;
 // Token
 //===============
 
-poToken::poToken(poTokenType token, const std::string& value, int line, int col)
+poToken::poToken(poTokenType token, const std::string& value, const int line, const int col, const int fileId)
     :
     _tok(token),
     _value(value),
     _line(line),
-    _col(col)
+    _col(col),
+    _fileId(fileId)
 {
 }
 
@@ -36,6 +37,8 @@ poLexer::poLexer()
     _pos(0),
     _lineNum(1),
     _colNum(1),
+    _fileId(0),
+    _filePos(0),
     _isError(false),
     _scanning(false)
 {
@@ -51,6 +54,7 @@ poLexer::poLexer()
     addKeyword("break", poTokenType::BREAK);
     addKeyword("class", poTokenType::CLASS);
     addKeyword("new", poTokenType::NEW);
+    addKeyword("delete", poTokenType::DELETE);
     addKeyword("public", poTokenType::PUBLIC);
     addKeyword("private", poTokenType::PRIVATE);
     addKeyword("protected", poTokenType::PROTECTED);
@@ -92,13 +96,13 @@ void poLexer::addKeyword(const std::string& keyword, poTokenType token)
 
 void poLexer::addToken(poTokenType type, const std::string& value)
 {
-    poToken token(type, value, _lineNum, _colNum);
+    poToken token(type, value, _lineNum, _colNum, _fileId);
     _tokens.push_back(token);
 }
 
 void poLexer::addToken(poTokenType type)
 {
-    poToken token(type, "", _lineNum, _colNum);
+    poToken token(type, "", _lineNum, _colNum, _fileId);
     _tokens.push_back(token);
 }
 
@@ -389,6 +393,7 @@ void poLexer::scanLine(const std::string& line)
     _pos = 0;
     _line = line;
     _scanning = true;
+    _lineStartPositions.push_back(_filePos);
 
     while (_scanning)
     {
@@ -401,6 +406,7 @@ void poLexer::scanLine(const std::string& line)
         case '=':
             advance();
             if (peek() == '=') { advance(); addToken(poTokenType::EQUALS_EQUALS); }
+            else if (peek() == '>') { advance(); addToken(poTokenType::ARROW); }
             else { addToken(poTokenType::EQUALS); }
             break;
         case '!':
@@ -555,21 +561,26 @@ void poLexer::scanLine(const std::string& line)
     }
 }
 
-void poLexer::tokenizeText(const std::string& text)
+void poLexer::tokenizeText(const std::string& text, const int fileId)
 {
+    _fileId = fileId;
+
     const int size = 512;
     char line[size];
 
     std::stringstream stream(text);
     while (!stream.eof())
     {
+        _filePos = int(stream.tellg());
         stream.getline(line, size);
         scanLine(line);
     }
 }
 
-void poLexer::tokenizeFile(const std::string& filename)
+void poLexer::tokenizeFile(const std::string& filename, const int fileId)
 {
+    _fileId = fileId;
+
     std::ifstream stream(filename);
     if (stream.is_open())
     {
@@ -578,6 +589,7 @@ void poLexer::tokenizeFile(const std::string& filename)
 
         while (!stream.eof())
         {
+            _filePos = int(stream.tellg());
             stream.getline(line, size);
             scanLine(line);
         }
@@ -591,10 +603,12 @@ void poLexer::tokenizeFile(const std::string& filename)
 void poLexer::reset()
 {
     _tokens.clear();
-    
+
     _pos = 0;
+    _filePos = 0;
     _lineNum = 1;
     _colNum = 1;
+    _lineStartPositions.clear();
     _isError = false;
     _scanning = false;
 }
