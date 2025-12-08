@@ -617,7 +617,10 @@ poCodeGenerator::poCodeGenerator(poModule& module)
     _loopIndexPtrBody(-1),
     _loopIndexVar(-1),
     _returnType(-1),
-    _isError(false)
+    _isError(false),
+    _errorCol(0),
+    _errorLine(0),
+    _errorFile(0)
 {
 }
 
@@ -920,7 +923,7 @@ void poCodeGenerator::emitConstructor(poFlowGraph& cfg)
 
     for (int i = 0; i < int(baseTypeData.fields().size()); i++)
     {
-        // TODO: emit call to constructors for arrays
+        // Emit call to constructors for arrays
         const poField& field = baseTypeData.fields()[i];
         const poType& fieldTypeData = _module.types()[field.type()];
         if (!fieldTypeData.isArray())
@@ -1094,7 +1097,7 @@ void poCodeGenerator::emitFunction(poNode* node, poFunction& function)
                 const int thisName = addVariable("this", ptrType, QUALIFIER_CONST, 8);
                 if (thisName == EMIT_ERROR)
                 {
-                    setError("Redefinition of variable 'this'.");
+                    setError("Redefinition of variable 'this'.", resolver->token());
                 }
                 else
                 {
@@ -1103,7 +1106,7 @@ void poCodeGenerator::emitFunction(poNode* node, poFunction& function)
             }
             else
             {
-                setError("Undefined type for 'this'.");
+                setError("Undefined type for 'this'.", resolver->token());
             }
         }
     }
@@ -1153,7 +1156,7 @@ void poCodeGenerator::emitFunction(poNode* node, poFunction& function)
         {
             // error: there isn't a return defined and the function doesn't return void
             // so we can't insert one
-            setError("Function expects a return value, but function doesn't return one.");
+            setError("Function expects a return value, but function doesn't return one.", node->token());
         }
     }
 
@@ -1205,7 +1208,7 @@ void poCodeGenerator::emitBody(poNode* node, poFlowGraph& cfg, poBasicBlock* loo
         }
         else
         {
-            setError("Unexpected statement in body.");
+            setError("Unexpected statement in body.", child->token());
         }
     }
 }
@@ -1323,14 +1326,14 @@ void poCodeGenerator::emitStatement(poNode* node, poFlowGraph& cfg)
     {
         if (emitCall(child, cfg, -1) == EMIT_ERROR)
         {
-            setError("Error emitting call.");
+            setError("Error emitting call.", child->token());
         }
     }
     else if (child->type() == poNodeType::MEMBER_CALL)
     {
         if (emitMemberCall(child, cfg) == EMIT_ERROR)
         {
-            setError("Error emitting call.");
+            setError("Error emitting call.", child->token());
         }
     }
     else if (child->type() == poNodeType::BODY)
@@ -1622,7 +1625,7 @@ int poCodeGenerator::emitNew(poNode* node, poFlowGraph& cfg)
 
     if (call == nullptr)
     {
-        setError("Constructor missing call node.");
+        setError("Constructor missing call node.", node->token());
         return EMIT_ERROR;
     }
 
@@ -1631,7 +1634,7 @@ int poCodeGenerator::emitNew(poNode* node, poFlowGraph& cfg)
     const int type = _module.getTypeFromName(name);
     if (type == -1)
     {
-        setError("Undefined type '" + name + "' for 'new' operator.");
+        setError("Undefined type '" + name + "' for 'new' operator.", node->token());
         return EMIT_ERROR;
     }
 
@@ -1739,7 +1742,7 @@ int poCodeGenerator::emitCall(poNode* node, poFlowGraph& cfg, const int instance
 
     if (functionNode == nullptr)
     {
-        setError("Undefined function '" + name + "'.");
+        setError("Undefined function '" + name + "'.", node->token());
         return EMIT_ERROR;
     }
 
@@ -2051,7 +2054,7 @@ void poCodeGenerator::emitAssignment(poNode* node, poFlowGraph& cfg)
     if (right == EMIT_ERROR)
     {
         // Error: expression could not be evaluated
-        setError("Assignment expression could not be evaluated.");
+        setError("Assignment expression could not be evaluated.", node->token());
         return;
     }
 
@@ -2110,7 +2113,7 @@ void poCodeGenerator::emitAssignment(poNode* node, poFlowGraph& cfg)
                     }
                     else
                     {
-                        setError("Undefined member variable '" + name + "'.");
+                        setError("Undefined member variable '" + name + "'.", node->token());
                         return;
                     }
                 }
@@ -2199,7 +2202,7 @@ void poCodeGenerator::emitReturn(poNode* node, poFlowGraph& cfg)
         if (expr == EMIT_ERROR)
         {
             // Error: expression could not be evaluated
-            setError("Return expression could not be evaluated.");
+            setError("Return expression could not be evaluated.", node->token());
             return;
         }
 
@@ -2361,7 +2364,7 @@ void poCodeGenerator::emitDecl(poNode* node, poFlowGraph& cfg)
 
         if (variableNode == nullptr)
         {
-            setError("Constructor missing variable name.");
+            setError("Constructor missing variable name.", constructor->token());
             return;
         }
 
@@ -2574,7 +2577,7 @@ int poCodeGenerator::emitCast(poNode* node, poFlowGraph& cfg)
     const int expr = emitExpr(typeNode->child(), cfg);
     if (expr == EMIT_ERROR)
     {
-        setError("Cast expression could not be evaluated.");
+        setError("Cast expression could not be evaluated.", typeNode->token());
         return EMIT_ERROR;
     }
 
@@ -2654,7 +2657,7 @@ int poCodeGenerator::emitReference(poNode* node, poFlowGraph& cfg)
 
     if (expr == EMIT_ERROR)
     {
-        setError("Reference failed, variable not found.");
+        setError("Reference failed, variable not found.", child->token());
         return EMIT_ERROR;
     }
 
@@ -2675,14 +2678,14 @@ int poCodeGenerator::emitDereference(poNode* node, poFlowGraph& cfg)
     poNode* child = static_cast<poNode*>(derefNode->child());
     if (child->type() != poNodeType::VARIABLE)
     {
-        setError("Dereference can only be applied to a variable.");
+        setError("Dereference can only be applied to a variable.", child->token());
         return EMIT_ERROR;
     }
 
     const int expr = emitLoadVariable(child, cfg);
     if (expr == EMIT_ERROR)
     {
-        setError("Dereference failed, variable not found.");
+        setError("Dereference failed, variable not found.", child->token());
         return EMIT_ERROR;
     }
 
@@ -2696,7 +2699,7 @@ int poCodeGenerator::emitDereference(poNode* node, poFlowGraph& cfg)
     }
     else
     {
-        setError("Dereferencing a non-pointer type.");
+        setError("Dereferencing a non-pointer type.", child->token());
     }
     return id;
 }
@@ -2715,7 +2718,7 @@ int poCodeGenerator::emitSizeof(poNode* node, poFlowGraph& cfg)
 
     if (child->type() != poNodeType::TYPE)
     {
-        setError("Sizeof can only be applied to a type.");
+        setError("Sizeof can only be applied to a type.", node->token());
         return EMIT_ERROR;
     }
 
@@ -2770,7 +2773,7 @@ int poCodeGenerator::emitLoadVariable(poNode* node, poFlowGraph& cfg)
 
                 if (fieldType == -1)
                 {
-                    setError("Variable '" + name + "' not found.");
+                    setError("Variable '" + name + "' not found.", node->token());
                     return EMIT_ERROR;
                 }
 
@@ -2934,7 +2937,7 @@ void poCodeGenerator::emitStoreMember(poNode* node, poFlowGraph& cfg, const int 
             const int accessorExpr = emitExpr(accessor->accessor(), cfg);
             if (accessorExpr == EMIT_ERROR)
             {
-                setError("Array accessor expression could not be evaluated.");
+                setError("Array accessor expression could not be evaluated.", member->token());
                 return;
             }
 
@@ -3045,7 +3048,7 @@ int poCodeGenerator::emitLoadMember(poNode* node, poFlowGraph& cfg)
             const int accessorExpr = emitExpr(accessor->accessor(), cfg);
             if (accessorExpr == EMIT_ERROR)
             {
-                setError("Array accessor expression could not be evaluated.");
+                setError("Array accessor expression could not be evaluated.", accessor->token());
                 return EMIT_ERROR;
             }
             poType& accessType = _module.types()[fieldType];
