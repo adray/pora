@@ -1517,12 +1517,26 @@ int poTypeChecker::checkCast(poNode* node)
         }
     }
     
-    for (poOperator op : dstTypeData.operators())
+    int type = srcType;
+    while (type != -1)
     {
-        if (op.getOperator() == poOperatorType::EXPLICIT_CAST &&
-            op.otherType() == srcType)
+        for (poOperator op : dstTypeData.operators())
         {
-            return dstType;
+            if (op.getOperator() == poOperatorType::EXPLICIT_CAST &&
+                op.otherType() == type)
+            {
+                return dstType;
+            }
+        }
+
+        poType& typeData = _module.types()[type];
+        if (!typeData.isPointer())
+        {
+            type = typeData.baseType();
+        }
+        else
+        {
+            type = -1;
         }
     }
 

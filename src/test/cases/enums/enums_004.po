@@ -1,0 +1,12 @@
+import std;
+
+namespace Example {
+    static void main() {
+        day_of_week day = day_of_week::Tuesday;
+        u8*[7] days;
+        days[(i64)day_of_week::Monday] = "Monday";
+        days[(i64)day_of_week::Tuesday] = "Tuesday";
+        
+        println(days[(i64)day_of_week::Tuesday], (u32)8);
+    }
+}

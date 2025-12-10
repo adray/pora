@@ -510,6 +510,9 @@ void poModule::addExplicitCastOperators()
         /* Signed to floating point */
         dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, TYPE_F32, OPERATOR_FLAG_CONVERT_TO_REAL));
         dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, TYPE_F64, OPERATOR_FLAG_CONVERT_TO_REAL));
+
+        /* Enums */
+        dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, TYPE_ENUM, OPERATOR_FLAG_NONE));
     }
 
     for (int i = TYPE_U64; i <= TYPE_U8; i++)
@@ -543,6 +546,9 @@ void poModule::addExplicitCastOperators()
         /* Unsigned to floating point */
         //dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, TYPE_F32, OPERATOR_FLAG_CONVERT_TO_REAL));
         //dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, TYPE_F64, OPERATOR_FLAG_CONVERT_TO_REAL));
+
+        /* Enums */
+        dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, TYPE_ENUM, OPERATOR_FLAG_NONE));
     }
 
     for (int i = TYPE_F64; i <= TYPE_F32; i++)

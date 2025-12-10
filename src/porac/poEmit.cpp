@@ -2614,28 +2614,43 @@ int poCodeGenerator::emitCast(poNode* node, poFlowGraph& cfg)
         }
     }
 
-    for (const poOperator& op : dstTypeData.operators())
+    int type = srcType;
+    while (type != -1)
     {
-        if (op.getOperator() == poOperatorType::EXPLICIT_CAST && op.otherType() == srcType)
+        for (const poOperator& op : dstTypeData.operators())
         {
-            // We have a cast operator, use it.
-            switch (op.flags())
+            if (op.getOperator() == poOperatorType::EXPLICIT_CAST && op.otherType() == type)
             {
-            case OPERATOR_FLAG_SIGN_EXTEND:
-                return _emitter.emitSignExtend(dstType, srcType, expr, cfg);
-            case OPERATOR_FLAG_ZERO_EXTEND:
-                return _emitter.emitZeroExtend(dstType, srcType, expr, cfg);
-            case OPERATOR_FLAG_CONVERT_TO_INTEGER:
-            case OPERATOR_FLAG_CONVERT_TO_REAL:
-                return _emitter.emitConvert(dstType, srcType, expr, cfg);
-            default:
-                break;
-            }
+                // We have a cast operator, use it.
+                switch (op.flags())
+                {
+                case OPERATOR_FLAG_SIGN_EXTEND:
+                    return _emitter.emitSignExtend(dstType, type, expr, cfg);
+                case OPERATOR_FLAG_ZERO_EXTEND:
+                    return _emitter.emitZeroExtend(dstType, type, expr, cfg);
+                case OPERATOR_FLAG_CONVERT_TO_INTEGER:
+                case OPERATOR_FLAG_CONVERT_TO_REAL:
+                    return _emitter.emitConvert(dstType, type, expr, cfg);
+                default:
+                    break;
+                }
 
-            return _emitter.emitBitwiseCast(dstType, srcType, expr, cfg);
+                return _emitter.emitBitwiseCast(dstType, type, expr, cfg);
+            }
         }
+
+        const poType& typeData = _module.types()[type];
+        if (typeData.isPointer() || typeData.isArray())
+        {
+            type = -1;
+            continue;
+        }
+        type = typeData.baseType();
     }
 
+    setError("Invalid cast from type '" + _module.types()[srcType].name() + "' to type '" +
+             _module.types()[dstType].name() + "'.",
+        typeNode->token());
     return EMIT_ERROR;
 }
 
