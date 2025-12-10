@@ -40,6 +40,18 @@ poField::poField(const poAttributes attributes, const int offset, const int type
     _offset(offset),
     _type(type),
     _numElements(numElements),
+    _name(name),
+    _constantValue(0)
+{
+}
+
+poField::poField(const poAttributes attributes, const int offset, const int type, const int numElements, const std::string& name, const int constantValue)
+    :
+    _attributes(attributes),
+    _offset(offset),
+    _type(type),
+    _numElements(numElements),
+    _constantValue(constantValue),
     _name(name)
 {
 }

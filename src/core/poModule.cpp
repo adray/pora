@@ -1,5 +1,6 @@
 #include "poModule.h"
 #include <iostream>
+#include <assert.h>
 
 using namespace po;
 
@@ -441,7 +442,9 @@ void poModule::addPrimitives()
     addType(poType(TYPE_BOOLEAN, -1, "BOOLEAN"));
     addType(poType(TYPE_STRING, -1, "STRING"));
     addType(poType(TYPE_NULLPTR, -1, "NULLPTR"));
+    addType(poType(TYPE_ENUM, -1, "ENUM"));
     addType(poType(TYPE_OBJECT, -1, "OBJECT"));
+    assert(_types.size() == TYPE_OBJECT + 1);
 
     auto& types = _types;
     types[TYPE_I64].setSize(8);
@@ -456,6 +459,7 @@ void poModule::addPrimitives()
     types[TYPE_U8].setSize(1);
     types[TYPE_BOOLEAN].setSize(1);
     types[TYPE_STRING].setSize(8);
+    types[TYPE_ENUM].setSize(4);
 
     for (auto& type : types)
     {

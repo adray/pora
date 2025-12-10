@@ -368,6 +368,27 @@ poNode* poFunctionParser::parsePrimary()
         {
             node = parseMember(new poNode(poNodeType::VARIABLE, token), token);
         }
+        else if (_parser.match(poTokenType::RESOLVER))
+        {
+            std::vector<std::string> path;
+            path.push_back(token.string());
+            while (_parser.match(poTokenType::RESOLVER))
+            {
+                _parser.advance();
+                if (_parser.match(poTokenType::IDENTIFIER))
+                {
+                    const poToken& next = _parser.peek();
+                    path.push_back(next.string());
+                    _parser.advance();
+                }
+                else
+                {
+                    _parser.setError("Expected identifier after resolver operator.");
+                    break;
+                }
+            }
+            node = new poResolverNode(token, path);
+        }
         else
         {
             node = new poNode(poNodeType::VARIABLE, token);
@@ -2356,6 +2377,63 @@ poNode* poStructParser::parse()
 }
 
 //
+// poEnumParser
+//
+
+poEnumParser::poEnumParser(poParser& parser)
+    :
+    _parser(parser)
+{
+}
+
+poNode* poEnumParser::parse()
+{
+    _parser.advance();
+
+    if (!_parser.match(poTokenType::IDENTIFIER))
+    {
+        _parser.setError("Expected identifier.");
+        return nullptr;
+    }
+
+    poToken name = _parser.peek();
+    _parser.advance();
+
+    if (!_parser.match(poTokenType::OPEN_BRACE))
+    {
+        _parser.setError("Expected open brace");
+        return nullptr;
+    }
+
+    _parser.advance();
+
+    std::vector<poNode*> children;
+    while (!_parser.match(poTokenType::CLOSE_BRACE) && !_parser.isError())
+    {
+        if (_parser.match(poTokenType::IDENTIFIER))
+        {
+            poToken enumValue = _parser.peek();
+            _parser.advance();
+            children.push_back(new poUnaryNode(poNodeType::DECL, new poNode(poNodeType::ENUM_VALUE, enumValue), enumValue));
+            if (_parser.match(poTokenType::COMMA))
+            {
+                _parser.advance();
+            }
+        }
+        else
+        {
+            _parser.setError("Expected enum value.");
+        }
+    }
+
+
+    _parser.advance();
+
+    return new poListNode(poNodeType::ENUM, children, name);
+}
+
+
+//
 // poNamespaceParser
 //
 
@@ -2392,6 +2470,12 @@ poNode* poNamespaceParser::parseStruct()
 poNode* poNamespaceParser::parseClass()
 {
     poClassParser parser(_parser);
+    return parser.parse();
+}
+
+poNode* poNamespaceParser::parseEnum()
+{
+    poEnumParser parser(_parser);
     return parser.parse();
 }
 
@@ -2469,6 +2553,10 @@ poNode* poNamespaceParser::parse()
             else if (_parser.match(poTokenType::STRUCT))
             {
                 children.push_back(parseStruct());
+            }
+            else if (_parser.match(poTokenType::ENUM))
+            {
+                children.push_back(parseEnum());
             }
             else if (_parser.match(poTokenType::EXTERN))
             {

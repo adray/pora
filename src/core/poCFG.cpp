@@ -1,5 +1,6 @@
 #include "poCFG.h"
 #include <algorithm>
+#include <assert.h>
 
 using namespace po;
 
@@ -16,6 +17,7 @@ poInstruction::poInstruction(const int32_t name, const int16_t type, const int16
     _code(code),
     _name(name)
 {
+    assert(type >= 0);
 }
 
 poInstruction::poInstruction(const int32_t name, const int16_t type, const int16_t constant, const int16_t code)
@@ -27,6 +29,7 @@ poInstruction::poInstruction(const int32_t name, const int16_t type, const int16
     _right(-1),
     _name(name)
 {
+    assert(type >= 0);
 }
 
 poInstruction::poInstruction(const int32_t name, const int16_t type, const int16_t left, const int16_t right, const int16_t memOffset, const int16_t code)
@@ -38,6 +41,7 @@ poInstruction::poInstruction(const int32_t name, const int16_t type, const int16
     _code(code),
     _name(name)
 {
+    assert(type >= 0);
 }
 
 bool poInstruction::isSpecialInstruction() const

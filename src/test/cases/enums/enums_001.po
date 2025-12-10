@@ -1,0 +1,10 @@
+import std;
+
+namespace Example {    
+    static void main() {
+        day_of_week day = day_of_week::Monday;
+        if (day == day_of_week::Monday) {
+            println("Monday", (u32)7);
+        }
+    }
+}

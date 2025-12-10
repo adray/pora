@@ -1,0 +1,16 @@
+import std;
+
+namespace Example {
+    static boolean isFriday(day_of_week day) {
+        if (day == day_of_week::Friday) {
+            return true;
+        }
+        return false;
+    }
+
+    static void main() {
+        if (isFriday(day_of_week::Friday)) {
+            println("Friday", (u32)7);
+        }
+    }
+}

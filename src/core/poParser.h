@@ -93,6 +93,16 @@ namespace po
         poParser& _parser;
     };
 
+    class poEnumParser
+    {
+    public:
+        poEnumParser(poParser& parser);
+        poNode* parse();
+
+    private:
+        poParser& _parser;
+    };
+
     class poNamespaceParser
     {
     public:
@@ -104,6 +114,7 @@ namespace po
         poNode* parseExternalFunction(const poToken& ret);
         poNode* parseStruct();
         poNode* parseClass();
+        poNode* parseEnum();
         poNode* parseStaticVariable(const poToken& type, const int pointerCount, const poToken& name);
 
         poParser& _parser;

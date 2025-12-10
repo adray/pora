@@ -48,6 +48,7 @@ namespace po
         int checkCall(poNode* node);
         int checkNew(poNode* node);
         int checkCast(poNode* node);
+        int checkResolver(poNode* node);
         int getArrayType(const int baseType, const int arrayRank);
         int getPointerType(const int baseType, const int count);
         int getType(const poToken& token);

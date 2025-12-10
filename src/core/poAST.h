@@ -38,6 +38,7 @@ namespace po
         PARAMETER, /* poUnaryNode */
         ARGS, /* poListNode */
         TYPE, /* poNode */
+        ENUM_VALUE, /* poNode */
         RETURN_TYPE, /* poUnaryNode */
         ARRAY, /* poArrayNode */
         DYNAMIC_ARRAY, /* poUnaryNode */
@@ -60,6 +61,7 @@ namespace po
         BODY, /* poListNode */
         CLASS, /* poListNode */
         STRUCT, /* poListNode */
+        ENUM, /* poListNode */
         NAMESPACE, /* poListNode */
         MODULE, /* poListNode */
         IMPORT, /* poNode */

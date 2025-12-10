@@ -1,0 +1,17 @@
+import std;
+
+namespace Example {
+    struct order {
+        day_of_week dayOfWeek;
+        date date;
+    }
+
+    static void main() {
+        order order;
+        order.dayOfWeek = day_of_week::Thursday;
+        order.date.setNow();
+        if (order.dayOfWeek == day_of_week::Thursday) {
+            println("Thursday", (u32)9);
+        }
+    }
+}

@@ -95,7 +95,7 @@ int poCompiler:: compile()
     generator.generate(nodes);
     if (generator.isError())
     {
-        reportError("Code Generation Error:", generator.errorText(), 0, 0, 0);
+        reportError("Code Generation Error:", generator.errorText(), generator.errorFile(), generator.errorColumn(), generator.errorLine());
         return 0;
     }
     if (_debugDump) { module.dump(); }

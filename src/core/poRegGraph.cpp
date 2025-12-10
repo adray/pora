@@ -380,8 +380,8 @@ void poRegGraph::allocateRegisters(poFlowGraph& cfg)
                     pos + live));
                 break;
             default:
-                if (!_module.types()[ins.type()].isPointer()/* &&
-                    !_module.types()[ins.type()].isArray()*/)
+                if (!_module.types()[ins.type()].isPointer() &&
+                    _module.types()[ins.type()].baseType() != TYPE_ENUM)
                 {
                     pos++;
                     continue;

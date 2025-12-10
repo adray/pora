@@ -18,7 +18,8 @@ namespace po
     constexpr int TYPE_BOOLEAN = 11;
     constexpr int TYPE_STRING = 12;
     constexpr int TYPE_NULLPTR = 13;
-    constexpr int TYPE_OBJECT = 14; /* values above this are user defined (non primitive) */
+    constexpr int TYPE_ENUM = 14;
+    constexpr int TYPE_OBJECT = 15; /* values above this are user defined (non primitive) */
 
     enum class poAttributes
     {
@@ -27,6 +28,8 @@ namespace po
         INTERNAL = 0x4,
         EXTERN = 0x8,
         PROTECTED = 0x10,
+        STATIC = 0x20,
+        CONST = 0x40
     };
 
     enum class poOperatorType
@@ -66,18 +69,22 @@ namespace po
     {
     public:
         poField(const poAttributes attributes, const int offset, const int type, const int numElements, const std::string& name);
+        poField(const poAttributes attributes, const int offset, const int type, const int numElements, const std::string& name, const int constantValue);
 
         inline const poAttributes attributes() const { return _attributes; }
+        inline bool hasAttribute(const poAttributes attribute) const { return (int(_attributes) & int(attribute)) == int(attribute); }
         inline const int offset() const { return _offset; }
         inline const int type() const { return _type; }
         inline const int numElements() const { return _numElements; }
         inline const std::string& name() const { return _name; }
+        inline const int constantValue() const { return _constantValue; }
 
     private:
         poAttributes _attributes;
         int _offset;
         int _type;
         int _numElements;
+        int _constantValue;
         std::string _name;
     };
 
@@ -91,6 +98,7 @@ namespace po
 
         inline const std::vector<int>& arguments() const { return _arguments; }
         inline const poAttributes attributes() const { return _attributes; }
+        inline bool hasAttribute(const poAttributes attribute) const { return (int(_attributes) & int(attribute)) == int(attribute); }
         inline const int id() const { return _id; }
         inline const bool isDefault() const { return _isDefault; }
     private:
@@ -108,6 +116,7 @@ namespace po
         inline void setId(const int id) { _id = id; }
         inline const std::vector<int>& arguments() const { return _arguments; }
         inline const poAttributes attributes() const { return _attributes; }
+        inline bool hasAttribute(const poAttributes attribute) const { return (int(_attributes) & int(attribute)) == int(attribute); }
         inline const int returnType() const { return _returnType; }
         inline const std::string& name() const { return _name; }
         inline const int id() const { return _id; }
@@ -128,6 +137,7 @@ namespace po
         inline const std::string& name() const { return _name; }
         inline const std::string& backingFieldName() const { return _backingFieldName; }
         inline const poAttributes& attributes() const { return _attributes; }
+        inline bool hasAttribute(const poAttributes attribute) const { return (int(_attributes) & int(attribute)) == int(attribute); }
 
     private:
         poAttributes _attributes;

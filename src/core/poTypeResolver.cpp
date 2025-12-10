@@ -293,6 +293,10 @@ void poTypeResolver::getNamespaces(poNode* node)
         {
             getClass(child, ns, id);
         }
+        else if (child->type() == poNodeType::ENUM)
+        {
+            getEnum(child, ns, id);
+        }
         else if (child->type() == poNodeType::EXTERN)
         {
             getExtern(child, ns);
@@ -303,16 +307,24 @@ void poTypeResolver::getNamespaces(poNode* node)
     _namespaces.insert(std::pair<poNode*, int>(node, id));
 }
 
-void poTypeResolver::addType(poNode* node, poNamespace& ns, const int nsId)
+void poTypeResolver::addType(poNode* node, poNamespace& ns, const int nsId, const int baseType)
 {
     const std::string& name = node->token().string();
     const int id = int(_module.types().size());
     _module.addType(poType(id,
-        TYPE_OBJECT,
+        baseType,
         name,
         ns.name() + "::" + name));
     ns.addType(id);
     _namespaceForTypes.insert(std::pair<poNode*, int>(node, nsId));
+}
+
+void poTypeResolver::getEnum(poNode* node, poNamespace& ns, const int nsId)
+{
+    assert(node->type() == poNodeType::ENUM);
+    _userTypes.push_back(node);
+
+    addType(node, ns, nsId, TYPE_ENUM);
 }
 
 void poTypeResolver::getClass(poNode* node, poNamespace& ns, const int nsId)
@@ -320,7 +332,7 @@ void poTypeResolver::getClass(poNode* node, poNamespace& ns, const int nsId)
     assert(node->type() == poNodeType::CLASS);
     _userTypes.push_back(node);
 
-    addType(node, ns, nsId);
+    addType(node, ns, nsId, TYPE_OBJECT);
 }
 
 void poTypeResolver::getStruct(poNode* node, poNamespace& ns, const int nsId)
@@ -328,7 +340,7 @@ void poTypeResolver::getStruct(poNode* node, poNamespace& ns, const int nsId)
     assert(node->type() == poNodeType::STRUCT);
     _userTypes.push_back(node);
 
-    addType(node, ns, nsId);
+    addType(node, ns, nsId, TYPE_OBJECT);
 }
 
 void poTypeResolver::getExtern(poNode* node, poNamespace& ns)
@@ -689,6 +701,26 @@ void poTypeResolver::resolveType(const std::string& name, poNamespace& ns, poLis
 
             offset += size;
             sizeOfLargestField = std::max(sizeOfLargestField, alignment);
+        }
+        else if (decl->child()->type() == poNodeType::ENUM_VALUE)
+        {
+            attributes = (poAttributes)(int(attributes) | int(poAttributes::STATIC) | int(poAttributes::CONST));
+
+            poNode* enumValueNode = decl->child();
+            const int fieldType = TYPE_I32;
+
+            auto& type = _module.types()[id];
+            const int enumValue = int(type.fields().size());
+            int enumConstantId = _module.constants().getConstant(enumValue);
+            if (enumConstantId == -1)
+            {
+                enumConstantId = _module.constants().addConstant(enumValue);
+            }
+
+            type.addField(poField(attributes, offset, id, 1, decl->token().string(), enumConstantId));
+            const int size = _module.types()[fieldType].size();
+            sizeOfLargestField = size;
+            offset += size;
         }
         else if (decl->child()->type() == poNodeType::ARRAY)
         {

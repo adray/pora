@@ -23,7 +23,7 @@ namespace po
         inline const int errorLine() const { return _errorLine; }
 
     private:
-        void addType(poNode* node, poNamespace& ns, const int nsId);
+        void addType(poNode* node, poNamespace& ns, const int nsId, const int baseType);
         void resolveTypes();
         void resolveType(const std::string& name, poNamespace& ns, poListNode* typeNode);
         void resolveStatics(poNode* namespaceNode);
@@ -31,6 +31,7 @@ namespace po
         void getNamespaces(poNode* node);
         void getStruct(poNode* node, poNamespace& ns, const int nsId);
         void getClass(poNode* node, poNamespace& ns, const int nsId);
+        void getEnum(poNode* node, poNamespace& ns, const int nsId);
         void getExtern(poNode* node, poNamespace& ns);
         void getFunction(poNode* node, poNamespace& ns);
         void getConstructor(poNode* node, poNamespace& ns);

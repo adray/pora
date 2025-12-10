@@ -69,6 +69,7 @@ namespace po
         CONTINUE,
         BREAK,
         CLASS,
+        ENUM,
         STRUCT,
         NEW,
         DELETE,

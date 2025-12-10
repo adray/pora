@@ -871,12 +871,12 @@ int poCodeGenerator::addVariable(const std::string& name, const int type, const 
 
 void poCodeGenerator::emitArrayCopy(const int src, const int dst, poFlowGraph& cfg, const int size)
 {
-    const poType& srcType = _module.types()[_emitter.getType(src)];
-    const poType& dstType = _module.types()[_emitter.getType(dst)];
+    const poType srcType = _module.types()[_emitter.getType(src)];
+    const poType dstType = _module.types()[_emitter.getType(dst)];
     assert(srcType.id() == dstType.id());
     assert(srcType.isArray());
 
-    const poType& baseType = _module.types()[srcType.baseType()];
+    const poType baseType = _module.types()[srcType.baseType()];
     const int pointerType = getPointerType(srcType.id());
 
     for (int i = 0; i < size; i++)
@@ -2544,6 +2544,9 @@ int poCodeGenerator::emitExpr(poNode* node, poFlowGraph& cfg)
     case poNodeType::SIZEOF:
         instructionId = emitSizeof(node, cfg);
         break;
+    case poNodeType::RESOLVER:
+        instructionId = emitResolver(node, cfg);
+        break;
     }
     return instructionId;
 }
@@ -3182,6 +3185,43 @@ int poCodeGenerator::emitConstantExpr(poNode* node, poFlowGraph& cfg)
         instructionId = _emitter.emitConstant(constant->token().string(), cfg);
         break;
     }
+    return instructionId;
+}
+
+int poCodeGenerator::emitResolver(poNode* node, poFlowGraph& cfg)
+{
+    poResolverNode* resolver = static_cast<poResolverNode*>(node);
+    int instructionId = EMIT_ERROR;
+    int type = -1;
+    for (const std::string& pathPart : resolver->path())
+    {
+        if (type == -1)
+        {
+            type = _module.getTypeFromName(pathPart);
+        }
+        else
+        {
+            poType& typeData = _module.types()[type];
+            bool found = false;
+            for (const poField& field : typeData.fields())
+            {
+                if (field.hasAttribute(poAttributes::STATIC) &&
+                    typeData.baseType() == TYPE_ENUM &&
+                    field.name() == pathPart)
+                {
+                    instructionId = _emitter.emitConstant(type, field.constantValue(), cfg);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                setError("Resolver path part '" + pathPart + "' not found.", resolver->token());
+                return EMIT_ERROR;
+            }
+        }
+    }
+
     return instructionId;
 }
 

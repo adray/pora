@@ -316,7 +316,8 @@ void poTypeChecker::checkNamespaces(poNode* node, const std::vector<poNode*> imp
         }
         else if (child->type() == poNodeType::STRUCT ||
             child->type() == poNodeType::EXTERN ||
-            child->type() == poNodeType::STATEMENT)
+            child->type() == poNodeType::STATEMENT ||
+            child->type() == poNodeType::ENUM)
         {
             continue;
         }
@@ -1386,6 +1387,9 @@ int poTypeChecker::checkExpr(poNode* node)
     case poNodeType::CAST:
         type = checkCast(node);
         break;
+    case poNodeType::RESOLVER:
+        type = checkResolver(node);
+        break;
     case poNodeType::OR:
     case poNodeType::AND:
     {
@@ -1423,6 +1427,47 @@ int poTypeChecker::checkExpr(poNode* node)
         break;
     }
     }
+    return type;
+}
+
+int poTypeChecker::checkResolver(poNode* node)
+{
+    poResolverNode* resolver = static_cast<poResolverNode*>(node);
+    assert(resolver->type() == poNodeType::RESOLVER);
+    
+    int type = -1;
+    for (const std::string& path : resolver->path())
+    {
+        if (type == -1)
+        {
+            type = _module.getTypeFromName(path);
+        }
+        else
+        {
+            poType& typeData = _module.types()[type];
+            bool found = false;
+            for (const poField& field : typeData.fields())
+            {
+                if (field.hasAttribute(poAttributes::STATIC) && field.name() == path)
+                {
+                    type = field.type();
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                type = -1;
+                break;
+            }
+        }
+        if (type == -1)
+        {
+            setError("Resolver path is invalid.", resolver->token());
+            break;
+        }
+    }
+
     return type;
 }
 
@@ -1644,7 +1689,7 @@ int poTypeChecker::checkMember(poNode* node)
         for (const poField& field : baseType.fields())
         {
             if (field.name() == memberName &&
-                ((int)field.attributes() & (int)poAttributes::PUBLIC) == (int)poAttributes::PUBLIC)
+                field.hasAttribute(poAttributes::PUBLIC))
             {
                 return field.type();
             }

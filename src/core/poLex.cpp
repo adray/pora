@@ -53,6 +53,7 @@ poLexer::poLexer()
     addKeyword("continue", poTokenType::CONTINUE);
     addKeyword("break", poTokenType::BREAK);
     addKeyword("class", poTokenType::CLASS);
+    addKeyword("enum", poTokenType::ENUM);
     addKeyword("new", poTokenType::NEW);
     addKeyword("delete", poTokenType::DELETE);
     addKeyword("public", poTokenType::PUBLIC);

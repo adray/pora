@@ -1452,5 +1452,32 @@ void po::syntaxTest()
         "   i64 p = t.P;"\
         "}"\
         "}", false);
+    checkSyntax("Enums #1", "namespace Test {"\
+        "enum Days { Monday, Tuesday, Wednesday, Thursday, Friday }"\
+        "static void main() {"\
+        "   Days d = Days::Monday;"\
+        "}"\
+        "}", true);
+    checkSyntax("Enums #2", "namespace Test {"\
+        "enum Days { Monday, Tuesday, Wednesday, Thursday, Friday }"\
+        "static void main() {"\
+        "   Days d = Days::Monday;"\
+        "   if (d == Days::Tuesday) {}"\
+        "}"\
+        "}", true);
+    checkSyntax("Enums #3", "namespace Test {"\
+        "enum Days { Monday, Tuesday, Wednesday, Thursday, Friday }"\
+        "static void main() {"\
+        "   Days d = Days::Monday + Days::Tuesday;"\
+        "}"\
+        "}", false);
+    checkSyntax("Enums #4", "namespace Test {"\
+        "enum Enum1 { One, Two }"\
+        "enum Enum2 { One, Two }"\
+        "static void main() {"\
+        "   Enum1 a = Enum1::One;"\
+        "   a = Enum2::One;"\
+        "}"\
+        "}", false);
 
 }

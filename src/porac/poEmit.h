@@ -151,6 +151,9 @@ namespace po
 
         inline const bool isError() const { return _isError; }
         inline const std::string& errorText() const { return _errorText; }
+        inline const int errorFile() const { return _errorFile; }
+        inline const int errorLine() const { return _errorLine; }
+        inline const int errorColumn() const { return _errorCol; }
 
     private:
         void setError(const std::string& errorText);
@@ -195,6 +198,7 @@ namespace po
         int emitReference(poNode* node, poFlowGraph& cfg);
         int emitConstantExpr(poNode* node, poFlowGraph& cfg);
         int emitBinaryExpr(poNode* node, poFlowGraph& cfg);
+        int emitResolver(poNode* node, poFlowGraph& cfg);
         int emitUnaryMinus(poNode* node, poFlowGraph& cfg);
         int emitLoadArray(poNode* node, poFlowGraph& cfg);
         void emitStoreArray(poNode* node, poFlowGraph& cfg, const int id);

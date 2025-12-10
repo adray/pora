@@ -60,6 +60,7 @@ static bool executeCommand(const std::string& args, bool redirectOutput)
         &pi);
     if (!res)
     {
+        safeClose(hStdOut);
         return false;
     }
 

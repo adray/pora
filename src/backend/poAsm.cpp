@@ -157,7 +157,7 @@ void poAsm::ir_ptr(poModule& module, PO_ALLOCATOR& allocator, const poInstructio
     }
 }
 
-void poAsm::ir_load(PO_ALLOCATOR& allocator, const poInstruction& ins)
+void poAsm::ir_load(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins)
 {
     // We need to mov data from the ptr address to the destination register
 
@@ -189,7 +189,7 @@ void poAsm::ir_load(PO_ALLOCATOR& allocator, const poInstruction& ins)
         _x86_64_lower.mc_movss_memory_to_reg_x64(dst_sse, src, 0);
         break;
     default:
-        /* copy pointer value */
+        /* copy pointer/enum value */
         assert(dst != -1 && src != -1);
         _x86_64_lower.mc_mov_memory_to_reg_x64(dst, src, 0);
         break;
@@ -853,6 +853,11 @@ void poAsm::ir_cmp(poModule& module, PO_ALLOCATOR& allocator, const poInstructio
             _x86_64_lower.mc_cmp_reg_to_reg_x64(src1, src2);
             return;
         }
+        if (isEnum(module, ins))
+        {
+            _x86_64_lower.mc_cmp_reg_to_reg_32(src1, src2);
+            return;
+        }
         std::stringstream ss;
         ss << "Internal Error: Malformed compare instruction " << ins.name();
         setError(ss.str());
@@ -923,6 +928,14 @@ void poAsm::ir_copy(poModule& module, PO_ALLOCATOR& allocator, const poInstructi
             _x86_64_lower.mc_mov_reg_to_reg_x64(dst, src);
             break;
         }
+        if (isEnum(module, ins))
+        {
+            if (dst != src)
+            {
+                _x86_64_lower.mc_mov_reg_to_reg_32(dst, src);
+            }
+            break;
+        }
         std::stringstream ss;
         ss << "Internal Error: Malformed copy instruction " << ins.name();
         setError(ss.str());
@@ -985,6 +998,11 @@ void poAsm::ir_constant(poModule& module, poConstantPool& constants, PO_ALLOCATO
             {
                 _x86_64_lower.mc_lea_reg_to_reg_x64(dst, 0);
                 _x86_64_lower.cfg().getLast()->instructions().back().setId(ins.constant());
+                return;
+            }
+            else if (isEnum(module, ins))
+            {
+                _x86_64_lower.mc_mov_imm_to_reg_32(dst, constants.getI32(ins.constant()));
                 return;
             }
         }
@@ -1624,6 +1642,11 @@ poAsm::poAsm()
 {
 }
 
+bool poAsm::isEnum(poModule& module, const poInstruction& ins)
+{
+    return module.types()[ins.type()].baseType() == TYPE_ENUM;
+}
+
 bool poAsm::ir_jump(int jump, int imm, int type)
 {
     if (jump == IR_JUMP_UNCONDITIONAL)
@@ -2082,7 +2105,7 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg, const int numArgs)
                 ir_ptr(module, allocator, ins);
                 break;
             case IR_LOAD:
-                ir_load(allocator, ins);
+                ir_load(module, allocator, ins);
                 break;
             case IR_STORE:
                 ir_store(allocator, ins);

@@ -161,6 +161,7 @@ namespace po
         void setError(const std::string& errorText);
 
         void emitJump(po_x86_64_basic_block* bb);
+        bool isEnum(poModule& module, const poInstruction& ins);
 
         //=====================================
         // IR to machine code routines
@@ -169,7 +170,7 @@ namespace po
         void ir_element_ptr(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins);
         void ir_ptr(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins);
         void ir_store(PO_ALLOCATOR& allocator, const poInstruction& ins);
-        void ir_load(PO_ALLOCATOR& allocator, const poInstruction& ins);
+        void ir_load(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins);
         void ir_zero_extend(PO_ALLOCATOR& allocator, const poInstruction& ins);
         void ir_sign_extend(PO_ALLOCATOR& allocator, const poInstruction& ins);
         void ir_bitwise_cast(PO_ALLOCATOR& allocator, const poInstruction& ins);

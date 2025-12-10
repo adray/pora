@@ -192,6 +192,14 @@ void poOptMemToReg::optimize(poModule& module, poFlowGraph& cfg)
                 }
                 break;
             default:
+                if (module.types()[baseType].baseType() == TYPE_ENUM)
+                {
+                    constant = pool.getConstant((int32_t)0);
+                    if (constant == -1)
+                    {
+                        constant = pool.addConstant(int32_t(0));
+                    }
+                }
                 break;
             }
 
