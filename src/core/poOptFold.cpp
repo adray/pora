@@ -1,6 +1,7 @@
 #include "poOptFold.h"
 #include "poAST.h"
 #include "poType.h"
+#include "poEval.h"
 
 #include <assert.h>
 
@@ -143,36 +144,13 @@ void poOptFold::foldBinaryExpr(poNode* ast, poNode** fold)
     if (binary->left()->type() == poNodeType::CONSTANT &&
         binary->right()->type() == poNodeType::CONSTANT)
     {
-        poConstantNode* leftConstant = static_cast<poConstantNode*>(binary->left());
-        poConstantNode* rightConstant = static_cast<poConstantNode*>(binary->right());
-
-        if (leftConstant->type() == TYPE_I64 &&
-            rightConstant->type() == TYPE_I64)
+        poEvaluator evaluator;
+        int64_t result = evaluator.evaluateI64(ast);
+        if (evaluator.isError())
         {
-            int64_t left = 0;
-            int64_t right = 0;
-            int64_t result = 0;
-
-            left = leftConstant->i64();
-            right = rightConstant->i64();
-
-            switch (ast->type())
-            {
-            case poNodeType::ADD:
-                result = left + right;
-                break;
-            case poNodeType::MUL:
-                result = left * right;
-                break;
-            case poNodeType::SUB:
-                result = left - right;
-                break;
-            case poNodeType::DIV:
-                result = left / right;
-                break;
-            }
-
-            *fold = new poConstantNode(poNodeType::CONSTANT, binary->token(), result);
+            return;
         }
+
+        *fold = new poConstantNode(poNodeType::CONSTANT, binary->token(), result);
     }
 }

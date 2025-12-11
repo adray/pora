@@ -1,7 +1,6 @@
 #include "poEmit.h"
 #include "poAST.h"
 #include "poModule.h"
-#include "poType.h"
 #include <assert.h>
 #include <algorithm>
 #include <iostream>
@@ -2614,10 +2613,13 @@ int poCodeGenerator::emitCast(poNode* node, poFlowGraph& cfg)
         }
     }
 
+    std::vector<poOperator> operators;
+    getOperators(dstType, operators);
+
     int type = srcType;
     while (type != -1)
     {
-        for (const poOperator& op : dstTypeData.operators())
+        for (const poOperator& op : operators)
         {
             if (op.getOperator() == poOperatorType::EXPLICIT_CAST && op.otherType() == type)
             {
@@ -2652,6 +2654,27 @@ int poCodeGenerator::emitCast(poNode* node, poFlowGraph& cfg)
              _module.types()[dstType].name() + "'.",
         typeNode->token());
     return EMIT_ERROR;
+}
+
+void poCodeGenerator::getOperators(int type, std::vector<poOperator>& operators)
+{
+    int currentType = type;
+    while (currentType != -1)
+    {
+        poType& typeData = _module.types()[currentType];
+        for (const poOperator& op : typeData.operators())
+        {
+            operators.push_back(op);
+        }
+        if (!typeData.isPointer())
+        {
+            currentType = typeData.baseType();
+        }
+        else
+        {
+            currentType = -1;
+        }
+    }
 }
 
 int poCodeGenerator::emitReference(poNode* node, poFlowGraph& cfg)

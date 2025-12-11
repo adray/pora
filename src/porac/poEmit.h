@@ -3,6 +3,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "poType.h"
+
 namespace po
 {
     class poModule;
@@ -208,6 +210,7 @@ namespace po
         int emitLoadVariable(poNode* node, poFlowGraph& cfg);
         int emitSizeof(poNode* node, poFlowGraph& cfg);
 
+        void getOperators(int type, std::vector<poOperator>& operators);
 
         void emitLoopPreHeader(poFlowGraph& cfg, const int instanceExpr, const int64_t arraySize);
         void emitLoopPreHeader(poFlowGraph& cfg, const int instanceExpr);

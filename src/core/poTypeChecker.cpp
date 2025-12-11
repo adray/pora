@@ -1,6 +1,5 @@
 #include "poTypeChecker.h"
 #include "poAST.h"
-#include "poType.h"
 #include "poModule.h"
 
 #include <assert.h>
@@ -1516,11 +1515,14 @@ int poTypeChecker::checkCast(poNode* node)
             return dstType; // pointer to array cast
         }
     }
-    
+
+    std::vector<poOperator> operators;
+    getOperators(dstType, operators);
+
     int type = srcType;
     while (type != -1)
     {
-        for (poOperator op : dstTypeData.operators())
+        for (poOperator op : operators)
         {
             if (op.getOperator() == poOperatorType::EXPLICIT_CAST &&
                 op.otherType() == type)
@@ -1541,6 +1543,27 @@ int poTypeChecker::checkCast(poNode* node)
     }
 
     return -1;
+}
+
+void poTypeChecker::getOperators(int type, std::vector<poOperator>& operators)
+{
+    int currentType = type;
+    while (currentType != -1)
+    {
+        poType& typeData = _module.types()[currentType];
+        for (const poOperator& op : typeData.operators())
+        {
+            operators.push_back(op);
+        }
+        if (!typeData.isPointer())
+        {
+            currentType = typeData.baseType();
+        }
+        else
+        {
+            currentType = -1;
+        }
+    }
 }
 
 int poTypeChecker::checkArray(poNode* node)

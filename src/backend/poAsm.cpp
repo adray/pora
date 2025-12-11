@@ -312,6 +312,7 @@ void poAsm::ir_sign_extend(PO_ALLOCATOR& allocator, const poInstruction& ins)
     {
     case TYPE_I32:
     case TYPE_U32:
+    case TYPE_ENUM:
         _x86_64_lower.mc_movsx_32_to_64_reg_to_reg(dst, src);
         break;
     case TYPE_I16:

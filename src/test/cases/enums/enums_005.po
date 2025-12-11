@@ -1,0 +1,11 @@
+import std;
+
+namespace Example {
+    enum myEnum { I = 1 << 3 }
+
+    static void main() {
+        myEnum i = myEnum::I;
+    
+        print_64((i64)i);
+    }
+}

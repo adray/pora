@@ -1492,5 +1492,23 @@ void po::syntaxTest()
         "   i64 a = (i64)Enum::One;"\
         "}"\
         "}", true);
+    checkSyntax("Enums #7", "namespace Test {"\
+        "enum Enum { One, Two }"\
+        "static void main() {"\
+        "   Enum a = (Enum)1;"\
+        "}"\
+        "}", true);
+    checkSyntax("Enums #8", "namespace Test {"\
+        "enum Enum { One = 1 << 0, Two = 1 << 1 }"\
+        "static void main() {"\
+        "   Enum a = Enum::One;"\
+        "}"\
+        "}", true);
+    checkSyntax("Enums #9", "namespace Test {"\
+        "enum Enum { One = main() }"\
+        "static void main() {"\
+        "   Enum a = Enum::One;"\
+        "}"\
+        "}", false);
 
 }

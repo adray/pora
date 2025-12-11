@@ -2,6 +2,7 @@
 #include "poModule.h"
 #include "poType.h"
 #include "poAST.h"
+#include "poEval.h"
 
 #include <assert.h>
 
@@ -645,6 +646,8 @@ void poTypeResolver::resolveTypes()
 
 void poTypeResolver::resolveType(const std::string& name, poNamespace& ns, poListNode* typeNode)
 {
+    poEvaluator evaluator;
+
     const int id = _module.getTypeFromName(name);
     int offset = 0;
     int sizeOfLargestField = 0;
@@ -706,17 +709,27 @@ void poTypeResolver::resolveType(const std::string& name, poNamespace& ns, poLis
         {
             attributes = (poAttributes)(int(attributes) | int(poAttributes::STATIC) | int(poAttributes::CONST));
 
-            poNode* enumValueNode = decl->child();
-            const int fieldType = TYPE_I32;
-
             auto& type = _module.types()[id];
-            const int enumValue = int(type.fields().size());
-            int enumConstantId = _module.constants().getConstant(enumValue);
-            if (enumConstantId == -1)
+            int64_t enumValue = int(type.fields().size());
+
+            poUnaryNode* enumValueNode = static_cast<poUnaryNode*>(decl->child());
+            if (enumValueNode->child() != nullptr)
             {
-                enumConstantId = _module.constants().addConstant(enumValue);
+                enumValue = evaluator.evaluateI64(enumValueNode->child());
+                if (evaluator.isError())
+                {
+                    setError("Unable to evaluate enum value for '" + decl->token().string() + "'", enumValueNode->token());
+                    return;
+                }
             }
 
+            int enumConstantId = _module.constants().getConstant(int(enumValue));
+            if (enumConstantId == -1)
+            {
+                enumConstantId = _module.constants().addConstant(int(enumValue));
+            }
+
+            const int fieldType = TYPE_I32;
             type.addField(poField(attributes, offset, id, 1, decl->token().string(), enumConstantId));
             const int size = _module.types()[fieldType].size();
             sizeOfLargestField = size;

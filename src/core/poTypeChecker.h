@@ -1,5 +1,6 @@
 #pragma once
 #include "poLex.h"
+#include "poType.h"
 
 #include <vector>
 #include <unordered_set>
@@ -54,6 +55,8 @@ namespace po
         int getType(const poToken& token);
         void checkIfStatement(poNode* node, const int returnType);
         void checkWhileStatement(poNode* node, const int returnType);
+
+        void getOperators(int type, std::vector<poOperator>& operators);
 
         poListNode* getFunction(const std::string& name);
         int getVariable(const std::string& name);

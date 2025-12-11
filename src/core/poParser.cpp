@@ -2414,7 +2414,19 @@ poNode* poEnumParser::parse()
         {
             poToken enumValue = _parser.peek();
             _parser.advance();
-            children.push_back(new poUnaryNode(poNodeType::DECL, new poNode(poNodeType::ENUM_VALUE, enumValue), enumValue));
+            if (_parser.match(poTokenType::EQUALS))
+            {
+                _parser.advance();
+             
+                poFunctionParser funcParser(_parser);
+                poNode* expr = funcParser.parseExpression();
+                children.push_back(new poUnaryNode(poNodeType::DECL, new poUnaryNode(poNodeType::ENUM_VALUE, expr, enumValue), enumValue));
+            }
+            else
+            {
+                children.push_back(new poUnaryNode(poNodeType::DECL, new poUnaryNode(poNodeType::ENUM_VALUE, nullptr, enumValue), enumValue));
+            }
+
             if (_parser.match(poTokenType::COMMA))
             {
                 _parser.advance();

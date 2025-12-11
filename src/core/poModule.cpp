@@ -492,7 +492,7 @@ void poModule::addExplicitCastOperators()
             }
         }
 
-        /* Signed to Unsigned */
+        /* Unsigned to Signed */
         for (int j = TYPE_U64; j <= TYPE_U8; j++)
         {
             if (i != j)
@@ -512,13 +512,20 @@ void poModule::addExplicitCastOperators()
         dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, TYPE_F64, OPERATOR_FLAG_CONVERT_TO_REAL));
 
         /* Enums */
-        dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, TYPE_ENUM, OPERATOR_FLAG_NONE));
+        if (dstType.size() > types[TYPE_ENUM].size())
+        {
+            dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, TYPE_ENUM, OPERATOR_FLAG_SIGN_EXTEND));
+        }
+        else
+        {
+            dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, TYPE_ENUM, OPERATOR_FLAG_NONE));
+        }
     }
 
     for (int i = TYPE_U64; i <= TYPE_U8; i++)
     {
         auto& dstType = types[i];
-        /* Unsigned to Signed */
+        /* Signed to Unsigned */
         for (int j = TYPE_I64; j <= TYPE_I8; j++)
         {
             if (i != j)
@@ -583,6 +590,19 @@ void poModule::addExplicitCastOperators()
                 dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, j, OPERATOR_FLAG_NONE));
             }
         }
+    }
+
+    for (int i = TYPE_I64; i <= TYPE_I8; i++)
+    {
+        auto& dstType = types[TYPE_ENUM];
+        /* Signed to Enum */
+        auto& srcType = types[i];
+        int flags = OPERATOR_FLAG_NONE;
+        if (dstType.size() > srcType.size())
+        {
+            flags = OPERATOR_FLAG_SIGN_EXTEND;
+        }
+        dstType.addOperator(poOperator(poOperatorType::EXPLICIT_CAST, i, flags));
     }
 }
 

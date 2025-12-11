@@ -40,6 +40,7 @@ namespace po
         poNode* parseConstructor();
         poNode* parsePrototype(const poToken& ret);
         poNode* parseConstructorPrototype();
+        poNode* parseExpression();
     private:
         const int parsePointer();
 
@@ -54,7 +55,6 @@ namespace po
         poNode* parseEquality();
         poNode* parseAnd();
         poNode* parseOr();
-        poNode* parseExpression();
         poNode* parseBody(const bool isLoop);
         poNode* parseArg();
         poNode* parseIfStatement(const bool isLoop);
