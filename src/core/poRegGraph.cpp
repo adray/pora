@@ -6,7 +6,6 @@
 #include "poUses.h"
 #include "poPhiWeb.h"
 
-#include <algorithm>
 #include <assert.h>
 
 using namespace po;

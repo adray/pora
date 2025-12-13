@@ -108,10 +108,10 @@ namespace po
     public:
         poToken(poTokenType token, const std::string& value, const int line, const int col, const int fileId);
         inline poTokenType token() const { return _tok; }
-        inline long long i64() const { return std::atoll(_value.c_str()); }
-        inline int i32() const { return std::atol(_value.c_str()); }
-        inline short i16() const { return (short) std::atol(_value.c_str()); }
-        inline char i8() const { return static_cast<char>(std::atoi(_value.c_str()));; }
+        inline int64_t i64() const { return std::atoll(_value.c_str()); }
+        inline int32_t i32() const { return std::atol(_value.c_str()); }
+        inline int16_t i16() const { return (short) std::atol(_value.c_str()); }
+        inline int8_t i8() const { return static_cast<char>(std::atoi(_value.c_str()));; }
         uint64_t u64() const;
         inline unsigned int u32() const { return std::atol(_value.c_str()); }
         inline unsigned short u16() const { return (unsigned short) std::atol(_value.c_str()); }
