@@ -2,6 +2,7 @@
 #include "poPE.h"
 #include "poCompiler.h"
 #include "poCOFF.h"
+#include "poELF.h"
 #include <iostream>
 #include <string>
 #include <cstring>
@@ -57,6 +58,20 @@ static bool openLibraryFile(const std::string& fileName, poCommonObjectFileForma
 
     std::cout << "Failed to open " << fileName << std::endl;
     return false;
+}
+#else
+static bool openLibraryFile(const std::string& fileName, poELF& elf)
+{
+    std::filesystem::path dir("/usr/lib");
+    if (!std::filesystem::exists(dir) || !std::filesystem::is_directory(dir))
+    {
+        std::cout << "Failed to open " << fileName << std::endl;
+        return false;
+    }
+
+    elf.open(dir.string() + "/" + fileName);
+        
+    return true;
 }
 #endif
 

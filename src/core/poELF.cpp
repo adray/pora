@@ -1,6 +1,8 @@
 #include "poELF.h"
 
 #include <fstream>
+#include <iostream>
+#include <vector>
 
 using namespace po;
 
@@ -10,6 +12,7 @@ typedef uint32_t    Elf64_Word;
 typedef uint64_t    Elf64_Addr;
 typedef uint64_t    Elf64_Off;
 typedef uint64_t    Elf64_Xword;
+typedef uint16_t    Elf64_Section;
 
 struct ElfHeader64
 {
@@ -55,6 +58,24 @@ struct ElfProgramHeader64
     Elf64_Xword	p_align;
 };
 
+struct Elf64_Sym
+{
+    Elf64_Word      st_name;
+    unsigned char   st_info;
+    unsigned char   st_other;
+    Elf64_Section   st_shndx;
+    Elf64_Addr      st_value;
+    Elf64_Xword     st_size;
+};
+
+poELF_Symbol::poELF_Symbol(const int id, const int size, const int strPos)
+    :
+    _id(id),
+    _size(size),
+    _strPos(strPos)
+{
+}
+
 poELF::poELF()
 {
 
@@ -89,3 +110,132 @@ void poELF::write(const std::string& filename)
         stream.write((char*)&header, sizeof(header));
     }
 }
+
+bool poELF::open(const std::string& filename)
+{
+    std::ifstream stream(filename, std::ios::binary);
+    if (stream.is_open())
+    {
+        ElfHeader64 header = {};
+        stream.read(reinterpret_cast<char*>( &header ), sizeof(header));
+        const int programHeaderTableOffset = header.e_phoff - sizeof(header);
+        if (header.e_ident[0] == 0x7F &&
+            header.e_ident[1] == 'E' &&
+            header.e_ident[2] == 'L' &&
+            header.e_ident[3] == 'F' &&
+            header.e_machine == 0x3E &&
+            programHeaderTableOffset == 0)
+        {
+            std::vector<ElfProgramHeader64> headers;
+            for (int i = 0; i < int(header.e_phnum); i++)
+            {
+                ElfProgramHeader64& programHeader = headers.emplace_back();
+                stream.read(reinterpret_cast<char*>(&programHeader), sizeof(programHeader));
+                //std::cout << programHeader.p_type << " " << programHeader.p_offset << " " << programHeader.p_filesz << std::endl;
+            }
+            
+            const int programDataPos = int(stream.tellg());
+            stream.seekg(header.e_shoff);
+
+            int dynSymPos = -1;
+            int dynSymSize = 0;
+            std::vector<int> stringTablePos; /*list of string tables*/
+            std::vector<int> stringTableName;
+            int shstrtab = -1;
+
+            std::vector<ElfSectionHeader64> sections;
+            for (int i = 0; i < int(header.e_shnum); i++)
+            {
+                ElfSectionHeader64& section = sections.emplace_back();
+                stream.read(reinterpret_cast<char*>(&section), sizeof(section));
+
+                //std::cout << section.sh_type << std::endl;
+
+                if (section.sh_type == 0xB) /* SHT_DYNSYM */
+                {
+                    dynSymPos = section.sh_offset;
+                    dynSymSize = section.sh_size;
+                }
+                else if (section.sh_type == 0x3) /* SHT_STRTAB */
+                {
+                    stringTablePos.push_back(section.sh_offset);
+                    stringTableName.push_back(section.sh_name);
+
+                    if (i == int(header.e_shstrndx))
+                    {
+                        shstrtab = int(stringTablePos.size()) - 1;
+                    }
+                }
+            }
+
+            if (dynSymPos != -1) {
+                //std::cout << "Dyn symbols - " << dynSymPos << " " << dynSymSize << std::endl; 
+                stream.seekg(dynSymPos);
+                const int num = dynSymSize / sizeof(Elf64_Sym);
+                for (int i = 0; i < num; i++) {
+                    Elf64_Sym sym;
+                    stream.read(reinterpret_cast<char*>(&sym), sizeof(sym));
+                
+                    //std::cout << sym.st_name << " " << sym.st_size << std::endl;
+                    _symbols.push_back(poELF_Symbol(
+                                int(_symbols.size()),
+                                sym.st_size,
+                                sym.st_name));
+                }
+            }
+
+            int dynstrtab = -1;
+            if (shstrtab != -1)
+            {
+                for (int i = 0; i < int(stringTablePos.size()); i++) {
+                    const int pos = int(stringTablePos[shstrtab]);
+                    const int namePos = int(stringTableName[i]);
+                    stream.seekg(pos + namePos);
+                    
+                    std::string name;
+                    char c = char(0);
+                    stream.read(&c, 1);
+                    name += c;
+                    while (c != 0) {
+                        stream.read(&c, 1);
+                        if (c != 0) name += c;
+                    }
+
+                    std::cout << name << std::endl;
+                    if (name == ".dynstr") {
+                        //std::cout << "Found dynamic string table" << std::endl;
+                        dynstrtab = i;
+                    }
+                }
+            }
+
+            for (poELF_Symbol& symbol : _symbols)
+            {
+                const int pos = int(stringTablePos[dynstrtab]);
+                stream.seekg(pos + symbol.strPos());
+                
+                std::string name;
+                char c = char(0);
+                stream.read(&c, 1);
+                name += c;
+                while (c != 0) {
+                    stream.read(&c, 1);
+                    if (c != 0) name += c;
+                }
+                symbol.setName(name);
+            }
+
+            return true;
+        }
+    }
+
+    return false;
+}
+void poELF::dump()
+{
+    for (poELF_Symbol& symbol : _symbols)
+    {
+        std::cout << symbol.id() << " " << symbol.getName() << std::endl;
+    }
+}
+
