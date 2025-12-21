@@ -69,23 +69,44 @@ static bool openLibraryFile(const std::string& fileName, poELF& elf)
         return false;
     }
 
+    int version = -1;
     std::filesystem::path path;
     for (const std::filesystem::path& file : std::filesystem::directory_iterator(dir))
     {
         const std::string& candidate = file.filename().string();
+        const std::string& substring = candidate.substr(0, fileName.size());
 
-        if (file > path &&
-            candidate == fileName)
+        if (substring == fileName)
         {
-            path = file;
+            if (version == -1 &&
+                file.extension().string() == ".so")
+            {
+                path = file;
+                version = 0;
+            }
+            else
+            {
+                const std::string& extension = file.extension().string();
+                if (extension.size() >= 2)
+                {
+                    const int newVersion = std::atoi(extension.substr(1).c_str());
+                    if (newVersion > version)
+                    {
+                        version = newVersion;
+                        path = file;
+                    }
+                }
+            }
         }
     }
 
     if (!path.empty())
     {
-        elf.open(dir.string() + "/" + fileName);
-
-        return true;
+        if (elf.open(path.string()))
+        {
+            std::cout << "Loaded " << path.string() << std::endl;
+            return true;
+        }
     }
 
     return false;

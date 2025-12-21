@@ -196,7 +196,6 @@ bool poELF::open(const std::string& filename)
                         if (c != 0) name += c;
                     }
 
-                    std::cout << name << std::endl;
                     if (name == ".dynstr") {
                         dynstrtab = i;
                     }
