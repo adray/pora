@@ -571,6 +571,12 @@ void po::syntaxTest()
         "   if (x >= y)"\
         "}"\
         "}", false);
+    checkSyntax("Branch Test #11", "namespace Test {"\
+        "static void main() {"\
+        "   boolean x = true;"\
+        "   if (!x){}"\
+        "}"\
+        "}", true);
     checkSyntax("While Test #1", "namespace Test {"\
         "static void main() {"\
         "   i64 x = 0; i64 y = 2;"\
@@ -1508,6 +1514,12 @@ void po::syntaxTest()
         "enum Enum { One = main() }"\
         "static void main() {"\
         "   Enum a = Enum::One;"\
+        "}"\
+        "}", false);
+    checkSyntax("Enums #10", "namespace Test {"\
+        "enum Enum { One }"\
+        "static void main() {"\
+        "   Enum::One = 10;"\
         "}"\
         "}", false);
 

@@ -952,13 +952,16 @@ poNode* poFunctionParser::parseIfStatement(const bool isLoop)
             _parser.advance();
 
             poNode* equality = parseExpression();
-            fixupExpression(equality);
-            if (evaluateNeedsFixup(equality))
+            if (equality)
             {
-                poNode* compare = insertCompare(equality);
-                equality = compare;
+                fixupExpression(equality);
+                if (evaluateNeedsFixup(equality))
+                {
+                    poNode* compare = insertCompare(equality);
+                    equality = compare;
+                }
+                children.push_back(new poUnaryNode(poNodeType::STATEMENT, equality, expr));
             }
-            children.push_back(new poUnaryNode(poNodeType::STATEMENT, equality, expr));
 
             if (_parser.match(poTokenType::CLOSE_PARAN))
             {

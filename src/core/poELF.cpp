@@ -118,7 +118,7 @@ bool poELF::open(const std::string& filename)
     {
         ElfHeader64 header = {};
         stream.read(reinterpret_cast<char*>( &header ), sizeof(header));
-        const int programHeaderTableOffset = header.e_phoff - sizeof(header);
+        const size_t programHeaderTableOffset = header.e_phoff - sizeof(header);
         if (header.e_ident[0] == 0x7F &&
             header.e_ident[1] == 'E' &&
             header.e_ident[2] == 'L' &&
@@ -131,16 +131,15 @@ bool poELF::open(const std::string& filename)
             {
                 ElfProgramHeader64& programHeader = headers.emplace_back();
                 stream.read(reinterpret_cast<char*>(&programHeader), sizeof(programHeader));
-                //std::cout << programHeader.p_type << " " << programHeader.p_offset << " " << programHeader.p_filesz << std::endl;
             }
             
             const int programDataPos = int(stream.tellg());
             stream.seekg(header.e_shoff);
 
-            int dynSymPos = -1;
-            int dynSymSize = 0;
-            std::vector<int> stringTablePos; /*list of string tables*/
-            std::vector<int> stringTableName;
+            size_t dynSymPos = -1;
+            size_t dynSymSize = 0;
+            std::vector<size_t> stringTablePos; /*list of string tables*/
+            std::vector<size_t> stringTableName;
             int shstrtab = -1;
 
             std::vector<ElfSectionHeader64> sections;
@@ -148,8 +147,6 @@ bool poELF::open(const std::string& filename)
             {
                 ElfSectionHeader64& section = sections.emplace_back();
                 stream.read(reinterpret_cast<char*>(&section), sizeof(section));
-
-                //std::cout << section.sh_type << std::endl;
 
                 if (section.sh_type == 0xB) /* SHT_DYNSYM */
                 {
@@ -169,18 +166,16 @@ bool poELF::open(const std::string& filename)
             }
 
             if (dynSymPos != -1) {
-                //std::cout << "Dyn symbols - " << dynSymPos << " " << dynSymSize << std::endl; 
                 stream.seekg(dynSymPos);
-                const int num = dynSymSize / sizeof(Elf64_Sym);
-                for (int i = 0; i < num; i++) {
+                const size_t num = dynSymSize / sizeof(Elf64_Sym);
+                for (size_t i = 0; i < num; i++) {
                     Elf64_Sym sym;
                     stream.read(reinterpret_cast<char*>(&sym), sizeof(sym));
-                
-                    //std::cout << sym.st_name << " " << sym.st_size << std::endl;
+
                     _symbols.push_back(poELF_Symbol(
                                 int(_symbols.size()),
-                                sym.st_size,
-                                sym.st_name));
+                                int(sym.st_size),
+                                int(sym.st_name)));
                 }
             }
 
@@ -203,7 +198,6 @@ bool poELF::open(const std::string& filename)
 
                     std::cout << name << std::endl;
                     if (name == ".dynstr") {
-                        //std::cout << "Found dynamic string table" << std::endl;
                         dynstrtab = i;
                     }
                 }

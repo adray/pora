@@ -69,9 +69,26 @@ static bool openLibraryFile(const std::string& fileName, poELF& elf)
         return false;
     }
 
-    elf.open(dir.string() + "/" + fileName);
-        
-    return true;
+    std::filesystem::path path;
+    for (const std::filesystem::path& file : std::filesystem::directory_iterator(dir))
+    {
+        const std::string& candidate = file.filename().string();
+
+        if (file > path &&
+            candidate == fileName)
+        {
+            path = file;
+        }
+    }
+
+    if (!path.empty())
+    {
+        elf.open(dir.string() + "/" + fileName);
+
+        return true;
+    }
+
+    return false;
 }
 #endif
 
@@ -116,6 +133,14 @@ int main(const int numArgs, const char** const args)
         if (!openLibraryFile("user32.lib", user32))
         {
             std::cout << "Failed to open user32.lib" << std::endl;
+            return 0;
+        }
+#else
+        // Link the C runtime
+        poELF elf;
+        if (!openLibraryFile("libc.so", elf))
+        {
+            std::cout << "Failed to open libc.so" << std::endl;
             return 0;
         }
 #endif
