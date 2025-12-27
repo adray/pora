@@ -158,8 +158,8 @@ int main(const int numArgs, const char** const args)
         }
 #else
         // Link the C runtime
-        poELF elf;
-        if (!openLibraryFile("libc.so", elf))
+        poELF libc;
+        if (!openLibraryFile("libc.so", libc))
         {
             std::cout << "Failed to open libc.so" << std::endl;
             return 0;
@@ -202,11 +202,11 @@ int main(const int numArgs, const char** const args)
         const std::vector<unsigned char>& readOnlyData = compiler.assembler().readOnlyData();
         std::unordered_map<std::string, int>& imports = compiler.assembler().imports();
 
-        // Create portable executable
-        poPortableExecutable exe;
-
         // Build the import tables
 #ifdef WIN32
+        // Create portable executable
+        poPortableExecutable exe;
+        
         const int kernel32ImportTable = exe.addImportTable("Kernel32.dll");
         const int user32ImportTable = exe.addImportTable("User32.dll");
 
@@ -229,9 +229,22 @@ int main(const int numArgs, const char** const args)
                 table.addImport(import.importName(), import.importOrdinal());
             }
         }
+#else
+        // Create ELF executable file
+        poELF elf;
+
+        for (const poELF_Symbol& symbol : libc.symbols())
+        {
+            if (imports.find(symbol.getName()) != imports.end())
+            {
+
+            }
+        }
 #endif
 
-        // Create the data sections
+        // Final linking..
+#ifdef WIN32
+         // Create the data sections
         exe.setEntryPoint(compiler.assembler().entryPoint());
         exe.addSection(poSectionType::TEXT, align(int(programData.size()), 1024));
         exe.addSection(poSectionType::INITIALIZED, align(int(initializedData.size()), 1024));
@@ -239,9 +252,7 @@ int main(const int numArgs, const char** const args)
         exe.addSection(poSectionType::IDATA, 1024 * 2);
         exe.addSection(poSectionType::READONLY, align(int(readOnlyData.size()), 1024));
         exe.initializeSections();
-        
-        // Final linking..
-#ifdef WIN32
+ 
         for (poImportEntry& importEntry : exe.importTable(kernel32ImportTable).imports())
         {
             const auto& it = imports.find(importEntry.name());
@@ -259,7 +270,7 @@ int main(const int numArgs, const char** const args)
                 it->second = importEntry.addressRVA();
             }
         }
-#endif
+       
         compiler.assembler().link(0x1000, exe.initializedDataImagePos(), exe.readonlyDataImagePos());
 
         // Write program data
@@ -271,6 +282,15 @@ int main(const int numArgs, const char** const args)
         exe.write("app.exe");
 
         std::cout << "Program compiled successfully: app.exe" << std::endl;
+#else
+        elf.add(poELF_SectionType::SHT_PROGBITS, ".text", align(int(programData.size()), 1024)); // SHF_ALLOC | SHF_EXECINSTR
+        
+        // Write program data
+        std::memcpy(elf.textSection().data().data(), programData.data(), programData.size());
+
+        // Write the elf file
+        elf.write("app");
+#endif
     }
 
     return 0;

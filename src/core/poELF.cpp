@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <cstring>
 
 using namespace po;
 
@@ -68,6 +69,21 @@ struct Elf64_Sym
     Elf64_Xword     st_size;
 };
 
+poELF_Segment::poELF_Segment(const poELF_SegmentType type, const poELF_SegmentFlags flags)
+    :
+    _type(type),
+    _flags(flags)
+{
+}
+
+poELF_Section::poELF_Section(const poELF_SectionType& type, const std::string& name, const int size)
+    :
+    _type(type),
+    _name(name),
+    _size(size)
+{
+}
+
 poELF_Symbol::poELF_Symbol(const int id, const int size, const int strPos)
     :
     _id(id),
@@ -77,8 +93,24 @@ poELF_Symbol::poELF_Symbol(const int id, const int size, const int strPos)
 }
 
 poELF::poELF()
+    :
+    _textSection(-1),
+    _readOnlyDataSection(-1)
 {
+}
 
+void poELF::addProgramHeader(std::vector<ElfProgramHeader64>& headers)
+{
+    ElfProgramHeader64& header = headers.emplace_back();
+    std::memset(&header, 0, sizeof(header));
+
+    header.p_type = int(poELF_SegmentType::PT_LOAD);
+    header.p_flags = int(poELF_SegmentFlags::PF_X);
+    header.p_offset = 0;
+    header.p_vaddr = 0;
+    header.p_filesz = 0;
+    header.p_memsz = 0;
+    header.p_align = 1024; // p_vaddr = p_offset % p_align
 }
 
 void poELF::write(const std::string& filename)
@@ -86,6 +118,11 @@ void poELF::write(const std::string& filename)
     std::ofstream stream(filename, std::ios::binary);
     if (stream.is_open())
     {
+        std::vector<ElfProgramHeader64> programHeaders;
+        std::vector<ElfSectionHeader64> sectionHeaders;
+
+        addProgramHeader(programHeaders);
+
         ElfHeader64 header = {};
         header.e_ident[0] = 0x7F;
         header.e_ident[1] = 'E';
@@ -102,12 +139,17 @@ void poELF::write(const std::string& filename)
         header.e_shoff = 0; // Section header table offset (we'll set this later)
         header.e_flags = 0;
         header.e_ehsize = sizeof(ElfHeader64);
-        header.e_phentsize = 56; // Size of program header entry
-        header.e_phnum = 0; // Number of program header entries (we'll set this later)
-        header.e_shentsize = 64; // Size of section header entry
-        header.e_shnum = 0; // Number of section header entries (we'll set this later)
+        header.e_phentsize = sizeof(ElfProgramHeader64); // Size of program header entry
+        header.e_phnum = int(programHeaders.size()); // Number of program header entries
+        header.e_shentsize = sizeof(ElfSectionHeader64); // Size of section header entry
+        header.e_shnum = int(sectionHeaders.size()); // Number of section header entries
         header.e_shstrndx = 0; // Section header string table index (we'll set this later)
         stream.write((char*)&header, sizeof(header));
+
+        for (ElfProgramHeader64& header : programHeaders)
+        {
+            stream.write((char*)&header, sizeof(header));
+        }
     }
 }
 
@@ -132,7 +174,7 @@ bool poELF::open(const std::string& filename)
                 ElfProgramHeader64& programHeader = headers.emplace_back();
                 stream.read(reinterpret_cast<char*>(&programHeader), sizeof(programHeader));
             }
-            
+ 
             const int programDataPos = int(stream.tellg());
             stream.seekg(header.e_shoff);
 
@@ -231,4 +273,14 @@ void poELF::dump()
         std::cout << symbol.id() << " " << symbol.getName() << std::endl;
     }
 }
+void poELF::add(const poELF_SectionType section, const std::string& name, const int size)
+{
+    if (name == ".text")
+    {
+        _textSection = int(_sections.size());
+    }
+
+    _sections.push_back(poELF_Section(section, name, size));
+}
+
 
