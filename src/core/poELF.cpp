@@ -997,7 +997,7 @@ void poELF::buildRelocationTable()
 void poELF::buildHashTable()
 {
     _hashTable.compute();
-    _hashTable.dump();
+    //_hashTable.dump();
 
     poELF_Section& hash = _sections[_hashtable];
     
