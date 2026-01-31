@@ -574,7 +574,7 @@ void poELF::write(const std::string& filename)
 
         // Setup the PHDR segments
 
-        int virtualAddress = programHeaders[int(programHeaders.size()) - 1].p_vaddr + programHeaders[int(programHeaders.size())-1].p_memsz;
+        int virtualAddress = int(programHeaders[int(programHeaders.size()) - 1].p_vaddr + programHeaders[int(programHeaders.size())-1].p_memsz);
         const int sectionMod = virtualAddress % pageSize;
         if (sectionMod > 0)
         {
@@ -644,7 +644,7 @@ void poELF::write(const std::string& filename)
             ElfSectionHeader64& header = sectionHeaders[i];
             poELF_Section& section = _sections[i];
             
-            const int padding = header.sh_offset - streamPos;
+            const int padding = int(header.sh_offset) - streamPos;
             for (int i = 0; i < padding; i++)
             {
                 const char pad = 0;
@@ -701,8 +701,8 @@ bool poELF::open(const std::string& filename)
 
                 if (section.sh_type == 0xB) /* SHT_DYNSYM */
                 {
-                    dynSymPos = section.sh_offset;
-                    dynSymSize = section.sh_size;
+                    dynSymPos = int(section.sh_offset);
+                    dynSymSize = int(section.sh_size);
                 }
                 else if (section.sh_type == 0x3) /* SHT_STRTAB */
                 {
@@ -728,7 +728,7 @@ bool poELF::open(const std::string& filename)
                                 int(sym.st_size),
                                 int(sym.st_name)));
                     symbol.setType(sym.st_info);
-                    symbol.setAddr(sym.st_value);
+                    symbol.setAddr(int(sym.st_value));
                 }
             }
 

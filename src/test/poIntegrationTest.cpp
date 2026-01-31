@@ -50,7 +50,7 @@ static bool executeCommand(const std::vector<std::string>& args, bool redirectOu
  
     std::stringstream ss;
     for (const std::string& arg : args) {
-        ss << "\"" << arg << "\"";
+        ss << "\"" << arg << "\" "; // make sure there is a space between args
     }
 
     BOOL res = CreateProcess(
@@ -146,11 +146,11 @@ static int compareStrings(const std::string& str1, const std::string& str2) {
 
     if (str1.size() > str2.size()) {
         if (str1[pos] != '\r') {
-            return pos;
+            return int(pos);
         }
     } else if (str2.size() > str1.size()) {
         if (str2[pos] != '\r') {
-            return pos;
+            return int(pos);
         }
     }
 
@@ -270,12 +270,12 @@ static void runIntegrationTest(const std::string& name, const std::string& path,
     args.push_back(dir + "string_class.po");
     args.push_back(dir + os + "clock.po");
     args.push_back(dir + os + "memory.po");
-    //args.push_back(dir + "pora.po");
-    //args.push_back(dir + os + "control.po");
+    args.push_back(dir + "pora.po");
+    args.push_back(dir + os + "control.po");
     args.push_back(dir + "calendar.po");
     args.push_back(dir + os + "date.po");
 
-    if (!executeCommand(args, false))
+    if (!executeCommand(args, true))
     {
         std::cout << " FAILED: compiler timed out or failed to start." << std::endl;
         return;

@@ -1,0 +1,53 @@
+namespace std
+{
+    struct SharedMemoryHeader
+    {
+        u32 magic;
+        u32 version;
+        u32 command_count;
+        u32 buffer_offset;
+        i64 mutex;
+        u8[32] reserved;
+    }
+    
+    struct SharedMemoryItem
+    {
+        u32 command_type;
+        u32 size;
+    }
+    
+    class SharedMemoryController
+    {
+        private i64 _handle;
+        private boolean _running;
+        
+        i64 getHandle();
+        void init();
+        void run();
+    }
+    
+    i64 SharedMemoryController::getHandle() { return _handle; }
+    
+    void SharedMemoryController::init()
+    {
+        
+    }
+    
+    void SharedMemoryController::run() {
+        _running = true;
+        while (_running) {
+            
+        }
+    }
+
+    static SharedMemoryController* ctrl;
+
+    static void startController() {
+        ctrl = new SharedMemoryController();
+        ctrl.init();
+    }
+    
+    static void shutdownController() {
+        //free((u8*)ctrl);
+    }
+}

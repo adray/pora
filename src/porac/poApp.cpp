@@ -294,7 +294,7 @@ int main(const int numArgs, const char** const args)
             }
         }
        
-        compiler.assembler().link(0x1000, exe.initializedDataImagePos(), exe.readonlyDataImagePos(), 0);
+        compiler.assembler().link(0x1000, exe.initializedDataImagePos(), exe.readonlyDataImagePos(), 0, 0);
 
         // Write program data
         std::memcpy(exe.textSection().data().data(), programData.data(), programData.size());

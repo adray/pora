@@ -1,5 +1,8 @@
 
 namespace std {
+    static void initializeMemory() {
+    }
+
     static u8* malloc2(u64 numBytes, u64 typeId, u64 flags) {
         if (numBytes == 0u) {
             return (u8*)null;
