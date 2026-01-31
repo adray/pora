@@ -26,11 +26,38 @@ namespace po
 {
     class poFlowGraph;
     class poModule;
+    class poFunction;
     class poInstruction;
     class poRegLinearIterator;
     class poConstantPool;
     class poBasicBlock;
     class PO_ALLOCATOR;
+
+    enum class poRelocationType
+    {
+        JUMP,
+        RELATIVE
+    };
+
+    class poRelocation
+    {
+        public:
+            poRelocation(const int pos, const poRelocationType type, const std::string& symbol) :
+                _symbol(symbol),
+                _relocationPos(pos),
+                _type(type)
+            {
+            }
+
+            const std::string& symbol() const { return _symbol; }
+            const int relocationPos() const { return _relocationPos; }
+            const poRelocationType type() const { return _type; }
+
+        private:
+            std::string _symbol;
+            int _relocationPos;
+            poRelocationType _type;
+    };
 
     class poAsmCopy
     {
@@ -127,17 +154,51 @@ namespace po
         std::unordered_map<int, int> _dataMap;
     };
 
+    class poAsmAddressBuffer
+    {
+        public:
+            inline void add(const int address) { _addresses.push_back(address); }
+            inline void patch(const int offset) {
+                for (int i = 0; i < int(_addresses.size()); i++) {
+                    _addresses[i] += offset;
+                }
+            }
+            inline void encode() {
+                _data.clear();
+                for (int i = 0; i < int(_addresses.size()); i++) {
+                    const int64_t addr = _addresses[i];
+                    _data.push_back(addr & 0xFF);
+                    _data.push_back((addr >> 8) & 0xFF);
+                    _data.push_back((addr >> 16) & 0xFF);
+                    _data.push_back((addr >> 24) & 0xFF);
+                    _data.push_back((addr >> 32) & 0xFF);
+                    _data.push_back((addr >> 40) & 0xFF);
+                    _data.push_back((addr >> 48) & 0xFF);
+                    _data.push_back((addr >> 56) & 0xFF);
+                }
+            }
+            const std::vector<unsigned char>& data() const { return _data; }
+            const int size() { return int(_addresses.size()) * sizeof(int64_t); }
+
+        private:
+            std::vector<int64_t> _addresses;
+            std::vector<unsigned char> _data;
+    };
+
     class poAsm
     {
     public:
         poAsm();
         void generate(poModule& module);
-        void link(const int programDataPos, const int initializedDataPos, const int readOnlyDataPos);
+        void link(const int programDataPos, const int initializedDataPos, const int readOnlyDataPos, const int pltDataPos, const int pltgotDataPos);
 
+        inline const std::vector<poRelocation>& pltRelocations() const { return _pltRelocations; }
         inline std::unordered_map<std::string, int>& imports() { return _imports; }
         inline const std::vector<unsigned char>& programData() const { return _x86_64.programData(); }
         inline const std::vector<unsigned char>& initializedData() const { return _initializedData.data(); }
         inline const std::vector<unsigned char>& readOnlyData() const { return _readOnlyData.data(); }
+        inline const std::vector<unsigned char>& pltData() const { return _plt.programData(); }
+        inline const std::vector<unsigned char>& pltGotData() const { return _pltgot.data(); }
         inline const int entryPoint() const { return _entryPoint; }
         inline bool isError() const { return _isError; }
         inline const std::string& errorText() const { return _errorText; }
@@ -152,6 +213,7 @@ namespace po
         void generate(poModule& module, poFlowGraph& cfg, const int numArgs);
         void generateMachineCode(poModule& module);
         void generateExternStub(poModule& module, poFlowGraph& cfg);
+        void generateExternStub(const poFunction& function);
         void patchForwardJumps(po_x86_64_basic_block* bb);
         void scanBasicBlocks(poFlowGraph& cfg);
         void patchJump(po_x86_64_basic_block* jump);
@@ -194,14 +256,22 @@ namespace po
         void ir_store_global(poModule& module, PO_ALLOCATOR& allocator, const poInstruction& ins);
         bool ir_jump(const int jump, const int imm, const int type);
 
+        std::vector<poRelocation> _pltRelocations;
         std::unordered_map<std::string, int> _mapping;
+        std::unordered_map<std::string, int> _pltmapping;
         std::vector<poAsmCall> _calls;
         std::vector<poAsmExternCall> _externCalls;
+        std::vector<poAsmCall> _pltCalls;
+        std::vector<poAsmExternCall> _externPLTCalls;
+        std::vector<poAsmCall> _unknownCalls;
         std::unordered_map<std::string, int> _imports;
+        std::vector<int> _indirectCalls;
         poAsmDataBuffer _readOnlyData;
         poAsmDataBuffer _initializedData;
         std::unordered_map<poBasicBlock*, po_x86_64_basic_block*> _basicBlockMap;
         poPhiWeb _web;
+        poAsmAddressBuffer _pltgot;
+        po_x86_64 _plt;
         po_x86_64 _x86_64;
         po_x86_64_Lower _x86_64_lower;
         int _entryPoint;

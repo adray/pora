@@ -1,0 +1,21 @@
+
+namespace std {
+    static u8* malloc2(u64 numBytes, u64 typeId, u64 flags) {
+        if (numBytes == 0u) {
+            return (u8*)null;
+        }
+
+        return malloc(numBytes);
+    }
+
+
+    static u8* malloc3(u64 numBytes, u64 numElements, u64 typeId, u64 flags) {
+        if (numBytes == 0u) {
+            return (u8*)null;
+        }
+
+        return malloc(numBytes * numElements);
+    }
+}
+
+

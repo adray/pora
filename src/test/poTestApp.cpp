@@ -11,6 +11,7 @@
 #include "poRegGraphTests.h"
 
 #include <iostream>
+#include <cstring>
 
 using namespace po;
 

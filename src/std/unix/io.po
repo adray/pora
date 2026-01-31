@@ -1,0 +1,28 @@
+namespace std {
+    static void println(u8* str, u32 len) {
+        //i64 err = (i64)puts(str);
+        //if (err == -1) {
+        //    perror("puts()");
+        //}
+
+        // TODO: This is aligned with windows, which isn't
+        // really how it should work
+
+        print(str, len);
+        puts("");
+        putchar((i32)0);
+    }
+
+    static void print(u8* str, u32 len) {
+        u8[] arr = (u8[0])str;
+        for (i64 i = 0; i < (i64)len; i+=1) {
+            i64 err = (i64)putchar((i32)arr[i]);
+        }
+    }
+
+    static void print_64(i64 value) {
+        u8[128] buffer;
+        u32 size = toString(value, (u8*)buffer, (u32)128);
+        print((u8*)buffer, size);
+    }
+}

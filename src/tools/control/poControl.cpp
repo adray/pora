@@ -1,8 +1,8 @@
 #include "poControl.h"
 
-#include <Windows.h>
 #include <iostream>
 #include <string>
+#include <cstdint>
 
 struct sharedMemoryHeader
 {
@@ -13,6 +13,10 @@ struct sharedMemoryHeader
     int64_t mutex;
     uint8_t reserved[32];
 };
+
+#ifdef WIN32
+
+#include <Windows.h>
 
 static void monitorProcess(const std::string& pid)
 {
@@ -71,6 +75,28 @@ static void run()
         return;
     }
 }
+
+#else
+
+#include <unistd.h>
+#include <sys/mman.h>
+
+static void monitorProcess(const std::string& pid)
+{
+    // Open shared memory using the name of the process ID
+
+
+}
+
+static void run()
+{
+    const int pid = getpid();
+    std::cout << "Process ID: " << pid << std::endl;
+
+    // Create shared memory using the name of the process ID
+}
+
+#endif
 
 int main(int argc, char** argv)
 {

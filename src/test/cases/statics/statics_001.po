@@ -16,8 +16,9 @@ namespace Test {
         z = x + y;
         print_64(z);
         
-        i64 heap = GetProcessHeap();
-        p = (p*)HeapAlloc(heap, (i32)0, (u64)sizeof(p));
+        //i64 heap = GetProcessHeap();
+        //p = (p*)HeapAlloc(heap, (i32)0, (u64)sizeof(p));
+        p = (p*)malloc(sizeof(p));
         p.q = 99;
         print_64(p.q);
     }

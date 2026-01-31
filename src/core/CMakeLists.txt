@@ -66,5 +66,8 @@ if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET poracore PROPERTY CXX_STANDARD 20)
 endif()
 
-
+if (NOT(WIN32))
+  target_compile_options(poracore PRIVATE -Wall -Wextra) 
+  # -Wpadantic not included for now
+endif()
 

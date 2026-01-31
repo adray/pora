@@ -1,0 +1,32 @@
+//
+// Standard Library for Unix/Linux
+//
+
+namespace std {
+    extern i32 puts(u8* str);
+    extern i32 putchar(i32 ch);
+    extern void perror(u8* str);
+    extern i32 execve(u8* path, u8** args, u8** evnp);
+    extern u8* malloc(u64 size);
+    extern void free(u8* ptr);
+
+    struct tm {
+        i32 tm_sec;
+        i32 tm_min;
+        i32 tm_hours;
+        i32 tm_mday;
+        i32 tm_mon;
+        i32 tm_year;
+        i32 tm_wday;
+        i32 tm_yday;
+        i32 tm_isdst; // daylight saving time
+    }
+
+    // Note that the localtime returns
+    // a pointer to an internal structure.
+    // This is also not thread-safe on Linux.
+
+    extern u64 time(u64* arg);
+    extern tm* localtime(u64* time);
+}
+

@@ -1115,7 +1115,7 @@ void po_x86_64::emit_sse_brmo(const vm_sse_instruction& ins, int src, int dst, i
     _programData.push_back(ins.ins2);
     _programData.push_back(ins.ins3);
 
-    if (src == VM_REGISTER_ESP)
+    if ((src % 8) == VM_REGISTER_ESP)
     {
         _programData.push_back((((dst % 8) & 0x7) << 3) | 0x4 | (0x2 << 6));
         _programData.push_back(0x24); // SIB byte
@@ -1151,7 +1151,7 @@ void po_x86_64::emit_sse_bmro(const vm_sse_instruction& ins, int src, int dst, i
     _programData.push_back(ins.ins2);
     _programData.push_back(ins.ins3);
 
-    if (dst == VM_REGISTER_ESP)
+    if ((dst % 8) == VM_REGISTER_ESP)
     {
         _programData.push_back((((src % 8) & 0x7) << 3) | 0x4 | (0x2 << 6));
         _programData.push_back(0x24); // SIB byte

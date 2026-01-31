@@ -1802,8 +1802,11 @@ static const int align(const int size)
 
 void poAsm::generatePrologue(PO_ALLOCATOR& allocator)
 {
+    int numPushed = 1;
+    _x86_64_lower.mc_push_reg(VM_REGISTER_EBP);
+    _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_EBP, VM_REGISTER_ESP);
+
     // Push all non-volatile general purpose registers which are used
-    int numPushed = 0;
     for (int i = 0; i < VM_REGISTER_MAX; i++)
     {
         if (!allocator.isVolatile(i) && allocator.isRegisterSet(i))
@@ -1896,7 +1899,7 @@ void poAsm::generateEpilogue(PO_ALLOCATOR& allocator)
 
     const int size = _prologueSize - 8 * numToPop;
 
-    int count = 0;
+    int count = 1;
     for (int i = VM_REGISTER_MAX; i < VM_REGISTER_MAX + VM_SSE_REGISTER_MAX; i++)
     {
         if (!allocator.isVolatile(i) && allocator.isRegisterSet(i))
@@ -1919,6 +1922,9 @@ void poAsm::generateEpilogue(PO_ALLOCATOR& allocator)
             _x86_64_lower.mc_pop_reg(i);
         }
     }
+ 
+    _x86_64_lower.mc_mov_reg_to_reg_x64(VM_REGISTER_ESP, VM_REGISTER_EBP);
+    _x86_64_lower.mc_pop_reg(VM_REGISTER_EBP);
 }
 
 void poAsm::dump(const PO_ALLOCATOR& allocator, poRegLinearIterator& iterator, poFlowGraph& cfg)
@@ -2276,10 +2282,17 @@ void poAsm::generateMachineCode(poModule& module)
                     std::string symbolName;
                     module.getSymbol(symbol, symbolName);
 
+#ifdef WIN32
                     // Add patch for this call
 
                     _calls.push_back(poAsmCall(int(_x86_64.programData().size()), 0/*numArgs*/, symbolName));
                     _x86_64.mc_call(0); // Placeholder for the call
+#else
+                    // If it is Linux and an external call we need to call into the PLT
+
+                    _unknownCalls.push_back( poAsmCall(int(_x86_64.programData().size()), 0/*numArgs*/, symbolName) );
+                    _x86_64.mc_call(0); // Placeholder for the call                                           
+#endif
                 }
                 break;
                 case VMI_SAR8_SRC_IMM_DST_REG:
@@ -2521,26 +2534,68 @@ void poAsm::generateExternStub(poModule& module, poFlowGraph& cfg)
     _x86_64.mc_jump_memory(0); // Placeholder for the extern function call
 }
 
+void poAsm::generateExternStub(const poFunction& function)
+{
+    const std::string& name = function.name();
+    const std::string& fullname = function.fullname();
+    _imports.insert(std::pair<std::string, int>(name, 0));
+
+    // Add a jump into the PLT to the GOT address
+
+    _pltmapping.insert(std::pair<std::string, int>(fullname, int(_pltgot.size())));
+    _externPLTCalls.push_back(poAsmExternCall(fullname, int(_plt.programData().size()) + 2 /* get the position of the displacement */));
+    _plt.mc_jump_memory(0); // Placeholder for the extern function call
+
+    // Add the pre-patched scaffolding
+
+    const int targetPos = int(_plt.programData().size());
+    _plt.mc_push_32(0); // TODO: may need to be push 64. Also assuming the symbol id = 0
+    _pltCalls.push_back(poAsmCall(int(_plt.programData().size()) + 1 /* get the position of the displacement */, 0 /* numArgs */, "_dl_runtime_resolve")); 
+    _plt.mc_jump_unconditional(0);
+
+    // Add the GOT entry to the real function in the shared library
+
+    _pltRelocations.push_back(poRelocation(int(_pltgot.size()),
+                poRelocationType::JUMP,
+                name));
+    _pltgot.add(targetPos);
+
+}
+
 void poAsm::generate(poModule& module)
 {
+#ifndef WIN32
+    // Generate the initial PLT code used by lazy loading
+    // TODO: This needs completing (its OK as we disable it, but could be overriden)
+    const std::string runtime_resolve = "_dl_runtime_resolve";
+    _mapping.insert(std::pair<std::string, int>(runtime_resolve, int(_plt.programData().size())));
+    _plt.mc_jump_memory(0); // Insert a blank entry
+#endif
+
     std::vector<poFunction>& functions = module.functions();
     for (poFunction& function : functions)
     {
-        _mapping.insert(std::pair<std::string, int>(function.fullname(), int(_x86_64.programData().size())));
-
         if (function.hasAttribute(poAttributes::EXTERN))
         {
+#ifdef WIN32
+            _mapping.insert(std::pair<std::string, int>(function.fullname(), int(_x86_64.programData().size())));
+
             _externCalls.push_back(poAsmExternCall(function.name(), int(_x86_64.programData().size()) + 2 /* get the position of the displacement */));
             _imports.insert(std::pair<std::string, int>(function.name(), 0));
             generateExternStub(module, function.cfg());
-        }
+#else
+            // Insert into the PLT
+            _mapping.insert(std::pair<std::string, int>(function.fullname(), int(_plt.programData().size())));
+
+            generateExternStub(function);
+#endif
+        } 
         else
         {
+            _mapping.insert(std::pair<std::string, int>(function.fullname(), int(_x86_64.programData().size())));
             generate(module, function.cfg(), int(function.args().size()));
         }
     }
-
-    patchCalls();
 
     std::string mainName;
     std::string openName;
@@ -2560,8 +2615,10 @@ void poAsm::generate(poModule& module)
     const auto& main = _mapping.find(mainName);
     if (main != _mapping.end())
     {
+        const int stackSize = 8;
+
         _entryPoint = int(_x86_64.programData().size());
-        _x86_64.mc_sub_imm_to_reg_x64(VM_REGISTER_EBP, 8);
+        _x86_64.mc_sub_imm_to_reg_x64(VM_REGISTER_ESP, stackSize);
 
         const auto& open = _mapping.find(openName);
         if (open != _mapping.end())
@@ -2570,8 +2627,56 @@ void poAsm::generate(poModule& module)
             _x86_64.mc_call(imm);
         }
 
+#ifndef WIN32
+        // Linux we link to GLIBC so we need to call  __libc_start_main
+        // Lets add the symbol here
+        const std::string libcStartMain = "__libc_start_main";
+        _imports.insert(std::pair<std::string, int>(libcStartMain, 0));
+
+        // 7 parameters...
+
+        const int mainImm = main->second /*- int(_x86_64.programData().size()) + 9*/;
+        _x86_64.mc_mov_imm_to_reg_x64(VM_ARG1, mainImm);
+        _indirectCalls.push_back(_x86_64.programData().size() - sizeof(int64_t));
+
+        _x86_64.mc_mov_imm_to_reg_x64(VM_ARG2, 0); 
+        _x86_64.mc_mov_imm_to_reg_x64(VM_ARG3, 0); 
+        _x86_64.mc_mov_imm_to_reg_x64(VM_ARG4, 0);
+        _x86_64.mc_mov_imm_to_reg_x64(VM_ARG5, 0); 
+        _x86_64.mc_mov_imm_to_reg_x64(VM_ARG6, 0); 
+
+        // Add patch for this call to the function in the PLT
+
+        _mapping.insert(std::pair<std::string, int>(libcStartMain, int(_plt.programData().size())));
+        _externCalls.push_back(poAsmExternCall( libcStartMain, int(_x86_64.programData().size())));
+        _x86_64.mc_call(0); // Placeholder for the call
+
+        // Add a jump into the PLT to the GOT address
+
+        _pltmapping.insert(std::pair<std::string, int>(libcStartMain, int(_pltgot.size())));
+        _externPLTCalls.push_back(poAsmExternCall(libcStartMain, int(_plt.programData().size()) + 2 /* get the position of the displacement */));
+        _plt.mc_jump_memory(0); // Placeholder for the extern function call
+ 
+        // Add the pre-patched scaffolding
+
+        const int targetPos = int(_plt.programData().size());
+        _plt.mc_push_32(0); // TODO: may need to be push 64. Also assuming the symbol id = 0
+        _pltCalls.push_back(poAsmCall(int(_plt.programData().size()) + 1 /* get the position of the displacement */, 0 /* numArgs */, runtime_resolve)); 
+        _plt.mc_jump_unconditional(0);
+
+        // Add the GOT entry to the real function in the shared library
+
+        _pltRelocations.push_back(poRelocation(int(_pltgot.size()),
+                    poRelocationType::JUMP,
+                    libcStartMain));
+        _pltgot.add(targetPos);
+        _pltgot.encode();
+#else
         const int mainImm = main->second - int(_x86_64.programData().size());
         _x86_64.mc_call(mainImm);
+#endif
+
+        // TODO: this won't get run on linux
 
         const auto& close = _mapping.find(closeName);
         if (close != _mapping.end())
@@ -2580,7 +2685,7 @@ void poAsm::generate(poModule& module)
             _x86_64.mc_call(imm);
         }
 
-        _x86_64.mc_add_imm_to_reg_x64(VM_REGISTER_EBP, 8);
+        _x86_64.mc_add_imm_to_reg_x64(VM_REGISTER_ESP, stackSize);
         _x86_64.mc_return();
     }
     else
@@ -2621,10 +2726,53 @@ void poAsm::patchCalls()
             setError(ss.str());
         }
     }
+
+    for (auto& call : _pltCalls)
+    {
+        // This is a jump from somewhere in the PLT to somewhere else in the PLT
+
+        const int pos = call.getPos();
+        const std::string& symbol = call.getSymbol();
+        const auto& it = _mapping.find(symbol);
+
+        if (it != _mapping.end())
+        {
+            const int disp32 = it->second - (pos + int(sizeof(int32_t)));
+            _plt.programData()[pos] = disp32 & 0xFF;
+            _plt.programData()[pos + 1] = (disp32 >> 8) & 0xFF;
+            _plt.programData()[pos + 2] = (disp32 >> 16) & 0xFF;
+            _plt.programData()[pos + 3] = (disp32 >> 24) & 0xFF;   
+        }
+        else
+        {
+            std::stringstream ss;
+            ss << "Unresolved symbol " << symbol;
+            setError(ss.str());
+        }
+    }
 }
 
-void poAsm::link(const int programDataPos, const int initializedDataPos, const int readOnlyDataPos)
+void poAsm::link(const int programDataPos, const int initializedDataPos, const int readOnlyDataPos, const int pltDataPos, const int pltgotDataPos)
 {
+    for (poAsmCall& call : _unknownCalls)
+    {
+        // We didn't know if this was a call to the PLT or not.
+        // Lets try to determine and push it onto the right list.
+
+        if (_pltmapping.find(call.getSymbol()) == _mapping.end())
+        {
+           _calls.push_back(call);
+        }
+        else
+        {
+            // Add patch for this call to the function in the PLT
+
+           _externCalls.push_back(poAsmExternCall( call.getSymbol(), call.getPos()));
+        }
+    }
+    
+    patchCalls();
+
     for (auto& constant : _readOnlyData.patchPoints())
     {
         const int disp32 = (constant.getDataPos() + readOnlyDataPos) - (programDataPos + constant.getProgramDataPos() + int(sizeof(int32_t)));
@@ -2645,10 +2793,55 @@ void poAsm::link(const int programDataPos, const int initializedDataPos, const i
 
     for (auto& externCall : _externCalls)
     {
+#ifdef WIN32
         const int disp32 = _imports[externCall.name()] - (externCall.programPos() + programDataPos + int(sizeof(int32_t)));
         _x86_64.programData()[externCall.programPos()] = disp32 & 0xFF;
         _x86_64.programData()[externCall.programPos() + 1] = (disp32 >> 8) & 0xFF;
         _x86_64.programData()[externCall.programPos() + 2] = (disp32 >> 16) & 0xFF;
         _x86_64.programData()[externCall.programPos() + 3] = (disp32 >> 24) & 0xFF;
+#else
+        const int disp32 = pltDataPos + _mapping[externCall.name()] - (programDataPos + externCall.programPos());
+
+        const int size = 5;
+        const int dataPos = int(_x86_64.programData().size());
+        _x86_64.mc_call(disp32);
+        memcpy(_x86_64.programData().data() + externCall.programPos(), _x86_64.programData().data() + dataPos, size);
+        _x86_64.programData().resize(_x86_64.programData().size() - size);
+#endif
     }
+
+    for (auto& externCall : _externPLTCalls)
+    {
+        const int disp32 = pltgotDataPos + _pltmapping[externCall.name()] - (externCall.programPos() + pltDataPos + int(sizeof(int32_t)));
+        _plt.programData()[externCall.programPos()] = disp32 & 0xFF;
+        _plt.programData()[externCall.programPos() + 1] = (disp32 >> 8) & 0xFF;
+        _plt.programData()[externCall.programPos() + 2] = (disp32 >> 16) & 0xFF;
+        _plt.programData()[externCall.programPos() + 3] = (disp32 >> 24) & 0xFF;
+    }
+
+    for (const int call : _indirectCalls)
+    {
+        const int64_t disp = programDataPos + 
+            (int64_t(_x86_64.programData()[call]) |
+            (int64_t(_x86_64.programData()[call + 1]) << 8) |
+            (int64_t(_x86_64.programData()[call + 2]) << 16) |
+            (int64_t(_x86_64.programData()[call + 3]) << 24) |
+            (int64_t(_x86_64.programData()[call + 4]) << 32) |
+            (int64_t(_x86_64.programData()[call + 5]) << 40) |
+            (int64_t(_x86_64.programData()[call + 6]) << 48) |
+            (int64_t(_x86_64.programData()[call + 7]) << 56));
+ 
+        _x86_64.programData()[call] = disp & 0xFF;
+        _x86_64.programData()[call + 1] = (disp >> 8) & 0xFF;
+        _x86_64.programData()[call + 2] = (disp >> 16) & 0xFF;
+        _x86_64.programData()[call + 3] = (disp >> 24) & 0xFF;
+
+        _x86_64.programData()[call + 4] = (disp >> 32) & 0xFF;
+        _x86_64.programData()[call + 5] = (disp >> 40) & 0xFF;
+        _x86_64.programData()[call + 6] = (disp >> 48) & 0xFF;
+        _x86_64.programData()[call + 7] = (disp >> 56) & 0xFF;
+    }
+
+    _pltgot.patch(pltDataPos);
+    _pltgot.encode();
 }

@@ -1,6 +1,7 @@
 #include "poCodeGen.h"
 #include "poAsm.h"
 #include "poPE.h"
+#include "poELF.h"
 #include <cstring>
 
 #include <iostream>
@@ -765,6 +766,33 @@ static void generateSarInstructions(po_x86_64& x86_64)
     generatePadding(x86_64);
 }
 
+void generateMovsdInstructions(po_x86_64& x86_64)
+{
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_movsd_memory_to_reg_x64(int(VM_SSE_REGISTER_XMM0), i, 0);
+    }
+    generatePadding(x86_64);
+
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_movsd_memory_to_reg_x64(int(VM_SSE_REGISTER_XMM12), i, 0);
+    }
+    generatePadding(x86_64);
+
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_movsd_reg_to_memory_x64(i, int(VM_SSE_REGISTER_XMM0), 0);
+    }
+    generatePadding(x86_64);
+
+    for (int i = 0; i <= VM_REGISTER_R15; i++)
+    {
+        x86_64.mc_movsd_reg_to_memory_x64(i, int(VM_SSE_REGISTER_XMM12), 0);
+    }
+    generatePadding(x86_64);
+}
+
 int main(int numArgs, char** args)
 {
     std::cout << "Running code gen test" << std::endl;
@@ -788,11 +816,13 @@ int main(int numArgs, char** args)
     if (strcmp(args[1], "lea") == 0) { generateLeaInstructions(x86_64); }
     if (strcmp(args[1], "sal") == 0) { generateSalInstructions(x86_64); }
     if (strcmp(args[1], "sar") == 0) { generateSarInstructions(x86_64);  }
+    if (strcmp(args[1], "movsd") == 0) { generateMovsdInstructions(x86_64); }
 
     //generateMovZXInstructions1(x86_64);
     //generateMovZXInstructions2(x86_64);
     //generateUnarySubInstructions(x86_64);
 
+#ifdef WIN32
     poPortableExecutable exe;
 
     // Create the data sections
@@ -812,6 +842,43 @@ int main(int numArgs, char** args)
     exe.write("app.exe");
 
     std::cout << "Program compiled successfully: app.exe" << std::endl;
+#else
+    poELF elf;
+
+    // Create the data sections
+    elf.setEntryPoint(0x4000);
+    elf.add(poELF_SectionType::SHT_NULL, "", 0); // always start with a NULL section
+    elf.add(poELF_SectionType::SHT_PROGBITS, ".interp", 0);
+    elf.add(poELF_SectionType::SHT_STRTAB, ".shstrtab", 1024);
+    elf.add(poELF_SectionType::SHT_STRTAB, ".dynstr", 0);
+    elf.add(poELF_SectionType::SHT_PROGBITS, ".text", 1024 * 4);
+    elf.add(poELF_SectionType::SHT_PROGBITS, ".rodata", 1024);
+    elf.add(poELF_SectionType::SHT_PROGBITS, ".data", 1024);
+    elf.add(poELF_SectionType::SHT_HASH, ".hash", 0);
+    elf.add(poELF_SectionType::SHT_SYMTAB, ".symtab", 0);
+    //elf.add(poELF_SectionType::SHT_RELA, ".rela.text", 0);
+    //elf.add(poELF_SectionType::SHT_REL, ".rel.text", 0);
+    elf.add(poELF_SectionType::SHT_PROGBITS, ".plt", 1024);
+    elf.add(poELF_SectionType::SHT_PROGBITS, ".got.plt", 1024);
+    elf.add(poELF_SectionType::SHT_RELA, ".rela.plt", 0);
+    //elf.add(poELF_SectionType::SHT_NOBITS, ".tbss", 1024);
+    //elf.add(poELF_SectionType::SHT_PROGBITS, ".tdata", 1024);
+    elf.add(poELF_SectionType::SHT_DYNAMIC, ".dynamic", 0); // always the last section
+    elf.initializeSections();
+
+    // Write program data
+    std::memcpy(elf.textSection().data().data(), x86_64.programData().data(), x86_64.programData().size());
+    //std::memcpy(elf.readOnlySection().data().data(), readOnlyData.data(), readOnlyData.size());
+    //std::memcpy(elf.initializedDataSection().data().data(), initializedData.data(), initializedData.size());
+    //std::memcpy(elf.pltDataSection().data().data(), pltData.data(), pltData.size());
+    //std::memcpy(elf.pltGotDataSection().data().data(), pltgotData.data(), pltgotData.size());
+
+    // Write the elf file
+    elf.write("app");
+
+    std::cout << "Program compiled successfully: app" << std::endl;
+
+#endif
 
     return 0;
 }

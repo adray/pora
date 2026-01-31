@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <iostream>
 #include <fstream>
+#include <vector>
 
 #ifdef WIN32
 #include <Windows.h>
@@ -16,7 +17,7 @@ static void safeClose(HANDLE handle)
     }
 }
 
-static bool executeCommand(const std::string& args, bool redirectOutput)
+static bool executeCommand(const std::vector<std::string>& args, bool redirectOutput)
 {
     HANDLE hStdOut = nullptr;
     if (redirectOutput)
@@ -46,10 +47,15 @@ static bool executeCommand(const std::string& args, bool redirectOutput)
     si.cb = sizeof(si);
     si.dwFlags = STARTF_USESTDHANDLES;
     si.hStdOutput = hStdOut;
-    
+ 
+    std::stringstream ss;
+    for (const std::string& arg : args) {
+        ss << "\"" << arg << "\"";
+    }
+
     BOOL res = CreateProcess(
         nullptr,
-        const_cast<char*>(args.c_str()),
+        const_cast<char*>(ss.str().c_str()),
         nullptr,
         nullptr,
         TRUE,
@@ -79,14 +85,77 @@ static bool executeCommand(const std::string& args, bool redirectOutput)
     return WAIT_TIMEOUT != result;
 }
 #else
-static bool executeCommand(const std::string& args, bool redirectOutput)
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+ 
+static bool executeCommand(const std::vector<std::string>& args, bool redirectOutput)
 {
-    // TODO
+    fflush(stdout); // flush before forking, otherwise child will inherit output
+    const int pid = fork();
+    if (pid == 0) {
+        if (redirectOutput) {
+            const int fd = open("output.txt", O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+            dup2(fd, STDOUT_FILENO);
+        } else {
+            const int fd = open("/dev/null", O_APPEND);
+            dup2(fd, STDOUT_FILENO);
+        }
+        std::vector<char*> cmd;
+        for (const std::string& arg : args) {
+            cmd.push_back(const_cast<char*>(arg.data()));
+        }
+        cmd.push_back(nullptr);
+
+        const int result = execv(args[0].c_str(), cmd.data());
+        if (result == -1) {
+            std::cout << "Process error";
+        }
+        fflush(stdout);
+        exit(result);
+    } else if (pid == -1) {
+        return false;
+    } else {
+        // Wait for child process to terminate
+        int status;
+        waitpid(pid, &status, 0);
+    }
+
+    return true;
 }
 
 #endif
 
 using namespace po;
+
+// Compare strings ignoring line endings
+static int compareStrings(const std::string& str1, const std::string& str2) {
+    size_t pos = 0;
+    while (pos < str1.size() && pos < str2.size()) {
+        if (str1[pos] != str2[pos]) {
+            return int(pos);
+        }
+
+        pos++;
+    }
+    
+    if (std::abs(int(str1.size() - str2.size())) > 1) {
+        return int(pos);
+    }
+
+    if (str1.size() > str2.size()) {
+        if (str1[pos] != '\r') {
+            return pos;
+        }
+    } else if (str2.size() > str1.size()) {
+        if (str2[pos] != '\r') {
+            return pos;
+        }
+    }
+
+    return -1;
+}
 
 static bool compareOutput(const std::string& sourceFile, const std::string& actualFile, const bool interactive)
 {
@@ -129,7 +198,8 @@ static bool compareOutput(const std::string& sourceFile, const std::string& actu
         std::getline(sourceStream, expected);
         std::getline(actualStream, actual);
         
-        if (expected != actual)
+        const int pos = compareStrings(expected, actual);
+        if (pos != -1)
         {
             failed = true;
 
@@ -138,6 +208,7 @@ static bool compareOutput(const std::string& sourceFile, const std::string& actu
                 std::cout << "Output mismatch:" << std::endl;
                 std::cout << "Expected: " << expected << std::endl;
                 std::cout << "Actual:   " << actual << std::endl;
+                std::cout << "Error Pos: " << pos << std::endl;
             }
         }
     }
@@ -171,33 +242,57 @@ static void runIntegrationTest(const std::string& name, const std::string& path,
 {
     std::cout << "Integration Test " << name;
 
-    if (std::filesystem::exists("app.exe"))
+#ifdef WIN32
+    const std::vector<std::string> app = { "app.exe" };
+#else
+    const std::vector<std::string> app = { "./app" };
+#endif
+    if (std::filesystem::exists(app[0]))
     {
-        std::filesystem::remove("app.exe");
+        std::filesystem::remove(app[0]);
     }
 
-    std::stringstream ss;
-    ss << "\"" << compiler << "\" build \"" << path << "\"" <<
-        " \"" << std << "\\os.po" << "\""
-        " \"" << std << "\\io.po" << "\""
-        " \"" << std << "\\string.po" << "\""
-        " \"" << std << "\\string_class.po" << "\""
-        " \"" << std << "\\clock.po" << "\""
-        " \"" << std << "\\memory.po" << "\""
-        " \"" << std << "\\pora.po" << "\""
-        " \"" << std << "\\control.po" << "\""
-        " \"" << std << "\\calendar.po" << "\""
-        " \"" << std << "\\date.po" << "\""
-        ;
-    if (!executeCommand(ss.str(), false))
+#ifdef WIN32
+    const std::string os = "win\\";
+    const std::string dir = std + "\\";
+#else
+    const std::string os = "unix/";
+    const std::string dir = std + "/";
+#endif
+
+    std::vector<std::string> args;
+    args.push_back(compiler);
+    args.push_back("build");
+    args.push_back(path);
+    args.push_back(dir + os + "os.po");
+    args.push_back(dir + os + "io.po");
+    args.push_back(dir + "string.po");
+    args.push_back(dir + "string_class.po");
+    args.push_back(dir + os + "clock.po");
+    args.push_back(dir + os + "memory.po");
+    //args.push_back(dir + "pora.po");
+    //args.push_back(dir + os + "control.po");
+    args.push_back(dir + "calendar.po");
+    args.push_back(dir + os + "date.po");
+
+    if (!executeCommand(args, false))
     {
         std::cout << " FAILED: compiler timed out or failed to start." << std::endl;
         return;
     }
 
-    if (std::filesystem::exists("app.exe"))
+    if (std::filesystem::exists(app[0]))
     {
-        if (executeCommand("app.exe", true))
+#ifndef WIN32
+        // Set the binary to executable
+        const int result = chmod(app[0].c_str(), S_IXUSR | S_IRUSR);
+        if (result == -1) {
+            std::cout << "Unable to give execution pemissions." << std::endl;
+            return;
+        }
+#endif
+
+        if (executeCommand(app, true))
         {
             /* Test that the application output is what is expected... */
 

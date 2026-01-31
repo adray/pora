@@ -200,7 +200,10 @@ int main(const int numArgs, const char** const args)
         const std::vector<unsigned char>& programData = compiler.assembler().programData();
         const std::vector<unsigned char>& initializedData = compiler.assembler().initializedData();
         const std::vector<unsigned char>& readOnlyData = compiler.assembler().readOnlyData();
+        const std::vector<unsigned char>& pltData = compiler.assembler().pltData();
+        const std::vector<unsigned char>& pltgotData = compiler.assembler().pltGotData();
         std::unordered_map<std::string, int>& imports = compiler.assembler().imports();
+        const std::vector<poRelocation>& pltRelocations = compiler.assembler().pltRelocations();
 
         // Build the import tables
 #ifdef WIN32
@@ -233,13 +236,33 @@ int main(const int numArgs, const char** const args)
         // Create ELF executable file
         poELF elf;
 
+        elf.addLibrary("libc.so.6");
+
+        std::unordered_set<std::string> mapped;
         for (const poELF_Symbol& symbol : libc.symbols())
         {
-            if (imports.find(symbol.getName()) != imports.end())
+            if (imports.find(symbol.getName()) != imports.end() &&
+                    mapped.find(symbol.getName()) == mapped.end())
             {
-
+                elf.addSymbol(symbol.getName(), symbol.id());
+                mapped.insert(symbol.getName());
             }
         }
+
+        for (const poRelocation& rel : pltRelocations)
+        {
+            elf.addPltRelocation(rel.relocationPos(), rel.symbol());
+        }
+
+        for (const poELF_Symbol& symbol : libc.symbols())
+        {
+            const auto& it = imports.find(symbol.getName());
+            if (it != imports.end())
+            {
+                it->second = symbol.addr();
+            }
+        }
+        
 #endif
 
         // Final linking..
@@ -271,7 +294,7 @@ int main(const int numArgs, const char** const args)
             }
         }
        
-        compiler.assembler().link(0x1000, exe.initializedDataImagePos(), exe.readonlyDataImagePos());
+        compiler.assembler().link(0x1000, exe.initializedDataImagePos(), exe.readonlyDataImagePos(), 0);
 
         // Write program data
         std::memcpy(exe.textSection().data().data(), programData.data(), programData.size());
@@ -283,13 +306,44 @@ int main(const int numArgs, const char** const args)
 
         std::cout << "Program compiled successfully: app.exe" << std::endl;
 #else
-        elf.add(poELF_SectionType::SHT_PROGBITS, ".text", align(int(programData.size()), 1024)); // SHF_ALLOC | SHF_EXECINSTR
-        
+        elf.setEntryPoint(compiler.assembler().entryPoint());
+        elf.add(poELF_SectionType::SHT_NULL, "", 0); // always start with a NULL section
+        elf.add(poELF_SectionType::SHT_PROGBITS, ".interp", 0);
+        elf.add(poELF_SectionType::SHT_STRTAB, ".shstrtab", align(int(programData.size()), 1024));
+        elf.add(poELF_SectionType::SHT_STRTAB, ".dynstr", 0);
+        elf.add(poELF_SectionType::SHT_PROGBITS, ".text", align(int(programData.size()), 1024));
+        elf.add(poELF_SectionType::SHT_PROGBITS, ".rodata", align(int(readOnlyData.size()), 1024));
+        elf.add(poELF_SectionType::SHT_PROGBITS, ".data", align(int(initializedData.size()), 1024));
+        elf.add(poELF_SectionType::SHT_HASH, ".hash", 0);
+        elf.add(poELF_SectionType::SHT_SYMTAB, ".symtab", 0);
+        //elf.add(poELF_SectionType::SHT_RELA, ".rela.text", 0);
+        //elf.add(poELF_SectionType::SHT_REL, ".rel.text", 0);
+        elf.add(poELF_SectionType::SHT_PROGBITS, ".plt", align(int(pltData.size()), 1024));
+        elf.add(poELF_SectionType::SHT_PROGBITS, ".got.plt", align(int(pltgotData.size()), 1024));
+        elf.add(poELF_SectionType::SHT_RELA, ".rela.plt", 0);
+        //elf.add(poELF_SectionType::SHT_NOBITS, ".tbss", 1024);
+        //elf.add(poELF_SectionType::SHT_PROGBITS, ".tdata", 1024);
+        elf.add(poELF_SectionType::SHT_DYNAMIC, ".dynamic", 0); // always the last section
+        elf.initializeSections();
+
+        compiler.assembler().link(
+                elf.textSection().virtualAddress(),
+                elf.initializedDataSection().virtualAddress(),
+                elf.readOnlySection().virtualAddress(),
+                elf.pltDataSection().virtualAddress(),
+                elf.pltGotDataSection().virtualAddress());
+
         // Write program data
         std::memcpy(elf.textSection().data().data(), programData.data(), programData.size());
+        std::memcpy(elf.readOnlySection().data().data(), readOnlyData.data(), readOnlyData.size());
+        std::memcpy(elf.initializedDataSection().data().data(), initializedData.data(), initializedData.size());
+        std::memcpy(elf.pltDataSection().data().data(), pltData.data(), pltData.size());
+        std::memcpy(elf.pltGotDataSection().data().data(), pltgotData.data(), pltgotData.size());
 
         // Write the elf file
         elf.write("app");
+
+        std::cout << "Program compiled successfully: app" << std::endl;
 #endif
     }
 

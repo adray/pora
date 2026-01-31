@@ -18,8 +18,7 @@ namespace Test {
             print_64(15);
         }
         
-        i64 heap = GetProcessHeap();
-        p = (p*)HeapAlloc(heap, (i32)0, (u64)sizeof(p));
+        p = new p();
         p.q = true;
         if (p.q) {
             print_64(99);

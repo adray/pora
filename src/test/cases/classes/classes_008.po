@@ -15,12 +15,11 @@ namespace Test {
         print_64(_i);
         print_64(_j);
     }
-    static void main() {
-       i64 heap = GetProcessHeap();       
+    static void main() {       
 
        myClass*[4] v;
-       v[0] = (myClass*)HeapAlloc(heap, (i32)0, (u64)sizeof(myClass));
-       v[1] = (myClass*)HeapAlloc(heap, (i32)0, (u64)sizeof(myClass));
+       v[0] = new myClass();
+       v[1] = new myClass();
 
        v[0].set(10, 4);
        v[1].set(99, 55);
