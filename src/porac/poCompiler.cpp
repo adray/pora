@@ -112,8 +112,8 @@ int poCompiler:: compile()
     //module.dump();
 
     // Perform copy propagation optimization
-    //poOptCopy copy;
-    //copy.optimize(module);
+    poOptCopy copy;
+    copy.optimize(module);
 
     // Eliminate any dead code
     poOptDCE dce;

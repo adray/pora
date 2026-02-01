@@ -8,6 +8,7 @@ namespace po
     class poModule;
     class poFlowGraph;
     class poUses;
+    class poInstruction;
 
     class poOptCopy
     {
@@ -16,7 +17,7 @@ namespace po
         void optimize(poModule& module);
         void optimize(poModule& module, poFlowGraph& cfg);
 
-        void copyPropagation(poUses& uses, const int name, const int source);
+        void copyPropagation(poInstruction& instr, poUses& uses, const int name, const int source);
     };
 }
 

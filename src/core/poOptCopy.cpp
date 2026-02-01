@@ -14,7 +14,7 @@ void poOptCopy::optimize(poModule& module)
     }
 }
 
-void poOptCopy::copyPropagation(poUses& uses, const int name, const int source)
+void poOptCopy::copyPropagation(poInstruction& instr, poUses& uses, const int name, const int source) 
 {
     const std::vector<poInstructionRef>& refs = uses.getUses(name);
 
@@ -23,10 +23,18 @@ void poOptCopy::copyPropagation(poUses& uses, const int name, const int source)
         const poInstructionRef& ref = refs[i];
         poBasicBlock* bb = ref.getBasicBlock();
         poInstruction& instr = bb->getInstruction(ref.getAdjustedRef());
-        if (instr.isSpecialInstruction())
+        if (instr.isSpecialInstruction() ||
+                instr.code() == IR_PHI)
         {
-            continue;
+            return;
         }
+    }
+
+    for (size_t i = 0; i < refs.size(); ++i)
+    {
+        const poInstructionRef& ref = refs[i];
+        poBasicBlock* bb = ref.getBasicBlock();
+        poInstruction& instr = bb->getInstruction(ref.getAdjustedRef());
 
         if (instr.left() == name)
         {
@@ -37,7 +45,7 @@ void poOptCopy::copyPropagation(poUses& uses, const int name, const int source)
             instr.setRight(source);
         }
 
-        if (instr.code() == IR_PHI)
+        /*if (instr.code() == IR_PHI)
         {
             for (poPhi phi : bb->phis())
             {
@@ -54,8 +62,10 @@ void poOptCopy::copyPropagation(poUses& uses, const int name, const int source)
                     }
                 }
             }
-        }
+        }*/
     }
+
+    instr.setName(-1); // Mark instruction as removed
 }
 
 void poOptCopy::optimize(poModule& module, poFlowGraph& cfg)
@@ -80,8 +90,7 @@ void poOptCopy::optimize(poModule& module, poFlowGraph& cfg)
 
                  if (uses.hasUses(name))
                  {
-                     copyPropagation(uses, name, source);
-                     //instr.setName(-1); // Mark instruction as removed
+                     copyPropagation(instr, uses, name, source);
                  }
              }
         }
