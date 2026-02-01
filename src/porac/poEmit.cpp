@@ -212,6 +212,7 @@ void poEmitter::emitInstruction(const poInstruction& instruction, poBasicBlock* 
     bb->addInstruction(instruction);
     _types.push_back(instruction.type());
     _qualifiers.push_back(QUALIFIER_NONE);
+    _arraySize.push_back(0);
 }
 
 int poEmitter::emitConstant(const int64_t i64, poFlowGraph& cfg)
@@ -553,6 +554,7 @@ void poEmitter::reset()
 {
     _types.clear();
     _qualifiers.clear();
+    _arraySize.clear();
     _instructionCount = 0;
 }
 
@@ -561,6 +563,16 @@ int poEmitter::addVariable(const int type, const int qualifier)
     const int id = _instructionCount++;
     _types.push_back(type);
     _qualifiers.push_back(qualifier);
+    _arraySize.push_back(0);
+    return id;
+}
+
+int poEmitter::addVariable(const int type, const int qualifier, const int arraySize)
+{
+    const int id = _instructionCount++;
+    _types.push_back(type);
+    _qualifiers.push_back(qualifier);
+    _arraySize.push_back(arraySize);
     return id;
 }
 
@@ -848,7 +860,7 @@ int poCodeGenerator::getOrAddVariable(const std::string& name, const int type, c
     }
     else
     {
-        var = _emitter.addVariable(type, qualifiers);
+        var = _emitter.addVariable(type, qualifiers, size);
         _variables.insert(std::pair<std::string, poVariable>(name, poVariable(var, type, size)));
     }
     return var;
@@ -862,7 +874,7 @@ int poCodeGenerator::addVariable(const std::string& name, const int type, const 
     const auto& it = _variables.find(name);
     if (it == _variables.end())
     {
-        var = _emitter.addVariable(type, qualifiers);
+        var = _emitter.addVariable(type, qualifiers, size);
         _variables.insert(std::pair<std::string, poVariable>(name, poVariable(var, type, size)));
     }
     return var;
@@ -2881,6 +2893,8 @@ void poCodeGenerator::emitStoreArray(poNode* node, poFlowGraph& cfg, const int i
         const int accessor = emitExpr(array->accessor(), cfg);
         const int pointerType = getPointerType(type.baseType());
 
+        emitBoundsCheck(cfg, expr, accessor);
+
         const int ptr = _emitter.emitElementPtr(pointerType, expr, accessor, cfg);
         _emitter.emitStore(type.baseType(), ptr, id, cfg);
     }
@@ -2891,6 +2905,54 @@ void poCodeGenerator::emitStoreArray(poNode* node, poFlowGraph& cfg, const int i
         const int ptr = _emitter.emitElementPtr(type.id(), expr, accessor, cfg);
         _emitter.emitStore(type.baseType(), ptr, id, cfg);
     }
+}
+
+int poCodeGenerator::emitPanic(poFlowGraph& cfg)
+{
+    const int symbolId = _module.addSymbol("std::panic");
+    _emitter.emitCall(TYPE_VOID, 0, symbolId, cfg);
+
+    return 0;    
+}
+
+int poCodeGenerator::emitBoundsCheck(poFlowGraph& cfg, const int var, const int accessor)
+{
+    const int arrayBounds = _emitter.getArraySize(var);
+    poBasicBlock* bb = cfg.getLast();
+
+    // Check upper bounds
+
+    const int id = _emitter.emitConstant(int64_t(arrayBounds), cfg);
+    _emitter.emitCmp(TYPE_I64, accessor, id, cfg);
+    _emitter.emitBranch(TYPE_I64, IR_JUMP_LESS, cfg);
+
+    poBasicBlock* panicBB = new poBasicBlock();
+    cfg.addBasicBlock(panicBB);
+    emitPanic(cfg);
+
+    poBasicBlock* lowerBB = new poBasicBlock();
+    cfg.addBasicBlock(lowerBB);
+
+    bb->setBranch(lowerBB, false);
+    lowerBB->addIncoming(bb);
+
+    // Check lower bounds
+
+    const int zeroId = _emitter.emitConstant(int64_t(0), cfg);
+    _emitter.emitCmp(TYPE_I64, accessor, zeroId, cfg);
+    _emitter.emitBranch(TYPE_I64, IR_JUMP_GREATER_EQUALS, cfg);
+
+    poBasicBlock* panicBB2 = new poBasicBlock();
+    cfg.addBasicBlock(panicBB2);
+    emitPanic(cfg);
+
+    poBasicBlock* newBB = new poBasicBlock();
+    cfg.addBasicBlock(newBB);
+
+    lowerBB->setBranch(newBB, false);
+    newBB->addIncoming(lowerBB);
+
+    return 0;
 }
 
 int poCodeGenerator::emitLoadArray(poNode* node, poFlowGraph& cfg)
@@ -2907,6 +2969,8 @@ int poCodeGenerator::emitLoadArray(poNode* node, poFlowGraph& cfg)
         const int accessor = emitExpr(array->accessor(), cfg);
         const int pointerType = getPointerType(type.baseType());
         poType baseType = _module.types()[type.baseType()];
+
+        emitBoundsCheck(cfg, expr, accessor);
 
         const int ptr = _emitter.emitElementPtr(pointerType, expr, accessor, cfg);
 

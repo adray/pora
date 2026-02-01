@@ -134,15 +134,18 @@ namespace po
 
         void reset();
         int addVariable(const int type, const int qualifier);
+        int addVariable(const int type, const int qualifier, const int arraySize);
 
         int getArrayType(const int baseType, const int arrayRank);
         int getPointerType(const int baseType);
 
         inline const int getType(const int id) const { return _types[id]; }
+        inline const int getArraySize(const int id) const { return _arraySize[id]; }
     private:
         poModule& _module;
         std::vector<int> _types;
         std::vector<int> _qualifiers;
+        std::vector<int> _arraySize;
         int _instructionCount;
     };
 
@@ -210,6 +213,8 @@ namespace po
         int emitLoadThis(poFlowGraph& cfg);
         int emitLoadVariable(poNode* node, poFlowGraph& cfg);
         int emitSizeof(poNode* node, poFlowGraph& cfg);
+        int emitBoundsCheck(poFlowGraph& cfg, const int var, const int accessor);
+        int emitPanic(poFlowGraph& cfg);
 
         void getOperators(int type, std::vector<poOperator>& operators);
 

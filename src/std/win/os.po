@@ -198,4 +198,9 @@ namespace std
         u8* Source,         //_In_ const VOID   *Source,
         u64 Length         //_In_       SIZE_T Length
     );
+
+    static void panic() {
+        println("Panic!", (u32)7);
+        ExitProcess((u32)0);
+    }
 }

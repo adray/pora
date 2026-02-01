@@ -9,6 +9,7 @@ namespace std {
     extern i32 execve(u8* path, u8** args, u8** evnp);
     extern u8* malloc(u64 size);
     extern void free(u8* ptr);
+    extern void exit(i32 code);
 
     struct tm {
         i32 tm_sec;
@@ -28,5 +29,11 @@ namespace std {
 
     extern u64 time(u64* arg);
     extern tm* localtime(u64* time);
+
+
+    static void panic() {
+        println("Panic!", (u32)7);
+        exit((i32)(-1));
+    }
 }
 
