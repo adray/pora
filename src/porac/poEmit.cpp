@@ -2724,6 +2724,29 @@ int poCodeGenerator::emitReference(poNode* node, poFlowGraph& cfg)
     return expr;
 }
 
+int poCodeGenerator::emitNullCheck(poFlowGraph& cfg, const int expr)
+{
+    poBasicBlock* bb = cfg.getLast();
+
+    // Check if the pointer is null
+
+    const int id = _emitter.emitConstant(0, cfg);
+    _emitter.emitCmp(TYPE_I64, expr, id, cfg);
+    _emitter.emitBranch(TYPE_I64, IR_JUMP_NOT_EQUALS, cfg);
+
+    poBasicBlock* panicBB = new poBasicBlock();
+    cfg.addBasicBlock(panicBB);
+    emitPanic(cfg);
+
+    poBasicBlock* newBB = new poBasicBlock();
+    cfg.addBasicBlock(newBB);
+
+    bb->setBranch(newBB, false);
+    newBB->addIncoming(bb);
+
+    return 0;
+}
+
 int poCodeGenerator::emitDereference(poNode* node, poFlowGraph& cfg)
 {
     int id = EMIT_ERROR;
@@ -2741,6 +2764,8 @@ int poCodeGenerator::emitDereference(poNode* node, poFlowGraph& cfg)
         setError("Dereference failed, variable not found.", child->token());
         return EMIT_ERROR;
     }
+
+    emitNullCheck(cfg, expr);
 
     const int type = _emitter.getType(expr);
     const poType& typeData = _module.types()[type];

@@ -214,6 +214,7 @@ namespace po
         int emitLoadVariable(poNode* node, poFlowGraph& cfg);
         int emitSizeof(poNode* node, poFlowGraph& cfg);
         int emitBoundsCheck(poFlowGraph& cfg, const int var, const int accessor);
+        int emitNullCheck(poFlowGraph& cfg, const int expr);
         int emitPanic(poFlowGraph& cfg);
 
         void getOperators(int type, std::vector<poOperator>& operators);
