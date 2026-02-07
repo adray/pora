@@ -238,7 +238,7 @@ static bool compareOutput(const std::string& sourceFile, const std::string& actu
     return true;
 }
 
-static void runIntegrationTest(const std::string& name, const std::string& path, const std::string& compiler, const std::string& std, const bool interactive)
+static void runIntegrationTest(const std::string& name, const std::string& path, const std::string& compiler, const std::string& std, const bool interactive, const std::string& optimizationLevel)
 {
     std::cout << "Integration Test " << name;
 
@@ -263,6 +263,7 @@ static void runIntegrationTest(const std::string& name, const std::string& path,
     std::vector<std::string> args;
     args.push_back(compiler);
     args.push_back("build");
+    args.push_back(optimizationLevel);
     args.push_back(path);
     args.push_back(dir + os + "os.po");
     args.push_back(dir + os + "io.po");
@@ -316,7 +317,7 @@ static void runIntegrationTest(const std::string& name, const std::string& path,
     }
 }
 
-void po::runIntegrationTests(const std::string& testDir, const std::string& compiler, const std::string& std, const bool interactive)
+void po::runIntegrationTests(const std::string& testDir, const std::string& compiler, const std::string& std, const bool interactive, const std::string& optimizationLevel)
 {
     std::filesystem::path rootDir(testDir);
     if (std::filesystem::exists(rootDir))
@@ -332,7 +333,7 @@ void po::runIntegrationTests(const std::string& testDir, const std::string& comp
                     const auto& path = test.path();
                     if (path.extension() == ".po")
                     {
-                        runIntegrationTest(path.filename().string(), path.string(), compiler, std, interactive);
+                        runIntegrationTest(path.filename().string(), path.string(), compiler, std, interactive, optimizationLevel);
                     }
                 }
             }

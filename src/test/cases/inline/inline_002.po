@@ -1,0 +1,21 @@
+import std;
+
+namespace Test {
+    static i64 test(i64 x) {
+        i64 q = 5;
+        if (x == 0) {
+            q = 1;
+        }
+        else if (x == 1) {
+            q = 100;
+        }
+        return q;
+    }
+    
+    static void main() {
+        i64 a = test(1000);
+        print_64(a);
+        i64 b = test(0);
+        print_64(b);
+    }
+}

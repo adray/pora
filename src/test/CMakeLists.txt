@@ -25,6 +25,8 @@ set (PORA_TEST_SOURCES
     "poOptMemoryToRegTests.cpp"
     "poOptDCETests.h"
     "poOptDCETests.cpp"
+	"poSCCTests.h"
+	"poSCCTests.cpp"
 )
 
 project ("poratest")

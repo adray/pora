@@ -4,7 +4,7 @@ namespace ProcApp {
     static void main() {
         println("Proceses:", (u32)10);
         process_list procs;        
-        u32 count = findProcesses(&procs);
+        u32 count = std::findProcesses(&procs);
         
         process_list* item = procs.next;
         while (item != null) {

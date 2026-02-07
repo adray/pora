@@ -64,13 +64,17 @@ namespace po
         inline const poAttributes attribute() const { return _attribute; }
         inline const poCallConvention callConvention() const { return _callingConvention; }
         inline poFlowGraph& cfg() { return _cfg; }
+        inline const poFlowGraph& cfg() const { return _cfg; }
         inline void addVariable(const int name) { _variables.push_back(name); }
         inline const std::vector<int> variables() const { return _variables; }
         inline const bool hasAttribute(poAttributes attribute) const { return (int(_attribute) & int(attribute)) == int(attribute); }
         inline void addArgument(const int type) { _arguments.push_back(type); } 
         inline const std::vector<int>& args() const { return _arguments; }
+        inline const bool canInline() const { return _canInline; }
+        inline void setCanInline(const bool canInline) { _canInline = canInline; }
 
     private:
+        bool _canInline;
         int _arity;
         poAttributes _attribute;
         std::string _name;

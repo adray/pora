@@ -128,10 +128,22 @@ void poFlowGraph::addBasicBlock(poBasicBlock* bb)
     _blocks.push_back(bb);
 }
 
-//void poFlowGraph::insertBasicBlock(int index, poBasicBlock* bb)
-//{
-//    _blocks.insert(_blocks.begin() + index, bb);
-//}
+void poFlowGraph::insertBasicBlock(poBasicBlock* insertAfter, poBasicBlock* bb)
+{
+    const auto& it = std::find(_blocks.begin(), _blocks.end(), insertAfter);
+    if (it != _blocks.end())
+    {
+        _blocks.insert(it+1, bb);
+
+        bb->setNext(insertAfter->getNext());
+        if (insertAfter->getNext())
+        {
+            insertAfter->getNext()->setPrev(bb);
+        }
+        insertAfter->setNext(bb);
+        bb->setPrev(insertAfter);
+    }
+}
 
 void poFlowGraph::removeBasicBlock(poBasicBlock* bb)
 {

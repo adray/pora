@@ -175,6 +175,19 @@ int main(const int numArgs, const char** const args)
             {
                 compiler.setDebugDump(true);
             }
+            else if (arg == "/O0")
+            {
+                // No optimizations
+                compiler.setOptimizationLevel(OPTIMIZATION_LEVEL_0);
+            }
+            else if (arg == "/O1")
+            {
+                compiler.setOptimizationLevel(OPTIMIZATION_LEVEL_1);
+            }
+            else if (arg == "/O2")
+            {
+                compiler.setOptimizationLevel(OPTIMIZATION_LEVEL_2);
+            }
             else
             {
                 std::cout << "Compiling " << arg << std::endl;

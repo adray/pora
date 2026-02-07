@@ -5,14 +5,16 @@ cmake_minimum_required (VERSION 3.8)
 set (PORACORE_SOURCES
     "poAST.h"
     "poAST.cpp"
+    "poCallGraph.h"
+    "poCallGraph.cpp"
     "poCFG.h"
     "poCFG.cpp"
     "poCOFF.h"
     "poCOFF.cpp"
     "poDom.h"
     "poDom.cpp"
-	"poEval.h"
-	"poEval.cpp"
+    "poEval.h"
+    "poEval.cpp"
     "poELF.h"
     "poELF.cpp"
     "poFile.h"
@@ -29,6 +31,8 @@ set (PORACORE_SOURCES
     "poOptFold.cpp"
     "poOptMemToReg.h"
     "poOptMemToReg.cpp"
+	"poOptInline.h"
+	"poOptInline.cpp"
     "poParser.h"
     "poParser.cpp"
     "poTypeChecker.h"
@@ -55,6 +59,8 @@ set (PORACORE_SOURCES
     "poOptDCE.h"
     "poOptCopy.cpp"
     "poOptCopy.h"
+    "poSCC.h"
+    "poSCC.cpp"
 )
 
 project ("poracore")

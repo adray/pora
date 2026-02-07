@@ -155,7 +155,7 @@ namespace po
         inline std::vector<poPhi>& phis() { return _phis; }
 
         inline void addIncoming(poBasicBlock* bb) { _incoming.push_back(bb); }
-        //inline void removeIncoming(poBasicBlock* bb);
+        inline void removeIncoming(poBasicBlock* bb) { std::erase(_incoming, bb); }
         inline const std::vector<poBasicBlock*>& getIncoming() const { return _incoming; }
 
     private:
@@ -172,7 +172,7 @@ namespace po
     {
     public:
         void addBasicBlock(poBasicBlock* bb);
-        //void insertBasicBlock(int index, poBasicBlock* bb);
+        void insertBasicBlock(poBasicBlock* insertAfter, poBasicBlock* bb);
         void removeBasicBlock(poBasicBlock* bb);
         poBasicBlock* getBasicBlock(int index) const;
 

@@ -2589,7 +2589,7 @@ void poAsm::generate(poModule& module)
 
             generateExternStub(function);
 #endif
-        } 
+        }
         else
         {
             _mapping.insert(std::pair<std::string, int>(function.fullname(), int(_x86_64.programData().size())));

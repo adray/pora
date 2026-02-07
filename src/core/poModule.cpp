@@ -399,6 +399,7 @@ const std::string& poConstantPool::getString(const int id)
 
 poFunction::poFunction(const std::string& name, const std::string& fullname, int arity, poAttributes attribute, poCallConvention callingConvention)
     :
+    _canInline(true),
     _name(name),
     _fullname(fullname),
     _arity(arity),

@@ -6,16 +6,22 @@
 
 namespace po
 {
+    constexpr int OPTIMIZATION_LEVEL_0 = 0;
+    constexpr int OPTIMIZATION_LEVEL_1 = 1;
+    constexpr int OPTIMIZATION_LEVEL_2 = 2;
+
     class poCompiler
     {
     public:
         poCompiler()
             :
-            _debugDump(false)
+            _debugDump(false),
+            _optimizationLevel(OPTIMIZATION_LEVEL_2)
         {
         }
         void addFile(const std::string& file);
-        void setDebugDump(const bool debugDump) { _debugDump = debugDump; }
+        inline void setDebugDump(const bool debugDump) { _debugDump = debugDump; }
+        inline void setOptimizationLevel(const int optimizationLevel) { _optimizationLevel = optimizationLevel; }
         int compile();
         inline const std::vector<std::string>& errors() const { return _errors; }
         inline poAsm& assembler() { return _assembler; }
@@ -28,5 +34,6 @@ namespace po
 
         poAsm _assembler;
         bool _debugDump;
+        int _optimizationLevel;
     };
 }

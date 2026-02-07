@@ -10,6 +10,7 @@
 #include "poOptMemToReg.h"
 #include "poOptDCE.h"
 #include "poOptCopy.h"
+#include "poOptInline.h"
 #include "poSSA.h"
 #include "poTypeResolver.h"
 #include "poTypeValidator.h"
@@ -87,8 +88,11 @@ int poCompiler:: compile()
     }
 
     // Perform constant folding
-    poOptFold fold;
-    fold.fold(nodes);
+    if (_optimizationLevel >= OPTIMIZATION_LEVEL_1)
+    {
+        poOptFold fold;
+        fold.fold(nodes);
+    }
 
     // Convert the AST to a IR (three address code - intermediate representation) formed of BB (basic blocks) and CFG (control flow graph)
     poCodeGenerator generator(module);
@@ -115,9 +119,20 @@ int poCompiler:: compile()
     poOptCopy copy;
     copy.optimize(module);
 
+    // Inline small functions
+    if (_optimizationLevel >= OPTIMIZATION_LEVEL_2)
+    {
+        poOptInline inliner;
+        inliner.optimize(module);
+    }
+
     // Eliminate any dead code
-    poOptDCE dce;
-    dce.optimize(module);
+    if (_optimizationLevel >= OPTIMIZATION_LEVEL_1)
+    {
+        poOptDCE dce;
+        dce.optimize(module);
+    }
+    
     if (_debugDump) { module.dump(); }
 
     // Convert the basic blocks/cfg to machine code

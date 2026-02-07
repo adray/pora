@@ -10,6 +10,7 @@ namespace std {
     extern u8* malloc(u64 size);
     extern void free(u8* ptr);
     extern void exit(i32 code);
+    extern void abort();
 
     struct tm {
         i32 tm_sec;
@@ -33,7 +34,7 @@ namespace std {
 
     static void panic() {
         println("Panic!", (u32)7);
-        exit((i32)(-1));
+        abort();
     }
 }
 
