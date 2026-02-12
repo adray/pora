@@ -175,6 +175,14 @@ int main(const int numArgs, const char** const args)
             {
                 compiler.setDebugDump(true);
             }
+            else if (arg.starts_with("/dump"))
+            {
+                if (arg.size() > 5 && arg[5] == ':')
+                {
+                    compiler.setDebugDumpName(arg.substr(6));
+                }
+                compiler.setDebugDump(true);
+            }
             else if (arg == "/O0")
             {
                 // No optimizations

@@ -226,13 +226,66 @@ void poFlowGraph::optimize()
     }
 
     // Remove unreachable basic blocks?
+    bb = getFirst();
+    while (bb)
+    {
+        if (bb->getIncoming().size() == 0 &&
+            bb->getPrev())
+        {
+            poBasicBlock* cur = bb;
+            poBasicBlock* prev = bb->getPrev();
+            if (prev->unconditionalBranch())
+            {
+                bb = cur->getNext();
+                // Orphaned basic block found
+                removeBasicBlock(cur);
+                delete cur;
+                continue;
+            }
+        }
+
+        bb = bb->getNext();
+    }
+
+    // Merge basic blocks
+    bb = getFirst();
+    while (bb)
+    {
+        if (bb->getNext() &&
+            bb->numInstructions() > 0)
+        {
+            const int code = bb->getInstruction(int(bb->numInstructions()) - 1).code();
+            if (code == IR_BR &&
+                bb->getBranch() == bb->getNext())
+            {
+                bb->removeInstruction(int(bb->numInstructions()) - 2);
+                bb->removeInstruction(int(bb->numInstructions()) - 1);
+
+                // These blocks can be merged together
+                poBasicBlock* next = bb->getNext();
+                for (int i = 0; i < int(next->numInstructions()); i++)
+                {
+                    bb->insertInstruction(next->getInstruction(i), 
+                        int(bb->numInstructions()));
+                }
+
+                bb->setBranch(next->getBranch(), next->unconditionalBranch());
+
+                removeBasicBlock(next);
+                delete next;
+                continue;
+            }
+        }
+
+        bb = bb->getNext();
+    }
 }
 
-//poFlowGraph::~poFlowGraph()
-//{
-//    for (poBasicBlock* bb : _blocks)
-//    {
-//        delete bb;
-//    }
-//    _blocks.clear();
-//}
+void poFlowGraph::destroy()
+{
+    for (poBasicBlock* bb : _blocks)
+    {
+        delete bb;
+    }
+    _blocks.clear();
+}

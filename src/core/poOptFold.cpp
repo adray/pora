@@ -81,9 +81,29 @@ void poOptFold::foldStatement(poNode* ast)
     case poNodeType::ASSIGNMENT:
         foldAssignment(child);
         break;
+    case poNodeType::CALL:
+        foldCall(child);
+        break;
     }
 }
 
+void poOptFold::foldCall(poNode* ast)
+{
+    poListNode* call = static_cast<poListNode*>(ast);
+    assert(call->type() == poNodeType::CALL);
+
+    poListNode* args = nullptr;
+    for (int i = 0; i < call->list().size(); i++)
+    {
+        poNode* child = call->list()[i];
+        poNode* fold = nullptr;
+        foldExpr(child, &fold);
+        if (fold) {
+            delete child;
+            call->list()[i] = fold;
+        }
+    }
+}
 
 void poOptFold::foldDecl(poNode* ast)
 {
@@ -118,6 +138,25 @@ void poOptFold::foldExpr(poNode* ast, poNode** fold)
     case poNodeType::DIV:
         foldBinaryExpr(ast, fold);
         break;
+    case poNodeType::CAST:
+        foldCast(ast, fold);
+        break;
+    }
+}
+
+void poOptFold::foldCast(poNode* ast, poNode** fold)
+{
+    poUnaryNode* cast = static_cast<poUnaryNode*>(ast);
+
+    poUnaryNode* type = static_cast<poUnaryNode*>(cast->child());
+    poNode* child = type->child();
+
+    poNode* foldCast = nullptr;
+    foldExpr(child, &foldCast);
+
+    if (foldCast) {
+        delete child;
+        type->setChild(foldCast);
     }
 }
 

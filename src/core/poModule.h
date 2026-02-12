@@ -129,17 +129,17 @@ namespace po
         int getConstant(const double f64);
         int getConstant(const float f32);
         int getConstant(const std::string& str);
-        int64_t getI64(const int id);
-        int32_t getI32(const int id);
-        int16_t getI16(const int id);
-        int8_t getI8(const int id);
-        uint64_t getU64(const int id);
-        uint32_t getU32(const int id);
-        uint16_t getU16(const int id);
-        uint8_t getU8(const int id);
-        float getF32(const int id);
-        double getF64(const int id);
-        const std::string& getString(const int id);
+        int64_t getI64(const int id) const;
+        int32_t getI32(const int id) const;
+        int16_t getI16(const int id) const;
+        int8_t getI8(const int id) const;
+        uint64_t getU64(const int id) const;
+        uint32_t getU32(const int id) const;
+        uint16_t getU16(const int id) const;
+        uint8_t getU8(const int id) const;
+        float getF32(const int id) const;
+        double getF64(const int id) const;
+        const std::string& getString(const int id) const;
 
     private:
         std::unordered_map<uint64_t, int> _u64;
@@ -184,6 +184,7 @@ namespace po
     {
     public:
         poModule();
+        ~poModule();
         void addNamespace(const poNamespace& ns);
         inline std::vector<poNamespace>& namespaces() { return _namespaces; }
         inline poConstantPool& constants() { return _constants; }
@@ -200,7 +201,7 @@ namespace po
         int getTypeFromName(const std::string& name) const;
         int getArrayType(const int baseType) const;
         int getPointerType(const int baseType) const;
-        void dump();
+        void dump(const std::string& name);
         void dumpTypes();
 
     private:

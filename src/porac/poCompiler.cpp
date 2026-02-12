@@ -11,6 +11,7 @@
 #include "poOptDCE.h"
 #include "poOptCopy.h"
 #include "poOptInline.h"
+#include "poOptProp.h"
 #include "poSSA.h"
 #include "poTypeResolver.h"
 #include "poTypeValidator.h"
@@ -102,18 +103,18 @@ int poCompiler:: compile()
         reportError("Code Generation Error:", generator.errorText(), generator.errorFile(), generator.errorColumn(), generator.errorLine());
         return 0;
     }
-    if (_debugDump) { module.dump(); }
+    if (_debugDump) { module.dump(_debugDumpName); }
 
     // Convert to SSA form and insert PHI nodes
     poSSA ssa;
     ssa.construct(module);
-    //module.dump();
+    //module.dump(_debugDumpName);
     if (_debugDump) { module.dumpTypes(); }
 
     // Convert unnecessary memory accesses to registers
     poOptMemToReg regToMem;
     regToMem.optimize(module);
-    //module.dump();
+    //module.dump(_debugDumpName);
 
     // Perform copy propagation optimization
     poOptCopy copy;
@@ -126,6 +127,13 @@ int poCompiler:: compile()
         inliner.optimize(module);
     }
 
+    // Perform constant propagation
+    if (_optimizationLevel >= OPTIMIZATION_LEVEL_1)
+    {
+        poOptProp prop;
+        prop.optimize(module);
+    }
+
     // Eliminate any dead code
     if (_optimizationLevel >= OPTIMIZATION_LEVEL_1)
     {
@@ -133,12 +141,12 @@ int poCompiler:: compile()
         dce.optimize(module);
     }
     
-    if (_debugDump) { module.dump(); }
+    if (_debugDump) { module.dump(_debugDumpName); }
 
     // Convert the basic blocks/cfg to machine code
     _assembler.setDebugDump(_debugDump);
     _assembler.generate(module);
-    //module.dump();
+    //module.dump(_debugDumpName);
 
     if (_assembler.isError())
     {

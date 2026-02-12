@@ -21,13 +21,11 @@ namespace std
         private i64 _handle;
         private boolean _running;
         
-        i64 getHandle();
+        i64 getHandle => _handle;
         void init();
         void run();
     }
-    
-    i64 SharedMemoryController::getHandle() { return _handle; }
-    
+
     void SharedMemoryController::init()
     {
         i64 pid = (i64)GetCurrentProcessId();

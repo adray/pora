@@ -338,57 +338,57 @@ int poConstantPool::getConstant(const std::string& str)
     return -1;
 }
 
-int64_t poConstantPool::getI64(const int id)
+int64_t poConstantPool::getI64(const int id) const
 {
     return _constants[id].i64();
 }
 
-int8_t poConstantPool::getI8(const int id)
+int8_t poConstantPool::getI8(const int id) const
 {
     return _constants[id].i8();
 }
 
-int32_t poConstantPool::getI32(const int id)
+int32_t poConstantPool::getI32(const int id) const
 {
     return _constants[id].i32();
 }
 
-int16_t poConstantPool::getI16(const int id)
+int16_t poConstantPool::getI16(const int id) const
 {
     return _constants[id].i16();
 }
 
-uint64_t poConstantPool::getU64(const int id)
+uint64_t poConstantPool::getU64(const int id) const
 {
     return _constants[id].u64();
 }
 
-uint32_t poConstantPool::getU32(const int id)
+uint32_t poConstantPool::getU32(const int id) const
 {
     return _constants[id].u32();
 }
 
-uint16_t poConstantPool::getU16(const int id)
+uint16_t poConstantPool::getU16(const int id) const
 {
     return _constants[id].u16();
 }
 
-uint8_t poConstantPool::getU8(const int id)
+uint8_t poConstantPool::getU8(const int id) const
 {
     return _constants[id].u8();
 }
 
-float poConstantPool::getF32(const int id)
+float poConstantPool::getF32(const int id) const
 {
     return _constants[id].f32();
 }
 
-double poConstantPool::getF64(const int id)
+double poConstantPool::getF64(const int id) const
 {
     return _constants[id].f64();
 }
 
-const std::string& poConstantPool::getString(const int id)
+const std::string& poConstantPool::getString(const int id) const
 {
     return _strConstants[id];
 }
@@ -425,6 +425,14 @@ poNamespace::poNamespace(const std::string& name)
 poModule::poModule()
 {
     addPrimitives();
+}
+
+poModule::~poModule()
+{
+    for (poFunction& func : _functions)
+    {
+        func.cfg().destroy();
+    }
 }
 
 void poModule::addPrimitives()
@@ -698,11 +706,16 @@ void poModule::dumpTypes()
     }
 }
 
-void poModule::dump()
+void poModule::dump(const std::string& name)
 {
     for (auto& func : _functions)
     {
         if (func.hasAttribute(poAttributes::EXTERN))
+        {
+            continue;
+        }
+
+        if (!name.empty() && func.name() != name)
         {
             continue;
         }

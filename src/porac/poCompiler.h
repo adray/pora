@@ -21,6 +21,7 @@ namespace po
         }
         void addFile(const std::string& file);
         inline void setDebugDump(const bool debugDump) { _debugDump = debugDump; }
+        inline void setDebugDumpName(const std::string& name) { _debugDumpName = name; }
         inline void setOptimizationLevel(const int optimizationLevel) { _optimizationLevel = optimizationLevel; }
         int compile();
         inline const std::vector<std::string>& errors() const { return _errors; }
@@ -35,5 +36,6 @@ namespace po
         poAsm _assembler;
         bool _debugDump;
         int _optimizationLevel;
+        std::string _debugDumpName;
     };
 }

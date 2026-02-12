@@ -17,8 +17,10 @@ namespace po
         void foldBody(poNode* ast);
         void foldStatement(poNode* ast);
         void foldDecl(poNode* ast);
+        void foldCall(poNode* ast);
         void foldAssignment(poNode* ast);
         void foldExpr(poNode* ast, poNode** fold);
+        void foldCast(poNode* ast, poNode** fold);
         void foldBinaryExpr(poNode* ast, poNode** fold);
     };
 }

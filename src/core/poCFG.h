@@ -182,7 +182,7 @@ namespace po
 
         void optimize();
 
-        //~poFlowGraph();
+        void destroy();
 
     private:
         std::vector<poBasicBlock*> _blocks;

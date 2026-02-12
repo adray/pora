@@ -13,6 +13,7 @@ void poOptDCE::optimize(poModule& module)
         }
 
         optimize(function);
+        function.cfg().optimize(); /* remove any unreachable blocks after DCE */
     }
 }
 
