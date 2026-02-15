@@ -2,6 +2,8 @@
 #include "poModule.h"
 #include "poSCC.h"
 
+#include <assert.h>
+
 using namespace po;
 
 poCallGraphNode::poCallGraphNode(const std::string& name, const int id)
@@ -60,6 +62,7 @@ void poCallGraph::analyze(poModule& module)
 
 void poCallGraph::analyzeFunction(poModule& module, poCallGraphNode* node)
 {
+    assert(node->id() < int(module.functions().size()));
     poFunction& func = module.functions()[node->id()];
     for (int i = 0; i < int(func.cfg().numBlocks()); i++)
     {
@@ -75,7 +78,14 @@ void poCallGraph::analyzeFunction(poModule& module, poCallGraphNode* node)
                     continue;
                 }
 
-                const int id = _functions.find(functionName)->second;
+                const auto& it = _functions.find(functionName);
+                if (it == _functions.end())
+                {
+                    continue;
+                }
+
+                const int id = it->second;
+                assert(id >= 0 && id < int(_nodes.size()));
                 poCallGraphNode* childNode = _nodes[id];
 
                 bool alreadyAdded = false;
