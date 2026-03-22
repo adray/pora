@@ -109,7 +109,7 @@ static bool openLibraryFile(const std::string& fileName, poELF& elf)
         }
     }
 
-    std::cout << "Failed to open " << filename << std::endl;
+    std::cout << "Failed to open " << fileName << std::endl;
     return false;
 }
 #endif

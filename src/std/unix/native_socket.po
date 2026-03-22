@@ -1,0 +1,30 @@
+namespace std {
+    static void native_socket_start() {
+        // TODO    
+    }
+
+    static void native_socket_stop() {
+        // TODO
+    }
+
+    static i64 native_socket_create() {
+        // TODO
+        return 0;
+    }
+
+    static void native_socket_connect(IPAddress* address, u64 port, i64 socket) {
+        // TODO    
+    }
+
+    static void native_socket_bind(i64 socket) {
+        // TODO    
+    }
+
+    static void native_socket_listen(i64 socket) {
+        // TODO    
+    }
+    
+    static void native_socket_send(u8* data, u64 size, i64 socket) {
+        
+    }
+}
