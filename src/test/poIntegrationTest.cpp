@@ -267,14 +267,18 @@ static void runIntegrationTest(const std::string& name, const std::string& path,
     args.push_back(path);
     args.push_back(dir + os + "os.po");
     args.push_back(dir + os + "io.po");
-    args.push_back(dir + "string.po");
-    args.push_back(dir + "string_class.po");
     args.push_back(dir + os + "clock.po");
     args.push_back(dir + os + "memory.po");
-    args.push_back(dir + "pora.po");
     args.push_back(dir + os + "control.po");
-    args.push_back(dir + "calendar.po");
     args.push_back(dir + os + "date.po");
+    args.push_back(dir + os + "native_socket.po");
+    args.push_back(dir + "string.po");
+    args.push_back(dir + "string_class.po");
+    args.push_back(dir + "pora.po");
+    args.push_back(dir + "calendar.po");
+    args.push_back(dir + "socket.po");
+    args.push_back(dir + "list.po");
+    args.push_back(dir + "map.po");
 
     if (!executeCommand(args, true))
     {
@@ -288,7 +292,7 @@ static void runIntegrationTest(const std::string& name, const std::string& path,
         // Set the binary to executable
         const int result = chmod(app[0].c_str(), S_IXUSR | S_IRUSR);
         if (result == -1) {
-            std::cout << "Unable to give execution pemissions." << std::endl;
+            std::cout << "Unable to give execution permissions." << std::endl;
             return;
         }
 #endif

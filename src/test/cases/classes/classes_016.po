@@ -1,0 +1,24 @@
+import std;
+
+namespace Test {
+    struct myStruct {
+        i64 x;
+        i64 y;
+    }
+
+    class myClass {
+        myStruct create();
+    }
+    myStruct myClass::create() {
+        myStruct p;
+        p.x = 100;
+        p.y = 200;
+        return p;
+    }
+
+    static void main() {
+       myClass c;
+       myStruct s = c.create();
+       print_64(s.x);
+    }
+}

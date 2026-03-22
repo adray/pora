@@ -36,6 +36,7 @@ namespace po
         void checkFunctions(poNode* node);
         void checkExpression(poNode* classNode, poNode* node);
         void checkConstructor(poNode* node);
+        void pushGenericParameters(po::poListNode* genericArgs);
         void checkBody(poNode* node, const int returnType);
         void checkStatement(poNode* node, const int returnType);
         void checkConstructorCall(poNode* decl);
@@ -50,6 +51,7 @@ namespace po
         int checkNew(poNode* node);
         int checkCast(poNode* node);
         int checkResolver(poNode* node);
+        int getGenericType(const int baseType, const std::vector<int>& parameters);
         int getArrayType(const int baseType, const int arrayRank);
         int getPointerType(const int baseType, const int count);
         int getType(const poToken& token);
@@ -69,6 +71,7 @@ namespace po
         std::vector<std::unordered_map<std::string, int>> _variables;
         std::unordered_map<std::string, poListNode*> _functions;
         std::vector<std::string> _imports;
+        std::vector<std::string> _genericParameters;
         std::string _errorText;
         int _errorLine;
         int _errorCol;

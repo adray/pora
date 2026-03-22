@@ -1,0 +1,49 @@
+namespace std {
+    struct IPAddress {
+        u8[8] data;
+    }
+
+    class socket {
+        private IPAddress _address;
+        private u64 _port;
+        private i64 _socket;
+        
+        socket();
+        void connect(IPAddress* address, u64 port);
+        void bind();
+        void send(u8* data, u64 size);
+        void listen();
+        
+        u64 port => _port;
+    }
+    
+    socket::socket() {
+        _socket = native_socket_create();
+    }
+
+    void socket::connect(IPAddress* address, u64 port) {
+        if (address == null) {
+            return;
+        }
+        
+        _port = port;
+        _address.data = address.data;
+        native_socket_connect(address, _port, _socket);
+    }
+    
+    void socket::bind() {
+        native_socket_bind(_socket);
+    }
+    
+    void socket::listen() {
+        native_socket_listen(_socket);
+    }
+
+    void socket::send(u8* data, u64 size) {
+        if (data == null) {
+            return;
+        }
+        
+        native_socket_send(data, size, _socket);
+    }
+}

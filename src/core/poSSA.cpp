@@ -29,7 +29,8 @@ void poSSA::construct(poModule& module)
 {
     for (poFunction& func : module.functions())
     {
-        if (func.hasAttribute(poAttributes::EXTERN))
+        if (func.hasAttribute(poAttributes::EXTERN) ||
+            func.hasAttribute(poAttributes::GENERIC))
         {
             continue;
         }

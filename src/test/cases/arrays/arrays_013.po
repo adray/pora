@@ -1,0 +1,23 @@
+import std;
+
+namespace Test {
+    struct myProcess {
+        u8* name;
+        u32 len;
+        u32 pid;
+    }
+    
+    static void main() {
+        myProcess[4] procs;
+        
+        myProcess x;
+        x.name = "test";
+        x.pid = (u32)100;
+        x.len = (u32)5;
+        
+        procs[2] = x;
+        
+        println(procs[2].name, 
+            procs[2].len);
+    }
+}

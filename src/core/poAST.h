@@ -6,7 +6,7 @@ namespace po
 {
     enum class poNodeType
     {
-        POINTER, /* poUnaryNode */
+        POINTER, /* poPointerNode */
         REFERENCE, /* poUnaryNode */
         DEREFERENCE, /* poUnaryNode */
         NULLPTR, /* poNode */
@@ -29,19 +29,21 @@ namespace po
         STRIDE, /* poUnaryNode */
         CONTINUE, /* poNode */
         BREAK, /* poNode */
-        CAST, /* poUnaryNode */
+        CAST, /* poBinaryNode */
         CALL, /* poListNode */
         MEMBER_CALL, /* poBinaryNode */
         CALL_CONVENTION, /* poNode */
         ASSIGNMENT, /* poBinaryNode */
         VARIABLE, /* poNode */
         PARAMETER, /* poUnaryNode */
+        CONSTRAINT, /* poUnaryNode */
         ARGS, /* poListNode */
+        GENERIC_ARGS, /* poListNode */
         TYPE, /* poNode */
         ENUM_VALUE, /* poNode */
         RETURN_TYPE, /* poUnaryNode */
         ARRAY, /* poArrayNode */
-        DYNAMIC_ARRAY, /* poUnaryNode */
+        DYNAMIC_ARRAY, /* poBinaryNode */
         ARRAY_ACCESSOR, /* poArrayAccessorNode */
         DECL, /* poUnaryNode */
         CMP_EQUALS, /* poBinaryNode */
@@ -68,14 +70,18 @@ namespace po
         SIZEOF, /* poNode */
         ATTRIBUTES, /* poAttributeNode */
         RESOLVER, /* poResolverNode */
+        GENERIC, /* poGenericNode */
     };
 
     class poNode
     {
     public:
         poNode(poNodeType type, const poToken& token);
-        inline poNodeType type() { return _type; }
+        inline poNodeType type() const { return _type; }
         inline poToken& token() { return _token; }
+
+        virtual poNode* clone();
+        virtual ~poNode() {}
 
     private:
         poNodeType _type;
@@ -95,7 +101,11 @@ namespace po
         inline const float f32() const { return _f32; }
         inline const uint64_t u64() const { return _u64; }
 
-        inline const int type() const { return _type; }
+        inline const int constant() const { return _type; }
+
+        virtual poNode* clone();
+        virtual ~poConstantNode() {}
+
     private:
         union
         {
@@ -118,6 +128,13 @@ namespace po
         poUnaryNode(poNodeType type, poNode* child, const poToken& token);
         inline poNode* child() { return _child; }
         inline void setChild(poNode* child) { _child = child; }
+
+        virtual poNode* clone();
+        inline virtual ~poUnaryNode() {
+            delete _child;
+            _child = nullptr;
+        }
+
     private:
         poNode* _child;
     };
@@ -130,6 +147,10 @@ namespace po
         inline poNode* right() { return _right; }
         inline void setLeft(poNode* left) { _left = left; }
         inline void setRight(poNode* right) { _right = right; }
+
+        virtual poNode* clone();
+        virtual ~poBinaryNode();
+
     private:
         poNode* _left;
         poNode* _right;
@@ -140,6 +161,10 @@ namespace po
     public:
         poListNode(poNodeType type, const std::vector<poNode*>& nodes, const poToken& token);
         inline std::vector<poNode*>& list() { return _list; }
+
+        virtual poNode* clone();
+        virtual ~poListNode();
+
     private:
         std::vector<poNode*> _list;
     };
@@ -149,6 +174,9 @@ namespace po
     public:
         poArrayNode(const int64_t arraySize, poNode* node, const poNodeType type, const poToken& token);
         inline const int64_t arraySize() const { return _arraySize; }
+
+        virtual poNode* clone();
+        virtual ~poArrayNode() {}
 
     private:
         int64_t _arraySize;
@@ -163,6 +191,9 @@ namespace po
         inline bool dereference() const { return _dereference; }
         inline void setDereference(const bool dereference) { _dereference = dereference; }
 
+        virtual poNode* clone();
+        virtual ~poArrayAccessor();
+
     private:
         poNode* _accessor;
         poNode* _child;
@@ -175,6 +206,10 @@ namespace po
         poPointerNode(const poNodeType type, poNode* child, const poToken& token, const int count);
 
         inline const int count() const { return _count; }
+        inline void setCount(const int count) { _count = count; }
+
+        virtual poNode* clone();
+        virtual ~poPointerNode() {}
 
     private:
         int _count;
@@ -192,6 +227,9 @@ namespace po
 
         inline const poAttributes attributes() const { return _attributes; }
 
+        virtual poNode* clone();
+        virtual ~poAttributeNode() {}
+
     private:
         poAttributes _attributes;
     };
@@ -208,7 +246,29 @@ namespace po
 
         inline const std::vector<std::string>& path() const { return _path; }
 
+        virtual poNode* clone();
+        virtual ~poResolverNode() {}
+
     private:
         std::vector<std::string> _path;
+    };
+
+    class poGenericNode : public poUnaryNode
+    {
+    public:
+        poGenericNode(poNode* child, const std::vector<poNode*>& nodes, const poToken& token)
+            :
+            poUnaryNode(poNodeType::GENERIC, child, token),
+            _parameters(nodes)
+        {
+        }
+
+        inline const std::vector<poNode*>& nodes() const { return _parameters; }
+
+        virtual poNode* clone();
+        virtual ~poGenericNode();
+
+    private:
+        std::vector<poNode*> _parameters;
     };
 }

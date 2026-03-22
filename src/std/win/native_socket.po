@@ -1,0 +1,172 @@
+namespace std {
+    struct WSAData {
+        i16 wVersion;
+        i16 wHighVersion;
+        u16 iMaxSockets;
+        u16 iMaxUdpDg;
+        u8* lpVendorInfo;
+        u8[256] szDescription;
+        u8[256] szSystemStatus;
+    }
+    
+    struct WSAPROTOCOLCHAIN {
+        i64   ChainLen;
+        i32[7] ChainEntries;
+    }
+
+    struct WSAPROTOCOL_INFOA {
+        i32            dwServiceFlags1;
+        i32            dwServiceFlags2;
+        i32            dwServiceFlags3;
+        i32            dwServiceFlags4;
+        i32            dwProviderFlags;
+        GUID             ProviderId;
+        i32            dwCatalogEntryId;
+        WSAPROTOCOLCHAIN ProtocolChain;
+        i64              iVersion;
+        i64              iAddressFamily;
+        i64              iMaxSockAddr;
+        i64              iMinSockAddr;
+        i64              iSocketType;
+        i64              iProtocol;
+        i64              iProtocolMaxOffset;
+        i64              iNetworkByteOrder;
+        i64              iSecurityScheme;
+        i32            dwMessageSize;
+        i32            dwProviderReserved;
+        u8[256]             szProtocol;
+    }
+    
+    struct in6_addr {
+        u8[16] u;
+    }
+    
+    struct sockaddr {
+        i16   sin6_family;
+        u16 sin6_port;
+        u32 sin6_flowinfo;
+        in6_addr sin6_addr; //struct  in6_addr 
+        u32  sin6_scope_id;
+    }
+    
+    struct WSABUF {
+        u32 len;
+        u8* buf;
+    }
+    
+    struct flowspec {
+        u32       TokenRate;
+        u32       TokenBucketSize;
+        u32       PeakBandwidth;
+        u32       Latency;
+        u32       DelayVariation;
+        u32       ServiceType; // SERVICETYPE 
+        u32       MaxSduSize;
+        u32       MinimumPolicedSize;
+    }
+    
+    extern i64 bind(
+        i64 s, // SOCKET
+        sockaddr* addr,
+        i64 namelen
+    );
+    
+    extern i64 listen(
+        i64 s, // SOCKET
+        i64 backlog
+    );
+
+    extern i64 WSAHtons(
+        i64 s,
+        u16 hostshort,
+        u16* lpnetshort
+    );
+
+    extern i64 WSAStartup(
+        i16 flags, // WORD
+        WSAData* data
+    );
+
+    extern i64 WSACleanup();
+
+    extern i64 WSASocketA(
+        i32 af,
+        i32 type,
+        i32 protocol,
+        WSAPROTOCOL_INFOA* lpProtocolInfo,
+        i64 g, // GROUP
+        i32 dwFlags
+    );
+    
+    extern i64 WSAConnect(
+        i64 s, // SOCKET
+        sockaddr* name,
+        i32 namelength,
+        WSABUF* lpCallerData,
+        WSABUF* lpCalleeData,
+        flowspec* lpSQOS,
+        flowspec* lpGQOS
+    );
+
+    static void native_socket_start() {
+        i16 version = (i16)514; // version 2.2
+        WSAData data;
+        i64 ret = WSAStartup(version, &data);
+        if (ret != 0) {
+            if (ret == 10092) { //WSAVERNOTSUPPORTED 
+                println("Error - WSAVERNOTSUPPORTED", (u32)27);
+            }
+        
+            panic();
+        }
+    }
+
+    static void native_socket_stop() {
+        WSACleanup();
+    }
+
+    static i64 native_socket_create() {
+        i32 af = (i32)23; // AF_INET6
+        i32 type = (i32)1; // SOCK_STREAM (TCP)
+        i32 protocol = (i32)6; // IPPROTO_TCP
+        WSAPROTOCOL_INFOA info;
+    
+        return WSASocketA(af, type, protocol, &info, 0, (i32)0);
+    }
+
+    static void native_socket_connect(IPAddress* address, u64 port, i64 socket) {
+        u16 nport;
+        WSAHtons(socket, (u16)port, &nport);
+        
+        sockaddr addr;
+        addr.sin6_family = (i16)23;
+        addr.sin6_port = nport;
+        addr.sin6_flowinfo = (u32)0;
+        addr.sin6_addr.u = address.data;
+        addr.sin6_scope_id = (u32)0;
+    
+        i64 err = WSAConnect(socket,
+            &addr,
+            (i32)sizeof(sockaddr),
+            null,
+            null,
+            null,
+            null);
+        if (err != 0) {
+            panic(); // panic for now, but should return a enum error value
+        }
+    }
+
+    static void native_socket_bind(i64 socket) {
+        sockaddr addr;
+        bind(socket, &addr, (i64)sizeof(sockaddr));
+    }
+
+    static void native_socket_listen(i64 socket) {
+        listen(socket, 0);
+    }
+    
+    static void native_socket_send(u8* data, u64 size, i64 socket) {
+        
+    }
+}

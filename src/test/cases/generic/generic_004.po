@@ -1,0 +1,31 @@
+import std;
+
+namespace Test {
+    class Pair<K, V> {
+        private K _key;
+        private V _value;
+        
+        Pair(K key, V value);
+        
+        K key => _key;
+        V value => _value;
+    }
+    
+    Pair<K, V>::Pair(K key, V value) {
+        _key = key;
+        _value = value;
+    }
+
+    static void main() {
+        Pair<i64, i32> p(100, (i32)28);
+        Pair<u8, i64> p2(32b, 77);
+        
+        print_64(p.key);
+        print_64((i64)p.value);
+        
+        
+        print_64((i64)p2.key);
+        print_64(p2.value);
+    }
+}
+

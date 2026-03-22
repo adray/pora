@@ -1,0 +1,18 @@
+import std;
+namespace Test {
+    static void main() {
+        list<f32> l;
+        l.push(100.0f);
+        l.push(12.0f);
+        l.push(88.0f);
+        l.push(999.0f);
+        l.push(81.0f);
+        
+        
+        print_64((i64)l.at(0));
+        print_64((i64)l.at(1));
+        print_64((i64)l.at(2));
+        print_64((i64)l.at(3));
+        print_64((i64)l.at(4));
+    }
+}

@@ -26,7 +26,7 @@ static void memToRegTest1()
     poModule mod;
     const int intPtrType = int(mod.types().size());
     poType type(intPtrType, TYPE_I64, "I64*");
-    type.setPointer(true);
+    type.setKind(poTypeKind::Pointer);
     mod.addType(type);
     const int constant = mod.constants().addConstant(100);
 
@@ -77,7 +77,7 @@ static void memToRegTest2()
     poModule mod;
     const int intPtrType = int(mod.types().size());
     poType type(intPtrType, TYPE_I64, "I64*");
-    type.setPointer(true);
+    type.setKind(poTypeKind::Pointer);
     mod.addType(type);
     const int constant = mod.constants().addConstant(100);
     const int constant2 = mod.constants().addConstant(10);
@@ -150,7 +150,7 @@ static void memToRegTest3()
     poModule mod;
     const int intPtrType = int(mod.types().size());
     poType type(intPtrType, TYPE_I64, "I64*");
-    type.setPointer(true);
+    type.setKind(poTypeKind::Pointer);
     mod.addType(type);
     const int constant = mod.constants().addConstant(1);
     const int constant2 = mod.constants().addConstant(10);

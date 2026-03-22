@@ -1,0 +1,26 @@
+import std;
+
+namespace Test {
+    class Q<T> {
+        private T _n;
+        T* echo(T n);
+        void call(T n);
+    }
+    
+    T* Q<T>::echo(T n) {
+        _n = n;
+        return &_n;
+    }
+    
+    void Q<T>:: call(T n) {
+        echo(n);
+    }
+
+    static void main() {
+        Q<i64> q;
+        
+        i64* n = q.echo(55);
+        print_64(*n);
+    }
+}
+

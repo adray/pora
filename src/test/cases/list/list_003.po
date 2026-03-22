@@ -1,0 +1,25 @@
+import std;
+namespace Test {
+    static void main() {
+        
+        date a;
+        a.setDate((u16)2000, (u16)3, (u16)1);
+        
+        date_text text;
+        list<date> l;
+        l.push(a);
+        
+        date b;
+        b.setDate((u16)1992, (u16)6, (u16)3);        
+        l.push(b);
+
+        date c = l.at(0);
+        c.format(&text);
+        println((u8*)text.text, (u32)11);
+        
+        date d = l.at(1);
+        d.format(&text);
+        println((u8*)text.text, (u32)11);
+        
+    }
+}

@@ -1,0 +1,84 @@
+//
+// A list implemented as a dynamically sized array
+//
+
+namespace std {
+    class list<T:new> {
+        private T* _data;
+        private i64 _capacity;      // the total size of the data array
+        private i64 _size;          // the used size of the data array
+
+        i64 size => _size;
+        i64 capacity => _capacity;
+        T* data => _data;
+
+        list();
+        void push(T elem);
+        void erase(i64 pos);
+        void resize(i64 capacity);
+        void pop();
+        T at(i64 pos);
+    }
+
+    list<T>::list() {
+        _capacity = 0;
+        _size = 0;
+        
+        resize(4);
+    }
+
+    void list<T>::push(T elem) {
+        i64 newSize = _size + 1;
+        if (newSize >= _capacity) {
+            i64 newCapacity = _capacity + (_capacity >> 1);
+            resize(newCapacity);
+        }
+        T[] data = (T[0])_data;
+        data[_size] = elem;
+        _size = newSize;
+    }
+
+    void list<T>::erase(i64 pos) {
+        if (pos < 0 || pos >= _size) {
+            return;
+        }
+
+        T[] data = (T[0])_data;
+        for (i64 i = pos; i < _size - 1; i = i + 1) {
+            data[i] = data[i + 1];
+        }
+        _size = _size - 1;
+    }
+
+    void list<T>::resize(i64 capacity) {
+        T[] data = new T[capacity];
+        if (_size > capacity) {
+            _size = capacity;
+        }
+        
+        T[] old_arr = (T[0])_data;
+        for (i64 i = 0; i < _capacity; i = i + 1) {
+            data[i] = old_arr[i];
+        }
+        
+        //freeArray(data);
+        _data = (T*)data;
+        _capacity = capacity;
+    }
+
+    void list<T>::pop() {
+        if (_size > 0 {
+            _size = _size - 1;
+        }
+    }
+    
+    T list<T>::at(i64 pos) {
+        if (pos < 0 ||
+            pos >= _size) {
+            panic();
+        }
+        
+        T[] data = (T[0])_data;
+        return data[pos];
+    }
+}

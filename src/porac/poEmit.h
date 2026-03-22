@@ -137,7 +137,6 @@ namespace po
         int addVariable(const int type, const int qualifier, const int arraySize);
 
         int getArrayType(const int baseType, const int arrayRank);
-        int getPointerType(const int baseType);
 
         inline const int getType(const int id) const { return _types[id]; }
         inline const int getArraySize(const int id) const { return _arraySize[id]; }
@@ -171,7 +170,6 @@ namespace po
         int getOrAddVariable(const std::string& name, const int type, const int qualifiers, const int size);
         int addVariable(const std::string& name, const int type, const int qualifiers, const int size);
         int getArrayType(const int baseType, const int arrayRank);
-        int getPointerType(const int baseType);
         void getModules(poNode* node);
         void getNamespaces(poNode* node, const std::vector<poNode*>& importNodes);
         void emitArrayCopy(const int src, const int dst, poFlowGraph& cfg, const int size);

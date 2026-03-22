@@ -1,0 +1,18 @@
+import std;
+
+namespace Test {
+    class Q<T> {
+        T echo(T n);
+    }
+    
+    T Q<T>::echo(T n) {
+        return n;
+    }
+
+    static void main() {
+        Q<i64> q;
+        
+        print_64(q.echo(96));
+    }
+}
+

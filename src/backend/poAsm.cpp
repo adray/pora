@@ -2575,6 +2575,11 @@ void poAsm::generate(poModule& module)
     std::vector<poFunction>& functions = module.functions();
     for (poFunction& function : functions)
     {
+        if (function.hasAttribute(poAttributes::GENERIC))
+        {
+            continue;
+        }
+
         if (function.hasAttribute(poAttributes::EXTERN))
         {
 #ifdef WIN32

@@ -311,6 +311,7 @@ void poAnalyzer::fixFunctionCalls(poModule& module, po_x86_64_flow_graph& cfg)
 
                     switch (typeId)
                     {
+                        case TYPE_BOOLEAN:
                         case TYPE_I64:
                         case TYPE_I32:
                         case TYPE_I16:
@@ -390,6 +391,7 @@ int poAnalyzer::checkFunction(poModule& module, const int id)
             const poType& type = module.types()[typeId];
             switch (typeId)
             {
+                case TYPE_BOOLEAN:
                 case TYPE_I64:
                 case TYPE_I32:
                 case TYPE_I16:

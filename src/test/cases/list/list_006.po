@@ -1,0 +1,18 @@
+import std;
+namespace Test {
+    static void main() {
+        
+        i64 x = 100;
+        i64 y = 200;
+        
+        list<i64*> l;
+        l.push(&x);
+        l.push(&y);
+        
+        i64* a = l.at(0);
+        i64* b = l.at(1);
+        
+        print_64(*a);
+        print_64(*b);
+    }
+}

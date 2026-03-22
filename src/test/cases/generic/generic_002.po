@@ -1,0 +1,21 @@
+import std;
+
+namespace Test {
+    class Pair<K, V> {
+        K key;
+        V val;
+        
+        void setKey(K key);
+    }
+    
+    void Pair<K, V>::setKey(K k) {
+        key = k;
+    }
+
+    static void main() {
+        Pair<i64, i32> p;
+        p.setKey(10);
+        print_64(p.key);
+    }
+}
+

@@ -203,4 +203,11 @@ namespace std
         println("Panic!", (u32)7);
         ExitProcess((u32)0);
     }
+    
+    struct GUID {
+      u32  Data1; // unsigned long
+      u16 Data2; // unsigned short
+      u16 Data3; // unsigned long
+      u8[8]  Data4; // unsigned char
+    }
 }

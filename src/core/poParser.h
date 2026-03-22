@@ -5,6 +5,13 @@ namespace po
 {
     class poNode;
 
+    enum class poGenericType
+    {
+        Class,
+        Function,
+        Variable
+    };
+
     class poParser
     {
     public:
@@ -21,6 +28,8 @@ namespace po
         inline int errorLine() const { return _line; }
         inline int errorColumn() const { return _col; }
         const int parsePointer();
+        void parseGeneric(const poGenericType type, std::vector<poNode*>& parameters);
+        poNode* parseConstraint(poNode* param);
 
     private:
         const std::vector<poToken>& _tokens;

@@ -19,7 +19,23 @@ namespace po
     constexpr int TYPE_STRING = 12;
     constexpr int TYPE_NULLPTR = 13;
     constexpr int TYPE_ENUM = 14;
-    constexpr int TYPE_OBJECT = 15; /* values above this are user defined (non primitive) */
+    constexpr int TYPE_PARAMETRIC_1 = 15;
+    constexpr int TYPE_PARAMETRIC_2 = 16;
+    constexpr int TYPE_PARAMETRIC_3 = 17;
+    constexpr int TYPE_PARAMETRIC_4 = 18;
+    constexpr int TYPE_TRAIT_NEW = 19;
+    constexpr int TYPE_OBJECT = 20; /* values above this are user defined (non primitive) */
+
+    enum class poTypeKind
+    {
+        Unknown,
+        Struct,
+        Class,
+        Trait,
+        Enum,
+        Pointer,
+        Array
+    };
 
     enum class poAttributes
     {
@@ -29,7 +45,8 @@ namespace po
         EXTERN = 0x8,
         PROTECTED = 0x10,
         STATIC = 0x20,
-        CONST = 0x40
+        CONST = 0x40,
+        GENERIC = 0x80
     };
 
     enum class poOperatorType
@@ -78,6 +95,8 @@ namespace po
         inline const int numElements() const { return _numElements; }
         inline const std::string& name() const { return _name; }
         inline const int constantValue() const { return _constantValue; }
+        inline const std::vector<std::string>& parametricArgs() const { return _parametricArgs; }
+        inline void addParametricArg(const std::string& name) { _parametricArgs.push_back(name); }
 
     private:
         poAttributes _attributes;
@@ -86,12 +105,13 @@ namespace po
         int _numElements;
         int _constantValue;
         std::string _name;
+        std::vector<std::string> _parametricArgs;
     };
 
     class poConstructor
     {
     public:
-        poConstructor(const poAttributes attributes);
+        poConstructor(const poAttributes attributes, const std::string& name);
         inline void addArgument(const int type) { _arguments.push_back(type); }
         inline void setId(const int id) { _id = id; }
         inline void setIsDefault(const bool isDefault) { _isDefault = isDefault; }
@@ -101,11 +121,13 @@ namespace po
         inline bool hasAttribute(const poAttributes attribute) const { return (int(_attributes) & int(attribute)) == int(attribute); }
         inline const int id() const { return _id; }
         inline const bool isDefault() const { return _isDefault; }
+        inline const std::string& name() const { return _name; }
     private:
         int _id;
         bool _isDefault;
         poAttributes _attributes;
         std::vector<int> _arguments;
+        std::string _name;
     };
 
     class poMemberFunction
@@ -146,12 +168,26 @@ namespace po
         std::string _backingFieldName;
     };
 
+    class poParametricArgument
+    {
+    public:
+        poParametricArgument(const std::string& identifier, const int traitId);
+
+        inline const std::string& identifier() const { return _identifier; }
+        inline const int traitId() const { return _traitId; }
+
+    private:
+        std::string _identifier;
+        int _traitId;
+    };
+
     class poType
     {
     public:
         poType(const int id, const int baseType, const std::string& name);
         poType(const int id, const int baseType, const std::string& name, const std::string& fullname);
 
+        inline void addParametricArg(const std::string& name, const int traitId) { _parametricArgs.push_back(poParametricArgument(name, traitId)); }
         inline void addField(const poField& field) { _fields.push_back(field); }
         inline void addMethod(const poMemberFunction& method) { _methods.push_back(method); }
         inline void addOperator(const poOperator& operator_) { _operators.push_back(operator_); }
@@ -160,9 +196,10 @@ namespace po
         inline void setSize(const int size) { _size = size; }
         inline void setAlignment(const int alignment) { _alignment = alignment; }
 
-        inline void setArray(const bool isArray) { _isArray = isArray; }
-        inline void setPointer(const bool isPointer) { _isPointer = isPointer; }
+        inline void setGeneric(const bool isGeneric) { _isGeneric = isGeneric; }
+        inline void setKind(const poTypeKind kind) { _kind = kind; }
 
+        inline const std::vector<poParametricArgument>& parametricArgs() const { return _parametricArgs; }
         inline const std::vector<poField>& fields() const { return _fields; }
         inline const std::vector<poMemberFunction>& functions() const { return _methods; }
         inline const std::vector<poConstructor>& constructors() const { return _constructors; }
@@ -173,8 +210,10 @@ namespace po
         inline const int baseType() const { return _baseType; }
         inline const int size() const { return _size; }
         inline const int alignment() const { return _alignment; }
-        inline const bool isArray() const { return _isArray; }
-        inline const bool isPointer() const { return _isPointer; }
+        inline const poTypeKind kind() const { return _kind; }
+        inline const bool isArray() const { return _kind == poTypeKind::Array; }
+        inline const bool isPointer() const { return _kind == poTypeKind::Pointer; }
+        inline const bool isGeneric() const { return _isGeneric; }
         inline const bool isPrimitive() const { return _id < TYPE_OBJECT; }
         inline const bool isObject() const { return _id == TYPE_OBJECT; }
         inline const std::string& name() const { return _name; }
@@ -185,10 +224,11 @@ namespace po
         int _baseType;
         int _size;
         int _alignment;
-        bool _isArray;
-        bool _isPointer;
+        bool _isGeneric;
+        poTypeKind _kind;
         std::string _name;
         std::string _fullname;
+        std::vector<poParametricArgument> _parametricArgs;
         std::vector<poField> _fields;
         std::vector<poMemberFunction> _methods;
         std::vector<poConstructor> _constructors;

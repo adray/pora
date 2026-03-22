@@ -1,0 +1,17 @@
+import std;
+
+namespace Test {
+    class Q<T> {
+        T[12] n;
+    }
+
+    static void main() {
+        Q<i64> q;
+        q.n[0] = 12;
+        q.n[1] = 77;
+        
+        print_64(q.n[0]);
+        print_64(q.n[1]);
+    }
+}
+

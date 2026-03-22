@@ -1,0 +1,42 @@
+//
+// A hashmap implemented with open addressing (WIP)
+//
+
+namespace std {
+    class map<K:new, V:new> {
+        private K* _keys;
+        private V* _values;
+        private i64 _capacity;
+        private i64 _size;
+
+        map();
+        void insert(K key, V val);
+        i64 size => _size;
+        i64 capacity => _capacity;
+
+        private void resize(i64 capacity);
+        private i64 hash(K* key);
+    }
+
+    map<K,V>::map() {
+        _capacity = 0;
+        _size     = 0;
+
+        resize(4);
+    }
+
+    void map<K,V>::resize(i64 capacity) {
+        _capacity = capacity;
+        
+        _keys   = (K*)new K[_capacity];
+        _values = (V*)new V[_capacity];
+    }
+
+    void map<K,V>::insert(K key, V val) {
+        i64 hashcode = hash(&key);
+    }
+
+    i64 map<K,V>::hash(K* key) {
+        return 0;
+    }
+}

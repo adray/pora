@@ -1,0 +1,48 @@
+import std;
+
+// Types to create:
+// Pair<i64, i32>
+// Pair<Obj, i64>
+// Rec<i64>
+// Pair<i64, i64>
+// Pair<i64, u8>
+// Q<i32>
+// Pair<i32, i32>
+//
+
+namespace Test {
+    class Pair<K, V> {
+        K key;
+        V val;
+    }
+    
+    class Obj {
+        Pair<i64, u8> x;
+    }
+    
+    class Rec<T> {
+        //Rec<T> x;
+        Pair<T, T> p;
+    }
+
+    class Q<T> {
+        Pair<T, T> p;
+    }
+
+    static void main() {
+        Pair<i64, i32> p;
+        p.key = 10;
+        print_64(p.key);
+        
+        Pair<Obj, i64> q;
+        q.val = 99;
+        print_64(q.val);
+        
+        Rec<i64> r;
+        
+        Q<i32> x;
+        x.p.key = (i32)100;
+        print_64((i64)x.p.key);
+    }
+}
+

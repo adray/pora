@@ -10,7 +10,8 @@ void poOptProp:: optimize(poModule& module)
 {
     for (auto& function : module.functions())
     {
-        if (function.hasAttribute(poAttributes::EXTERN))
+        if (function.hasAttribute(poAttributes::EXTERN) ||
+            function.hasAttribute(poAttributes::GENERIC))
         {
             continue;
         }

@@ -27,6 +27,8 @@ set (PORA_TEST_SOURCES
     "poOptDCETests.cpp"
 	"poSCCTests.h"
 	"poSCCTests.cpp"
+	"poCycleTest.h"
+	"poCycleTest.cpp"
 )
 
 project ("poratest")

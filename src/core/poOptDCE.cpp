@@ -8,7 +8,8 @@ using namespace po;
 void poOptDCE::optimize(poModule& module)
 {
     for (poFunction& function : module.functions()) {
-        if (function.hasAttribute(poAttributes::EXTERN)) {
+        if (function.hasAttribute(poAttributes::EXTERN) ||
+            function.hasAttribute(poAttributes::GENERIC)) {
             continue; // Skip extern functions
         }
 

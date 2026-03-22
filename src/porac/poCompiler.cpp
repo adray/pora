@@ -15,6 +15,7 @@
 #include "poSSA.h"
 #include "poTypeResolver.h"
 #include "poTypeValidator.h"
+#include "poMorph.h"
 
 #include <sstream>
 
@@ -80,6 +81,14 @@ int poCompiler:: compile()
         return 0;
     }
 
+    // Perform monomophization (generics)
+    poMorph morph(module);
+    morph.morph(nodes);
+    if (morph.isError()) {
+        reportError("Monomorphization Error:", morph.errorText(), morph.errorFile(), morph.errorCol(), morph.errorLine());
+        return 0;
+    }
+
     // Type check AST
     poTypeChecker typeChecker(module);
     if (!typeChecker.check(nodes))
@@ -87,6 +96,8 @@ int poCompiler:: compile()
         reportError("Type Checking Error:", typeChecker.errorText(), typeChecker.errorFile(), typeChecker.errorCol(), typeChecker.errorLine());
         return 0;
     }
+
+    if (_debugDump) { module.dumpTypes(); }
 
     // Perform constant folding
     if (_optimizationLevel >= OPTIMIZATION_LEVEL_1)
@@ -109,7 +120,6 @@ int poCompiler:: compile()
     poSSA ssa;
     ssa.construct(module);
     //module.dump(_debugDumpName);
-    if (_debugDump) { module.dumpTypes(); }
 
     // Convert unnecessary memory accesses to registers
     poOptMemToReg regToMem;

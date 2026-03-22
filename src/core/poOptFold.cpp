@@ -146,17 +146,17 @@ void poOptFold::foldExpr(poNode* ast, poNode** fold)
 
 void poOptFold::foldCast(poNode* ast, poNode** fold)
 {
-    poUnaryNode* cast = static_cast<poUnaryNode*>(ast);
+    poBinaryNode* cast = static_cast<poBinaryNode*>(ast);
 
-    poUnaryNode* type = static_cast<poUnaryNode*>(cast->child());
-    poNode* child = type->child();
+    //poUnaryNode* type = static_cast<poUnaryNode*>(cast->left());
+    poNode* child = cast->right();
 
     poNode* foldCast = nullptr;
     foldExpr(child, &foldCast);
 
     if (foldCast) {
         delete child;
-        type->setChild(foldCast);
+        cast->setRight(foldCast);
     }
 }
 

@@ -109,6 +109,7 @@ static bool openLibraryFile(const std::string& fileName, poELF& elf)
         }
     }
 
+    std::cout << "Failed to open " << filename << std::endl;
     return false;
 }
 #endif
@@ -146,14 +147,18 @@ int main(const int numArgs, const char** const args)
         poCommonObjectFileFormat kernel32;
         if (!openLibraryFile("kernel32.lib", kernel32))
         {
-            std::cout << "Failed to open kernel32.lib" << std::endl;
             return 0;
         }
 
         poCommonObjectFileFormat user32;
         if (!openLibraryFile("user32.lib", user32))
         {
-            std::cout << "Failed to open user32.lib" << std::endl;
+            return 0;
+        }
+
+        poCommonObjectFileFormat winsock;
+        if (!openLibraryFile("ws2_32.lib", winsock))
+        {
             return 0;
         }
 #else
@@ -161,7 +166,6 @@ int main(const int numArgs, const char** const args)
         poELF libc;
         if (!openLibraryFile("libc.so", libc))
         {
-            std::cout << "Failed to open libc.so" << std::endl;
             return 0;
         }
 #endif
@@ -233,6 +237,7 @@ int main(const int numArgs, const char** const args)
         
         const int kernel32ImportTable = exe.addImportTable("Kernel32.dll");
         const int user32ImportTable = exe.addImportTable("User32.dll");
+        const int ws2_32ImportTable = exe.addImportTable("ws2_32.dll");
 
         for (const poImport& import : kernel32.imports())
         {
@@ -250,6 +255,16 @@ int main(const int numArgs, const char** const args)
             {
                 // TODO: we adding duplicate entries?
                 poPortableExecutableImportTable& table = exe.importTable(user32ImportTable);
+                table.addImport(import.importName(), import.importOrdinal());
+            }
+        }
+
+        for (const poImport& import : winsock.imports())
+        {
+            if (imports.find(import.importName()) != imports.end())
+            {
+                // TODO: we adding duplicate entries?
+                poPortableExecutableImportTable& table = exe.importTable(ws2_32ImportTable);
                 table.addImport(import.importName(), import.importOrdinal());
             }
         }
@@ -315,6 +330,15 @@ int main(const int numArgs, const char** const args)
             }
         }
        
+        for (poImportEntry& importEntry : exe.importTable(ws2_32ImportTable).imports())
+        {
+            const auto& it = imports.find(importEntry.name());
+            if (it != imports.end())
+            {
+                it->second = importEntry.addressRVA();
+            }
+        }
+
         compiler.assembler().link(0x1000, exe.initializedDataImagePos(), exe.readonlyDataImagePos(), 0, 0);
 
         // Write program data

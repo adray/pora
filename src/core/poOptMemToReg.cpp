@@ -39,10 +39,13 @@ void poOptMemToReg::optimize(poModule& module)
 {
     for (poFunction& func : module.functions())
     {
-        if (!func.hasAttribute(poAttributes::EXTERN))
+        if (func.hasAttribute(poAttributes::EXTERN) ||
+            func.hasAttribute(poAttributes::GENERIC))
         {
-            optimize(module, func.cfg());
+            continue;
         }
+     
+        optimize(module, func.cfg());
     }
 }
 

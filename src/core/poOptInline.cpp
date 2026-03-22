@@ -17,10 +17,13 @@ void poOptInline::optimize(poModule& module)
 
     for (poFunction& func : module.functions())
     {
-        if (!func.hasAttribute(poAttributes::EXTERN))
+        if (func.hasAttribute(poAttributes::EXTERN) ||
+            func.hasAttribute(poAttributes::GENERIC))
         {
-            func.setCanInline(shouldInline(module, func));
+            continue;
         }
+     
+        func.setCanInline(shouldInline(module, func));
     }
 
     bool changed = true;
@@ -61,7 +64,8 @@ void poOptInline::optimize(poModule& module)
                 if (allChildrenVisited)
                 {
                     poFunction& func = module.functions()[node->id()];
-                    if (!func.hasAttribute(poAttributes::EXTERN))
+                    if (!func.hasAttribute(poAttributes::EXTERN) &&
+                        !func.hasAttribute(poAttributes::GENERIC))
                     {
                         optimize(module, func.cfg());
                     }
@@ -191,7 +195,8 @@ bool poOptInline::canInline(poModule& module, const poInstruction& ins)
     }
 
     const poFunction& func = module.functions()[node->id()];
-    if (func.hasAttribute(poAttributes::EXTERN))
+    if (func.hasAttribute(poAttributes::EXTERN) ||
+        func.hasAttribute(poAttributes::GENERIC))
     {
         return false;
     }

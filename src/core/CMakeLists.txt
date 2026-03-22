@@ -11,6 +11,8 @@ set (PORACORE_SOURCES
     "poCFG.cpp"
     "poCOFF.h"
     "poCOFF.cpp"
+    "poCycle.h"
+    "poCycle.cpp"
     "poDom.h"
     "poDom.cpp"
     "poEval.h"
@@ -63,6 +65,10 @@ set (PORACORE_SOURCES
     "poOptCopy.h"
     "poSCC.h"
     "poSCC.cpp"
+    "poMorph.h"
+    "poMorph.cpp"
+	"poUtil.h"
+	"poUtil.cpp"
 )
 
 project ("poracore")

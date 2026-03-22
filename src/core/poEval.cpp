@@ -19,7 +19,7 @@ int64_t poEvaluator:: evaluateI64(poNode* node)
     if (node->type() == poNodeType::CONSTANT)
     {
         poConstantNode* constant = static_cast<poConstantNode*>(node);
-        if (constant->type() != TYPE_I64)
+        if (constant->constant() != TYPE_I64)
         {
             // Error: not an i64 constant
             _isError = true;

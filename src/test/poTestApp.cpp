@@ -10,6 +10,7 @@
 #include "poOptDCETests.h"
 #include "poRegGraphTests.h"
 #include "poSCCTests.h"
+#include "poCycleTest.h"
 
 #include <iostream>
 #include <cstring>
@@ -29,6 +30,7 @@ int main(int numArgs, const char** const args)
     runOptDCETests();
     runRegGraphTests();
     runSSCTests();
+    runCycleTests();
 
     if (numArgs >= 4)
     {

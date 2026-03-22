@@ -12,7 +12,7 @@ namespace std {
     
     calendar::calendar() {
         _daysInMonths[0] = (u16)31;    // January
-        _daysInMonths[1] = (u16)28;    // Feburary (29 in a leap year)
+        _daysInMonths[1] = (u16)28;    // February (29 in a leap year)
         _daysInMonths[2] = (u16)31;    // March
         _daysInMonths[3] = (u16)30;    // April
         _daysInMonths[4] = (u16)31;    // May
@@ -31,21 +31,21 @@ namespace std {
             day == (u16)0) {
                 return false;
          }
-         
+
          if (month > (u16)12) {
             return false;
          }
-         
+
          if (month == (u16)2 &&
             isLeapYear(year) &&
             day == (u16)29) {
             return true;
          }
-         
+
          if (day > _daysInMonths[(i64)month - 1]) {
             return false;
          }
-         
+
          return true;
     }
     

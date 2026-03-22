@@ -1,7 +1,7 @@
 
 namespace std {
 
-    enum day_of_week { Monday, Tuesday, Wednesday, Thursday, Friday }
+    enum day_of_week { Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday }
 
     struct date_text {
         u8[11] text;

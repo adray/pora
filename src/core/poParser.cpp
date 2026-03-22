@@ -89,6 +89,88 @@ const int poParser::parsePointer()
     return pointerCount;
 }
 
+poNode* poParser::parseConstraint(poNode* param)
+{
+    if (match(poTokenType::COLON)) {
+        advance();
+        if (match(poTokenType::IDENTIFIER) ||
+            match(poTokenType::NEW)) {
+            poToken identifier = peek();
+            advance();
+
+            param = new poUnaryNode(poNodeType::CONSTRAINT, param, identifier);
+        }
+        else {
+            setError("Expected identifier in type constraint.");
+        }
+    }
+
+    return param;
+}
+
+void poParser::parseGeneric(const poGenericType type, std::vector<poNode*>& parameters)
+{
+    // Generic type
+    poToken name = peek();
+    advance();
+
+    poNode* param = new poNode(poNodeType::TYPE, peek());
+    advance();
+
+    int count = 0;
+    switch (type) {
+    case poGenericType::Class:
+        param = parseConstraint(param);
+        break;
+    case poGenericType::Variable:
+        count = parsePointer();
+        break;
+    }
+
+    if (count > 0) {
+        param = new poPointerNode(poNodeType::POINTER, param, name, count);
+    }
+
+    parameters.push_back(param);
+    while (match(poTokenType::COMMA) && !eof() && !isError())
+    {
+        advance();
+
+        if (match(poTokenType::IDENTIFIER) ||
+            matchPrimitiveType())
+        {
+            poToken parameter = peek();
+            param = new poNode(poNodeType::TYPE, parameter);
+            advance();
+
+            count = 0;
+            switch (type) {
+            case poGenericType::Class:
+                param = parseConstraint(param);
+                break;
+            case poGenericType::Variable:
+                count = parsePointer();
+                break;
+            }
+
+            if (count > 0) {
+                param = new poPointerNode(poNodeType::POINTER, param, name, count);
+            }
+            parameters.push_back(param);
+        }
+        else { setError("Expected identifier"); }
+    }
+
+    if (match(poTokenType::GREATER))
+    {
+        advance();
+    }
+    else
+    {
+        setError("Expected end of generic definition");
+    }
+}
+
 //
 // poFunctionParser
 //
@@ -251,9 +333,13 @@ poNode* poFunctionParser::parsePrimary()
             if (_parser.match(poTokenType::CLOSE_BRACKET))
             {
                 _parser.advance();
+                
+                poNode* type = new poNode(poNodeType::TYPE, token);
+
                 node = new poUnaryNode(poNodeType::NEW,
-                    new poUnaryNode(poNodeType::DYNAMIC_ARRAY,
+                    new poBinaryNode(poNodeType::DYNAMIC_ARRAY,
                         sizeExpr,
+                        type,
                         token),
                     token);
             }
@@ -425,8 +511,8 @@ poNode* poFunctionParser::parsePrimary()
                         castExpr = parsePrimary();
                     }
                     
-                    node = new poUnaryNode(poNodeType::CAST,
-                            new poUnaryNode(poNodeType::TYPE, castExpr, token),
+                    node = new poBinaryNode(poNodeType::CAST,
+                            new poNode(poNodeType::TYPE, token), castExpr,
                             token);
                 }
             }
@@ -454,10 +540,9 @@ poNode* poFunctionParser::parsePrimary()
                         castExpr = parsePrimary();
                     }
 
-                    node = new poUnaryNode(poNodeType::CAST,
-                        new poUnaryNode(poNodeType::TYPE,
-                            new poPointerNode(poNodeType::POINTER, castExpr, token, pointerCount),
-                            token),
+                    node = new poBinaryNode(poNodeType::CAST,
+                            new poPointerNode(poNodeType::POINTER, new poNode(poNodeType::TYPE, token), token, pointerCount),
+                        castExpr,
                         token);
                 }
             }
@@ -487,9 +572,9 @@ poNode* poFunctionParser::parsePrimary()
                     {
                         _parser.advance();
 
-                        node = new poUnaryNode(poNodeType::CAST,
-                            new poUnaryNode(poNodeType::TYPE,  new poArrayNode(size.i64(), parseExpression(), poNodeType::ARRAY, token),
-                                token),
+                        node = new poBinaryNode(poNodeType::CAST, 
+                            new poArrayNode(size.i64(), new poNode(poNodeType::TYPE, token), poNodeType::ARRAY, token),
+                            parseExpression(),
                             token);
                     }
                 }
@@ -1035,6 +1120,12 @@ poNode* poFunctionParser::parseDecl(const poToken& type)
 {
     poNode* statement = nullptr;
 
+    std::vector<poNode*> generic;
+    if (_parser.match(poTokenType::LESS))
+    {
+        _parser.parseGeneric(poGenericType::Variable, generic);
+    }
+
     const int pointerCount = parsePointer();
 
     int64_t arraySize = 0;
@@ -1071,6 +1162,10 @@ poNode* poFunctionParser::parseDecl(const poToken& type)
         _parser.advance();
 
         poNode* variable = new poNode(poNodeType::VARIABLE, id);
+        if (generic.size() > 0)
+        {
+            variable = new poGenericNode(variable, generic, type);
+        }
         if (pointerCount > 0)
         {
             variable = new poPointerNode(poNodeType::POINTER, variable, id, pointerCount);
@@ -1429,9 +1524,12 @@ poNode* poFunctionParser::parseStatement()
                 {
                     /* Dynamic array decl */
 
-                    poNode* variable = new poUnaryNode(
+                    poNode* type = new poNode(poNodeType::TYPE, id);
+
+                    poNode* variable = new poBinaryNode(
                         poNodeType::DYNAMIC_ARRAY, 
                         new poNode(poNodeType::VARIABLE, name),
+                        type,
                         name);
 
                     poNode* child = nullptr;
@@ -1439,9 +1537,9 @@ poNode* poFunctionParser::parseStatement()
                     if (_parser.match(poTokenType::EQUALS))
                     {
                         // Array assignment
-                        poNode* rhs = parseRH(variable);
+                        poNode* assignment = parseRH(variable);
                         child = new poUnaryNode(poNodeType::DECL,
-                            rhs,
+                            assignment,
                             id);
                     }
                     else
@@ -1505,7 +1603,8 @@ poNode* poFunctionParser::parseStatement()
         }
     }
     else if (_parser.match(poTokenType::IDENTIFIER) ||
-        _parser.match(poTokenType::STAR))
+        _parser.match(poTokenType::STAR) ||
+        _parser.match(poTokenType::LESS))
     {
         statement = parseDecl(id);
     }
@@ -1697,6 +1796,41 @@ poNode* poFunctionParser::parseConstructor()
         poToken id = _parser.peek();
         _parser.advance();
 
+        std::vector<poNode*> parameters;
+        if (_parser.match(poTokenType::LESS))
+        {
+            _parser.advance();
+
+            if (_parser.match(poTokenType::IDENTIFIER))
+            {
+                parameters.push_back(new poNode(poNodeType::PARAMETER, _parser.peek()));
+                _parser.advance();
+            }
+            else { _parser.setError("Expected identifier"); }
+
+            while (_parser.match(poTokenType::COMMA) && !_parser.eof() && !_parser.isError())
+            {
+                _parser.advance();
+
+                if (_parser.match(poTokenType::IDENTIFIER))
+                {
+                    poToken token = _parser.peek();
+                    parameters.push_back(new poNode(poNodeType::PARAMETER, token));
+                    _parser.advance();
+                }
+                else { _parser.setError("Expected identifier"); }
+            }
+
+            if (_parser.match(poTokenType::GREATER))
+            {
+                _parser.advance();
+            }
+            else
+            {
+                _parser.setError("Expected end of generic definition");
+            }
+        }
+
         std::vector<std::string> path;
         while (_parser.match(poTokenType::RESOLVER))
         {
@@ -1744,6 +1878,9 @@ poNode* poFunctionParser::parseConstructor()
                 if (_parser.match(poTokenType::OPEN_BRACE))
                 {
                     nodes.push_back(parseBody(false));
+                    if (parameters.size() > 0) {
+                        nodes.push_back(new poListNode(poNodeType::GENERIC_ARGS, parameters, token));
+                    }
                     node = new poListNode(poNodeType::CONSTRUCTOR, nodes, id);
                 }
                 else
@@ -1781,6 +1918,11 @@ poNode* poFunctionParser::parseConstructor()
 
 poNode* poFunctionParser::parse(const poToken& ret, const int pointerCount, const poToken& name)
 {
+    std::vector<poNode*> parameters;
+    if (_parser.match(poTokenType::LESS)) {
+        _parser.parseGeneric(poGenericType::Function, parameters);
+    }
+
     poNode* node = nullptr;
     poToken id = name;
     std::vector<std::string> path;
@@ -1845,6 +1987,9 @@ poNode* poFunctionParser::parse(const poToken& ret, const int pointerCount, cons
             if (_parser.match(poTokenType::OPEN_BRACE))
             {
                 nodes.push_back(parseBody(false));
+                if (parameters.size() > 0) {
+                    nodes.push_back(new poListNode(poNodeType::GENERIC_ARGS, parameters, token));
+                }
                 node = new poListNode(poNodeType::FUNCTION, nodes, id);
             }
             else
@@ -2048,6 +2193,17 @@ poNode* poClassParser::parse()
     poToken name = _parser.peek();
     _parser.advance();
 
+    std::vector<poNode*> children;
+    if (_parser.match(poTokenType::LESS))
+    {
+        std::vector<poNode*> generic;
+        _parser.parseGeneric(poGenericType::Class, generic);
+        if (generic.size() == 0) {
+            return nullptr;
+        }
+        children.push_back(new poListNode(poNodeType::GENERIC_ARGS, generic, name));
+    }
+
     if (!_parser.match(poTokenType::OPEN_BRACE))
     {
         _parser.setError("Expected open brace");
@@ -2056,7 +2212,6 @@ poNode* poClassParser::parse()
 
     _parser.advance();
 
-    std::vector<poNode*> children;
     while (!_parser.match(poTokenType::CLOSE_BRACE) && !_parser.isError())
     {
         poAttributes attributes = poAttributes::PUBLIC;
@@ -2118,8 +2273,17 @@ poNode* poClassParser::parse()
 
             _parser.advance();
 
-            const int pointerCount = parsePointer();
+            std::vector<poNode*> generic;
+            if (_parser.match(poTokenType::LESS))
+            {
+                _parser.parseGeneric(poGenericType::Variable, generic);
+                if (generic.size() == 0)
+                {
+                    return nullptr;
+                }
+            }
 
+            const int pointerCount = parsePointer();
             if (_parser.match(poTokenType::IDENTIFIER) && _parser.lookahead(poTokenType::ARROW, 0))
             {
                 poToken name = _parser.peek();
@@ -2145,11 +2309,24 @@ poNode* poClassParser::parse()
 
                 std::vector<poNode*> elements;
                 elements.push_back(new poNode(poNodeType::VARIABLE, variable));
-                elements.push_back(new poUnaryNode(poNodeType::RETURN_TYPE,
-                    new poPointerNode(poNodeType::POINTER,
-                        new poNode(poNodeType::TYPE, type),
-                        type, pointerCount),
-                    type));
+                if (generic.size() > 0)
+                {
+                    elements.push_back(new poUnaryNode(poNodeType::RETURN_TYPE,
+                        new poPointerNode(poNodeType::POINTER,
+                            new poGenericNode(new poNode(poNodeType::TYPE, type),
+                                generic,
+                                type),
+                            type, pointerCount),
+                        type));
+                }
+                else
+                {
+                    elements.push_back(new poUnaryNode(poNodeType::RETURN_TYPE,
+                        new poPointerNode(poNodeType::POINTER,
+                            new poNode(poNodeType::TYPE, type),
+                            type, pointerCount),
+                        type));
+                }
 
                 children.push_back(new poUnaryNode(poNodeType::DECL,
                     new poAttributeNode(attributes, name,
@@ -2167,6 +2344,10 @@ poNode* poClassParser::parse()
 
                 _parser.advance();
                 poNode* typeNode = new poNode(poNodeType::TYPE, type);
+                if (generic.size() > 0)
+                {
+                    typeNode = new poGenericNode(typeNode, generic, type);
+                }
                 if (pointerCount > 0)
                 {
                     typeNode = new poPointerNode(poNodeType::POINTER, typeNode, name, pointerCount);
@@ -2299,14 +2480,27 @@ poNode* poStructParser::parse()
             poToken type = _parser.peek();
             _parser.advance();
 
-            const int pointerCount = parsePointer();
+            std::vector<poNode*> generic;
+            if (_parser.match(poTokenType::LESS))
+            {
+                _parser.parseGeneric(poGenericType::Variable, generic);
+                if (generic.size() == 0)
+                {
+                    return nullptr;
+                }
+            }
 
+            const int pointerCount = parsePointer();
             if (_parser.match(poTokenType::IDENTIFIER))
             {
                 poToken name = _parser.peek();
                 _parser.advance();
 
                 poNode* typeNode = new poNode(poNodeType::TYPE, type);
+                if (generic.size() > 0)
+                {
+                    typeNode = new poGenericNode(typeNode, generic, type);
+                }
                 if (pointerCount > 0)
                 {
                     typeNode = new poPointerNode(poNodeType::POINTER, typeNode, name, pointerCount);
@@ -2630,7 +2824,8 @@ poNode* poNamespaceParser::parse()
             {
                 auto& token = _parser.peek();
 
-                if (_parser.lookahead(poTokenType::RESOLVER, 0))
+                if (_parser.lookahead(poTokenType::RESOLVER, 0) ||
+                    _parser.lookahead(poTokenType::LESS, 0))
                 {
                     children.push_back(parseConstructor());
                 }

@@ -1,0 +1,25 @@
+import std;
+
+namespace Test {
+    class Collection<T:new> {
+        T* data;
+        
+        Collection();
+    }
+    
+    Collection<T>::Collection() {
+        data = (T*)new T[10];
+    }
+
+    static void main() {
+        Collection<i64> c;
+        
+        i64[] data = (i64[0])c.data;
+        for (i64 i = 0; i < 10; i = i + 1) {
+            data[i] = i;
+        }
+        
+        print_64(data[9]);
+    }
+}
+

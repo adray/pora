@@ -1522,5 +1522,124 @@ void po::syntaxTest()
         "   Enum::One = 10;"\
         "}"\
         "}", false);
+    checkSyntax("Generics #1", "namespace Test {"\
+        "class Value<T> {"\
+        "   T _member;"\
+        "}"\
+        "}", true);
+    checkSyntax("Generics #2", "namespace Test {"\
+        "class Pair<T, V> {"\
+        "   T _key;"\
+        "   V _value;"\
+        "}"\
+        "}", true);
+    checkSyntax("Generics #3", "namespace Test {"\
+        "class Data {"\
+        "   Value<i64> i;"\
+        "}"\
+        "class Value<T> {"\
+        "   T _member;"\
+        "}"\
+        "}", true);
+    checkSyntax("Generics #4", "namespace Test {"\
+        "struct Data {"\
+        "   Value<i64> i;"\
+        "}"\
+        "class Value<T> {"\
+        "   T _member;"\
+        "}"\
+        "}", true);
+    checkSyntax("Generics #5", "namespace Test {"\
+        "class Value<T> {"\
+        "   T _member;"\
+        "}"\
+        "static void main() {"\
+        "   Value<i64> i;"\
+        "}"\
+        "}", true);
+    checkSyntax("Generics #6", "namespace Test {"\
+        "struct Data {"\
+        "   Value<i64>* i;"\
+        "}"\
+        "class Value<T> {"\
+        "   T _member;"\
+        "}"\
+        "}", true);
+    checkSyntax("Generics #7", "namespace Test {"\
+        "class Value<T {"\
+        "   T _member;"\
+        "}"\
+        "}", false);
+    checkSyntax("Generics #8", "namespace Test {"\
+        "class Value< {"\
+        "   T _member;"\
+        "}"\
+        "}", false);
+    checkSyntax("Generics #9", "namespace Test {"\
+        "class List<T> {"\
+        "   T[10] _member;"\
+        "}"\
+        "}", true);
+    checkSyntax("Generics #10", "namespace Test {"\
+        "class List<T,> {"\
+        "   T[10] _member;"\
+        "}"\
+        "}", false);
+    checkSyntax("Generics #11", "namespace Test {"\
+        "struct List<T,> {"\
+        "   T[10] _member;"\
+        "}"\
+        "}", false);
+    checkSyntax("Generics #12", "namespace Test {"\
+        "class List<T> {"\
+        "   void add(T x);"\
+        "}"\
+        "void List<T,>::add(T x){}"
+        "}", false);
+    checkSyntax("Generics #13", "namespace Test {"\
+        "struct List<,T> {"\
+        "   T[10] _member;"\
+        "}"\
+        "}", false);
+    checkSyntax("Generics #14", "namespace Test {"\
+        "struct List<,T> {"\
+        "   T[10] _member;"\
+        "}"\
+        "}", false);
+    checkSyntax("Generics #15", "namespace Test {"\
+        "class List<T: new> {"\
+        "   T* _member;"\
+        "}"\
+        "}", true);
+    checkSyntax("Generics #16", "namespace Test {"\
+        "struct List<T: new> {"\
+        "   T* _member;"\
+        "}"\
+        "}", false);
+    checkSyntax("Generics #17", "namespace Test {"\
+        "class List<T: new> {"\
+        "   T _member;"\
+        "}"\
+        "struct Foo {"\
+        "   List<i64*> myList;"\
+        "}"\
+        "}", true);
+    checkSyntax("Generics #18", "namespace Test {"\
+        "class List<T: new> {"\
+        "   T _member;"\
+        "}"\
+        "class Foo {"\
+        "   Foo(i64 x);"\
+        "}"\
+        "Foo::Foo(i64 x) { }"\
+        "struct Bar {"\
+        "   List<Foo> myList;"\
+        "}"\
+        "}", false);
+    //checkSyntax("Traits #1", "namespace Test {"\
+    //    "trait Default {"\
+    //    "   Self default();"\
+    //    "}"\
+    //    "}", true);
 
 }

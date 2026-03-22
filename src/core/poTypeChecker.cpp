@@ -1,6 +1,7 @@
 #include "poTypeChecker.h"
 #include "poAST.h"
 #include "poModule.h"
+#include "poUtil.h"
 
 #include <assert.h>
 #include <iostream>
@@ -33,7 +34,7 @@ void poTypeChecker::setError(const std::string& text, const poToken& token)
 bool poTypeChecker::check(const std::vector<poNode*>& nodes)
 {
     /*
-    * TODO: gather all the classes and their defined member functions.
+    * gather all the classes and their defined member functions.
     */
 
     for (poNode* node : nodes)
@@ -81,6 +82,7 @@ void poTypeChecker::getNamespace(poNode* node)
         if (externNode->type() == poNodeType::FUNCTION)
         {
             poListNode* func = static_cast<poListNode*>(externNode);
+            poListNode* genericArgs = nullptr;
             const std::string& name = func->token().string();
             std::string fullname = ns->token().string() + "::" + name;
             for (poNode* node : func->list())
@@ -93,7 +95,10 @@ void poTypeChecker::getNamespace(poNode* node)
                     {
                         fullname = ns->token().string() + "::" + path[0] + "::" + name;
                     }
-                    break;
+                }
+                else if (node->type() == poNodeType::GENERIC_ARGS)
+                {
+                    genericArgs = static_cast<poListNode*>(node);
                 }
             }
 
@@ -201,7 +206,7 @@ bool poTypeChecker::checkEquivalence(const int lhs, const int rhs)
 
     const poType& lhsType = _module.types()[lhs];
     const poType& rhsType = _module.types()[rhs];
-    
+
     if ((lhsType.isPointer() && rhsType.id() == TYPE_NULLPTR) ||
         (lhsType.id() == TYPE_NULLPTR && rhsType.isPointer()))
     {
@@ -311,7 +316,12 @@ void poTypeChecker::checkNamespaces(poNode* node, const std::vector<poNode*> imp
                         checkExpression(classNode, attributes->child());
                     }
                 }
+                else if (node->type() == poNodeType::GENERIC_ARGS)
+                {
+                    pushGenericParameters(static_cast<poListNode*>(node));
+                }
             }
+            _genericParameters.clear();
         }
         else if (child->type() == poNodeType::STRUCT ||
             child->type() == poNodeType::EXTERN ||
@@ -375,6 +385,7 @@ void poTypeChecker::checkExpression(poNode* classNode, poNode* node)
         poNode* typeNode = pointerNode->child();
         const std::string& className = classNode->token().string();
         const int type = _module.getTypeFromName(className);
+
         const poType& classType = _module.types()[type];
         const int returnType = getPointerType(getType(typeNode->token()), pointerNode->count());
         const std::string& varName = variableNode->token().string();
@@ -407,6 +418,7 @@ void poTypeChecker::checkConstructor(poNode* node)
     poListNode* args = nullptr;
     poNode* body = nullptr;
     poResolverNode* resolver = nullptr;
+    poListNode* genericArgs = nullptr;
 
     for (poNode* child : constructor->list())
     {
@@ -425,6 +437,11 @@ void poTypeChecker::checkConstructor(poNode* node)
             assert(resolver == nullptr);
             resolver = static_cast<poResolverNode*>(child);
         }
+        else if (child->type() == poNodeType::GENERIC_ARGS)
+        {
+            assert(genericArgs == nullptr);
+            genericArgs = static_cast<poListNode*>(child);
+        }
         else
         {
             setError("Unexpected type in function AST.", child->token());
@@ -434,6 +451,8 @@ void poTypeChecker::checkConstructor(poNode* node)
 
     if (!isError() && args)
     {
+        pushGenericParameters(genericArgs);
+
         pushScope();
 
         if (resolver)
@@ -491,6 +510,22 @@ void poTypeChecker::checkConstructor(poNode* node)
 
         checkBody(body, TYPE_VOID);
         popScope();
+
+        _genericParameters.clear();
+    }
+}
+
+void po::poTypeChecker::pushGenericParameters(po::poListNode* genericArgs)
+{
+    if (genericArgs)
+    {
+        for (poNode* node : genericArgs->list())
+        {
+            if (node->type() == poNodeType::CONSTRAINT) {
+                node = static_cast<poUnaryNode*>(node)->child();
+            }
+            _genericParameters.push_back(node->token().string());
+        }
     }
 }
 
@@ -503,6 +538,7 @@ void poTypeChecker::checkFunctions(poNode* node)
     poNode* body = nullptr;
     poUnaryNode* type = nullptr;
     poResolverNode* resolver = nullptr;
+    poListNode* genericArgs = nullptr;
 
     for (poNode* child : func->list())
     {
@@ -515,6 +551,11 @@ void poTypeChecker::checkFunctions(poNode* node)
         {
             assert(args == nullptr);
             args = static_cast<poListNode*>(child);
+        }
+        else if (child->type() == poNodeType::GENERIC_ARGS)
+        {
+            assert(genericArgs == nullptr);
+            genericArgs = static_cast<poListNode*>(child);
         }
         else if (child->type() == poNodeType::RETURN_TYPE)
         {
@@ -535,6 +576,7 @@ void poTypeChecker::checkFunctions(poNode* node)
 
     if (!isError() && args)
     {
+        pushGenericParameters(genericArgs);
         pushScope();
 
         if (resolver)
@@ -574,7 +616,18 @@ void poTypeChecker::checkFunctions(poNode* node)
             }
 
             assert(type->type() == poNodeType::TYPE);
-            const int variableType = getPointerType(getType(type->token()), pointerCount);
+            int typeId = getType(type->token());
+            if (typeId == -1 && genericArgs) {
+                for (int i = 0; i < genericArgs->list().size(); i++) {
+                    poNode* arg = genericArgs->list()[i];
+                    if (arg->token().string() == type->token().string()) {
+                        typeId = TYPE_PARAMETRIC_1 + i;
+                        break;
+                    }
+                }
+            }
+
+            const int variableType = getPointerType(typeId, pointerCount);
             if (variableType != -1)
             {
                 if (!addVariable(unary->token().string(), variableType))
@@ -603,6 +656,7 @@ void poTypeChecker::checkFunctions(poNode* node)
         }
         checkBody(body, returnType);
         popScope();
+        _genericParameters.clear();
     }
 }
 
@@ -704,7 +758,7 @@ int poTypeChecker::getPointerType(const int baseType, const int count)
 
                 type = int(_module.types().size());
                 poType newType(type, pointerType, typeData.name() + "*");
-                newType.setPointer(true);
+                newType.setKind(poTypeKind::Pointer);
                 newType.setSize(8);
                 newType.setAlignment(8);
                 _module.addType(newType);
@@ -713,6 +767,26 @@ int poTypeChecker::getPointerType(const int baseType, const int count)
         }
     }
     return pointerType;
+}
+
+int poTypeChecker::getGenericType(const int baseType, const std::vector<int>& parameters)
+{
+    const poType& type = _module.types()[baseType];
+    std::string name = type.name() + "<";
+
+    for (int i = 0; i < int(parameters.size()); i++) {
+        if (i > 0) {
+            name += ",";
+        }
+        const int param = parameters[i];
+        const poType& paramType = _module.types()[param];
+        name += paramType.name();
+    }
+
+    name += ">";
+
+    const int typeId = _module.getTypeFromName(name);
+    return typeId;
 }
 
 int poTypeChecker::getArrayType(const int baseType, const int arrayRank)
@@ -725,7 +799,7 @@ int poTypeChecker::getArrayType(const int baseType, const int arrayRank)
         const int numTypes = int(_module.types().size());
         arrayType = numTypes;
         poType type(arrayType, baseType, name);
-        type.setArray(true);
+        type.setKind(poTypeKind::Array);
         _module.addType(type);
     }
     return arrayType;
@@ -733,6 +807,15 @@ int poTypeChecker::getArrayType(const int baseType, const int arrayRank)
 
 int poTypeChecker::getType(const poToken& token)
 {
+    for (int i = 0; i < int(_genericParameters.size()); i++)
+    {
+        const std::string& typeName = _genericParameters[i];
+        if (typeName == token.string())
+        {
+            return TYPE_PARAMETRIC_1 + i;
+        }
+    }
+
     int type = TYPE_VOID;
     switch (token.token())
     {
@@ -793,6 +876,7 @@ void poTypeChecker::checkConstructorCall(poNode* decl)
     poListNode* call = nullptr;
     poArrayNode* arrayNode = nullptr;
     poNode* variable = nullptr;
+    poGenericNode* genericNode = nullptr;
 
     for (poNode* node : constructor->list())
     {
@@ -809,28 +893,41 @@ void poTypeChecker::checkConstructorCall(poNode* decl)
         {
             call = static_cast<poListNode*>(node);
         }
+        else if (node->type() == poNodeType::GENERIC)
+        {
+            genericNode = static_cast<poGenericNode*>(node);
+        }
     }
+
+    if (genericNode) {
+        variable = genericNode->child();
+    }
+
 
     if (call)
     {
         // We need to check the call args match
         // a constructor args.
-
+ 
         int baseType = getType(decl->token());
         int type = baseType;
-        if (variable && variable->type() == poNodeType::POINTER)
-        {
-            poPointerNode* pointerNode = static_cast<poPointerNode*>(variable);
-            variable = pointerNode->child();
-            type = getPointerType(type, pointerNode->count());
-        }
 
         if (type != -1)
         {
             if (variable)
             {
                 const std::string& varName = variable->token().string();
-                if (arrayNode)
+                if (genericNode) {
+                    // Get the generic version?
+                    std::vector<int> parameters;
+                    for (poNode* node : genericNode->nodes()) {
+                        const int paramType = poUtil::unpackTypeNode(_module, node);
+                        parameters.push_back(paramType);
+                    }
+                    const int genericType = getGenericType(type, parameters);
+                    addVariable(varName, genericType);
+                }
+                else if (arrayNode)
                 {
                     const int arrayType = getArrayType(type, 1);
                     addVariable(varName, arrayType);
@@ -839,6 +936,12 @@ void poTypeChecker::checkConstructorCall(poNode* decl)
                 {
                     addVariable(varName, type);
                 }
+            }
+
+            if (baseType >= TYPE_PARAMETRIC_1 &&
+                baseType <= TYPE_PARAMETRIC_4) {
+                setError("Cannot instantiate a generic parameter type.", decl->token());
+                return;
             }
 
             bool success = false;
@@ -857,7 +960,14 @@ void poTypeChecker::checkConstructorCall(poNode* decl)
                     success = true;
                     for (int i = 0; i < int(constructorArgs.size()); i++)
                     {
-                        if (!checkEquivalence(constructorArgs[i],
+                        int parameterType = constructorArgs[i];
+                        if (parameterType >= TYPE_PARAMETRIC_1 &&
+                            parameterType <= TYPE_PARAMETRIC_4) {
+                            poNode* node = genericNode->nodes()[parameterType - TYPE_PARAMETRIC_1];
+                            parameterType = getType(node->token());
+                        }
+
+                        if (!checkEquivalence(parameterType,
                             checkExpr(call->list()[i])))
                         {
                             success = false;
@@ -931,14 +1041,17 @@ void poTypeChecker::checkDecl(poNode* node)
         }
         else if (assignment->left()->type() == poNodeType::DYNAMIC_ARRAY)
         {
-            poUnaryNode* dynamicArray = static_cast<poUnaryNode*>(assignment->left());
-            if (dynamicArray->child()->type() == poNodeType::VARIABLE)
+            poBinaryNode* dynamicArray = static_cast<poBinaryNode*>(assignment->left());
+            if (dynamicArray->left()->type() == poNodeType::VARIABLE)
             {
-                const int type = getType(decl->token());
+                int type = poUtil::unpackTypeNode(_module, dynamicArray->right());
                 if (type == -1)
                 {
-                    setError("Undefined type.", decl->token());
-                    return;
+                    type = getType(dynamicArray->right()->token());
+                    if (type == -1) {
+                        setError("Undefined type.", decl->token());
+                        return;
+                    }
                 }
                 const int arrayType = getArrayType(type, 1);
                 if (arrayType == -1)
@@ -952,9 +1065,9 @@ void poTypeChecker::checkDecl(poNode* node)
                     setError("Error checking types in declaration.", decl->token());
                     return;
                 }
-                if (!isError() && dynamicArray->child()->type() == poNodeType::VARIABLE)
+                if (!isError() && dynamicArray->left()->type() == poNodeType::VARIABLE)
                 {
-                    const auto& token = dynamicArray->child()->token();
+                    const auto& token = dynamicArray->left()->token();
                     const std::string& name = token.string();
                     if (!addVariable(name, arrayType))
                     {
@@ -1142,8 +1255,8 @@ void poTypeChecker::checkAssignment(poNode* node)
         }
         else if (assignment->left()->type() == poNodeType::DYNAMIC_ARRAY)
         {
-            poUnaryNode* dynamicArray = static_cast<poUnaryNode*>(assignment->left());
-            poNode* child = dynamicArray->child();
+            poBinaryNode* dynamicArray = static_cast<poBinaryNode*>(assignment->left());
+            poNode* child = dynamicArray->left();
             assert(child->type() == poNodeType::VARIABLE);
             const int variable = getVariable(child->token().string());
             if (variable == -1)
@@ -1472,25 +1585,24 @@ int poTypeChecker::checkResolver(poNode* node)
 
 int poTypeChecker::checkCast(poNode* node)
 {
-    poUnaryNode* castNode = static_cast<poUnaryNode*>(node);
-    assert(castNode->child()->type() == poNodeType::TYPE);
-    poUnaryNode* typeNode = static_cast<poUnaryNode*>(castNode->child());
-    int dstType = getType(typeNode->token());
+    poBinaryNode* castNode = static_cast<poBinaryNode*>(node);
+    assert(castNode->type() == poNodeType::CAST);
+    poNode* typeNode = static_cast<poNode*>(castNode->left());
+    poArrayNode* arrayNode = nullptr;
 
-    if (typeNode->child()->type() == poNodeType::POINTER)
+    if (typeNode->type() == poNodeType::ARRAY)
     {
-        poPointerNode* pointerNode = static_cast<poPointerNode*>(typeNode->child());
-        dstType = getPointerType(dstType, pointerNode->count());
-        typeNode = pointerNode;
+        arrayNode = static_cast<poArrayNode*>(typeNode);
+        typeNode = arrayNode->child();
     }
-    else if (typeNode->child()->type() == poNodeType::ARRAY)
-    {
-        poArrayNode* arrayNode = static_cast<poArrayNode*>(typeNode->child());
+
+    int dstType = poUtil::unpackTypeNode(_module, _genericParameters, typeNode);
+
+    if (arrayNode && dstType != -1) {
         dstType = getArrayType(dstType, 1);
-        typeNode = arrayNode;
     }
 
-    const int srcType = checkExpr(typeNode->child());
+    const int srcType = checkExpr(castNode->right());
     if (srcType == -1 || dstType == -1)
     {
         return -1;
@@ -1677,11 +1789,9 @@ int poTypeChecker::checkMemberCall(poNode* node)
     for (int i = 0; i < int(argsNode->list().size()); i++)
     {
         poUnaryNode* parameter = static_cast<poUnaryNode*>(argsNode->list()[i]);
-        int argType = getType(parameter->child()->token());
-        if (parameter->child()->type() == poNodeType::POINTER)
-        {
-            poPointerNode* pointerNode = static_cast<poPointerNode*>(parameter->child());
-            argType = getPointerType(argType, pointerNode->count());
+        int argType = poUtil::unpackTypeNode(_module, parameter->child());
+        if (argType == -1) {
+            argType = getType(parameter->child()->token());
         }
 
         const int callArgType = checkExpr(call->list()[i]);
@@ -1734,7 +1844,7 @@ int poTypeChecker::checkMember(poNode* node)
         for (const poMemberProperty& property : baseType.properties())
         {
             if (property.name() == memberName &&
-                ((int)property.attributes() & (int)poAttributes::PUBLIC) == (int)poAttributes::PUBLIC)
+                property.hasAttribute(poAttributes::PUBLIC))
             {
                 return property.type();
             }
@@ -1804,13 +1914,19 @@ int poTypeChecker::checkNew(poNode* node)
     }
     else if (newNode->child()->type() == poNodeType::DYNAMIC_ARRAY)
     {
-        poArrayNode* arrayNode = static_cast<poArrayNode*>(newNode->child());
-        if (checkExpr(arrayNode->child()) != TYPE_I64)
+        poBinaryNode* arrayNode = static_cast<poBinaryNode*>(newNode->child());
+        if (checkExpr(arrayNode->left()) != TYPE_I64)
         {
-            setError("Array size expression must evaluate to i64.", arrayNode->child()->token());
+            setError("Array size expression must evaluate to i64.", arrayNode->left()->token());
             return -1;
         }
-        const int type = getType(newNode->token());
+        int type = poUtil::unpackTypeNode(_module, arrayNode->right());
+        if (type == -1) {
+            type = getType(newNode->token());
+            if (type == -1) {
+                return -1;
+            }
+        }
         return getArrayType(type, 1);
     }
     else

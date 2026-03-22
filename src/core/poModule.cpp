@@ -209,8 +209,6 @@ int poConstantPool::addConstant(const std::string& str)
     const auto& it = _strings.find(str);
     if (it == _strings.end())
     {
-        //const int id = int(_constants.size());
-        //_constants.push_back(poConstant(0)); // Dummy constant, string is stored separately
         const int id = int(_strConstants.size());
         _strConstants.push_back(str);
         _strings.insert(std::pair<std::string, int>(str, id));
@@ -452,6 +450,11 @@ void poModule::addPrimitives()
     addType(poType(TYPE_STRING, -1, "STRING"));
     addType(poType(TYPE_NULLPTR, -1, "NULLPTR"));
     addType(poType(TYPE_ENUM, -1, "ENUM"));
+    addType(poType(TYPE_PARAMETRIC_1, -1, "PARAMETRIC_1"));
+    addType(poType(TYPE_PARAMETRIC_2, -1, "PARAMETRIC_2"));
+    addType(poType(TYPE_PARAMETRIC_3, -1, "PARAMETRIC_3"));
+    addType(poType(TYPE_PARAMETRIC_4, -1, "PARAMETRIC_4"));
+    addType(poType(TYPE_TRAIT_NEW, -1, "TRAIT_NEW"));
     addType(poType(TYPE_OBJECT, -1, "OBJECT"));
     assert(_types.size() == TYPE_OBJECT + 1);
 
@@ -469,6 +472,9 @@ void poModule::addPrimitives()
     types[TYPE_BOOLEAN].setSize(1);
     types[TYPE_STRING].setSize(8);
     types[TYPE_ENUM].setSize(4);
+
+    // Set kind
+    types[TYPE_TRAIT_NEW].setKind(poTypeKind::Trait);
 
     for (auto& type : types)
     {
@@ -710,7 +716,8 @@ void poModule::dump(const std::string& name)
 {
     for (auto& func : _functions)
     {
-        if (func.hasAttribute(poAttributes::EXTERN))
+        if (func.hasAttribute(poAttributes::EXTERN) ||
+            func.hasAttribute(poAttributes::GENERIC))
         {
             continue;
         }
