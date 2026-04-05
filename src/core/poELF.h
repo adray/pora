@@ -4,6 +4,8 @@
 #include <vector>
 #include <unordered_map>
 
+#include "poDWARF.h"
+
 struct ElfProgramHeader64;
 
 namespace po
@@ -260,6 +262,8 @@ namespace po
         poELF_StringTable _stringTable;
         poELF_HashTable _hashTable;
         poELF_RelocationTable _pltTable;
+
+        poDWARF _dw;
 
         int _entryPoint;
         int _strtable;

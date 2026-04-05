@@ -2074,7 +2074,7 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg, const int numArgs)
 
     // Lower into machine code cfg
     // 
-    _x86_64_lower.cfg().clear();
+    _x86_64_lower.clear();
     po_x86_64_basic_block* asmBB = new po_x86_64_basic_block();
     _x86_64_lower.cfg().addBasicBlock(asmBB);
 
@@ -2095,6 +2095,10 @@ void poAsm::generate(poModule& module, poFlowGraph& cfg, const int numArgs)
         for (int i = 0; i < int(instructions.size()); i++)
         {
             auto& ins = instructions[i];
+            _x86_64_lower.setDebugInfo(po_x86_64_debug_info(
+                        ins.debug().fileId(),
+                        ins.debug().line(),
+                        ins.debug().col()));
 
             assert(ins.code() != IR_ARG); // args are handled in the call
             

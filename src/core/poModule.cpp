@@ -839,6 +839,11 @@ void poModule::dump(const std::string& name)
                     std::cout << " IR_CONVERT " << int(ins.type()) << " " << int(ins.left()) << " /" << int(ins.memOffset());
                     break;
                 }
+
+                // Print debug info
+                const poDebugInfo& info = ins.debug();
+                std::cout << " [fileId=" << info.fileId() << " line=" << info.line() << " col=" << info.col() << "]";
+
                 std::cout << std::endl;
             }
         }

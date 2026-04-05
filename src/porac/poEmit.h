@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "poType.h"
+#include "poDebug.h"
 
 namespace po
 {
@@ -16,6 +17,7 @@ namespace po
     class poToken;
     class poBasicBlock;
     class poInstruction;
+    class poDebugInfo;
 
     class poVariable
     {
@@ -87,6 +89,8 @@ namespace po
     {
     public:
         poEmitter(poModule& module);
+        void setDebugInfo(const poDebugInfo& info);
+        void setDebugInfo(const int fileId, const int line, const int column);
         void emitInstruction(const poInstruction& instruction, poBasicBlock* bb);
         int emitConstant(const int64_t i64, poFlowGraph& cfg);
         int emitConstant(const uint64_t u64, poFlowGraph& cfg);
@@ -142,6 +146,7 @@ namespace po
         inline const int getArraySize(const int id) const { return _arraySize[id]; }
     private:
         poModule& _module;
+        poDebugInfo _info;
         std::vector<int> _types;
         std::vector<int> _qualifiers;
         std::vector<int> _arraySize;

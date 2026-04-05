@@ -1,4 +1,6 @@
 #pragma once
+#include "poDebug.h"
+
 #include <vector>
 #include <cstdint>
 
@@ -58,6 +60,11 @@ namespace po
         poInstruction(const int32_t name, const int16_t type, const int16_t left, const int16_t right, const int16_t code);
         poInstruction(const int32_t name, const int16_t type, const int16_t constant, const int16_t code);
         poInstruction(const int32_t name, const int16_t type, const int16_t left, const int16_t right, const int16_t memOffset, const int16_t code);
+
+        poInstruction(const int32_t name, const int16_t type, const int16_t left, const int16_t right, const int16_t code, const poDebugInfo& info);
+        poInstruction(const int32_t name, const int16_t type, const int16_t constant, const int16_t code, const poDebugInfo& info);
+        poInstruction(const int32_t name, const int16_t type, const int16_t left, const int16_t right, const int16_t memOffset, const int16_t code, const poDebugInfo& info);
+
         inline int16_t type() const { return _type; }
         inline int16_t left() const { return _left; }
         inline int16_t right() const { return _right; }
@@ -65,6 +72,8 @@ namespace po
         inline int16_t constant() const { return _constant; }
         inline int16_t memOffset() const { return _memOffset; }
         inline int32_t name() const { return _name; }
+        inline const poDebugInfo& debug() const { return _info; }
+        inline void setDebugInfo(const poDebugInfo& info) { _info = info; }
         inline void setName(const int32_t name) { _name = name; }
         inline void setLeft(const int32_t left) { _left = left; }
         inline void setRight(const int32_t right) { _right = right; }
@@ -75,6 +84,7 @@ namespace po
         bool isSpecialInstruction() const;
 
     private:
+        poDebugInfo _info;
         int32_t _name;
         int16_t _type;
         int16_t _left;

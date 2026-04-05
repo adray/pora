@@ -399,6 +399,7 @@ void poLexer::scanLine(const std::string& line)
     while (_scanning)
     {
         scanWhitespace();
+        _colNum = _pos;
 
         char ch = peek();
 

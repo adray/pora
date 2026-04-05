@@ -743,62 +743,67 @@ void po_x86_64::emit_ui(const vm_instruction& ins, int imm)
 
 //================
 
+void po_x86_64_Lower::clear()
+{
+    _cfg.clear();
+    _info = po_x86_64_debug_info();
+}
 
 void po_x86_64_Lower::op_imm(const int opcode, const int imm)
 {
-    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, -1, -1, imm));
+    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, -1, -1, imm, _info));
 }
 
 void po_x86_64_Lower::unaryop_imm(const int dst, const int opcode, const char imm)
 {
-    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, -1, dst, imm));
+    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, -1, dst, imm, _info));
 }
 void po_x86_64_Lower::unaryop_imm(const int dst, const int opcode, const short imm)
 {
-    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, -1, dst, imm));
+    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, -1, dst, imm, _info));
 }
 void po_x86_64_Lower::unaryop_imm(const int dst, const int opcode, const int32_t imm)
 {
-    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, -1, dst, imm));
+    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, -1, dst, imm, _info));
 }
 void po_x86_64_Lower::unaryop_imm(const int dst, const int opcode, const int64_t imm)
 {
-    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, -1, dst, imm));
+    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, -1, dst, imm, _info));
 }
 
 void po_x86_64_Lower::unaryop(const int dst, const int opcode, const int offset)
 {
-    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, -1, dst, offset));
+    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, -1, dst, offset, _info));
 }
 
 void po_x86_64_Lower::unaryop(const int dst, const int opcode)
 {
-    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, -1, dst));
+    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, -1, dst, _info));
 }
 
 void po_x86_64_Lower::binop(const int src, const int dst, const int opcode)
 {
-    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, src, dst));
+    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, src, dst, _info));
 }
 
 void po_x86_64_Lower::binop(const int src, const int dst, const int opcode, const int offset)
 {
-    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, src, dst, offset));
+    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, opcode, src, dst, offset, _info));
 }
 
 void po_x86_64_Lower::sse_binop(const int src, const int dst, const int opcode)
 {
-    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(true, opcode, src, dst));
+    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(true, opcode, src, dst, _info));
 }
 
 void po_x86_64_Lower::sse_binop(const int src, const int dst, const int opcode, const int offset)
 {
-    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(true, opcode, src, dst, offset));
+    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(true, opcode, src, dst, offset, _info));
 }
 
 void po_x86_64_Lower::sse_unaryop(const int dst, const int opcode, const int offset)
 {
-    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(true, opcode, -1, dst, offset));
+    _cfg.getLast()->instructions().push_back(po_x86_64_instruction(true, opcode, -1, dst, offset, _info));
 }
 
 void po_x86_64_Lower::mc_reserve() {}
@@ -995,7 +1000,7 @@ void po_x86_64_Lower::mc_movzx_16_to_32_reg_to_reg(char dst, char src) { binop(s
 void po_x86_64_Lower::mc_movzx_16_to_32_mem_to_reg(char dst, char src, int src_offset) { binop(src, dst, VMI_MOVZX_16_TO_32_SRC_MEM_DST_REG, src_offset); }
 void po_x86_64_Lower::mc_movzx_16_to_64_reg_to_reg(char dst, char src) { binop(src, dst, VMI_MOVZX_16_TO_64_SRC_REG_DST_REG); }
 void po_x86_64_Lower::mc_movzx_16_to_64_mem_to_reg(char dst, char src, int src_offset) { binop(src, dst, VMI_MOVZX_16_TO_64_SRC_MEM_DST_REG, src_offset); }
-void po_x86_64_Lower::mc_cdqe() { _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, VMI_CDQE, -1, -1)); }
+void po_x86_64_Lower::mc_cdqe() { _cfg.getLast()->instructions().push_back(po_x86_64_instruction(false, VMI_CDQE, -1, -1, _info)); }
 
 /* Floating point operations */
 
@@ -1052,27 +1057,32 @@ void po_x86_64_Lower::dump() const
                 const auto& sse_ins = gInstructions_SSE[ins.opcode()];
                 if (sse_ins.code == CODE_BRR)
                 {
-                    std::cout << ins.opcode() << " " << (ins.dstReg() >= 0 ? sse_registers[ins.dstReg()] : "") << " " << (ins.srcReg() >= 0 ? sse_registers[ins.srcReg()] : "") << " " << std::endl;
+                    std::cout << ins.opcode() << " " << (ins.dstReg() >= 0 ? sse_registers[ins.dstReg()] : "") << " " << (ins.srcReg() >= 0 ? sse_registers[ins.srcReg()] : "") << " ";
                 }
                 else if (sse_ins.code == CODE_BRMO ||
                     sse_ins.code == CODE_BRM)
                 {
-                    std::cout << ins.opcode() << " " << (ins.dstReg() >= 0 ? sse_registers[ins.dstReg()] : "") << " " << (ins.srcReg() >= 0 ? registers[ins.srcReg()] : "") << " " << std::endl;
+                    std::cout << ins.opcode() << " " << (ins.dstReg() >= 0 ? sse_registers[ins.dstReg()] : "") << " " << (ins.srcReg() >= 0 ? registers[ins.srcReg()] : "") << " ";
                 }
                 else if (sse_ins.code == CODE_BMRO ||
                     sse_ins.code == CODE_BMR)
                 {
-                    std::cout << ins.opcode() << " "<< (ins.dstReg() >= 0 ? registers[ins.dstReg()] : "") << " "  << (ins.srcReg() >= 0 ? sse_registers[ins.srcReg()] : "") << " " << std::endl;
+                    std::cout << ins.opcode() << " "<< (ins.dstReg() >= 0 ? registers[ins.dstReg()] : "") << " "  << (ins.srcReg() >= 0 ? sse_registers[ins.srcReg()] : "") << " ";
                 }
                 else
                 {
-                    std::cout << ins.opcode() << std::endl;
+                    std::cout << ins.opcode();
                 }
             }
             else
             {
-                std::cout << ins.opcode() << " " << (ins.dstReg() >= 0 ? registers[ins.dstReg()] : "") << " " << (ins.srcReg() >= 0 ? registers[ins.srcReg()] : "") << " " << std::endl;
+                std::cout << ins.opcode() << " " << (ins.dstReg() >= 0 ? registers[ins.dstReg()] : "") << " " << (ins.srcReg() >= 0 ? registers[ins.srcReg()] : "") << " ";
             }
+
+            // Debug info
+            std::cout << " [fileId=" << ins.info().fileId() << " line=" << ins.info().line() << " col=" << ins.info().col() << "]";
+
+            std::cout << std::endl;
         }
     }
     

@@ -714,7 +714,7 @@ bool poELF::open(const std::string& filename)
                         shstrtab = int(stringTablePos.size()) - 1;
                     }
                 }
-            }
+           }
 
             if (dynSymPos != -1) {
                 stream.seekg(dynSymPos);
@@ -771,6 +771,55 @@ bool poELF::open(const std::string& filename)
                 symbol.setName(name);
             }
 
+            for (const auto& section : sections)
+            {
+                if (section.sh_type == 0x1) /* SHT_PROGBITS */
+                {
+                    const int pos = int(stringTablePos[shstrtab]);
+                    const int namePos = section.sh_name;
+                    stream.seekg(pos + namePos);
+
+                    std::string name;
+                    char c = char(0);
+                    stream.read(&c, 1);
+                    name += c;
+                    while (c != 0) {
+                        stream.read(&c, 1);
+                        if (c != 0) name += c;
+                    }
+
+                    if (name == ".debug_info") {
+                        stream.seekg(section.sh_offset);
+                        std::vector<unsigned char> data(section.sh_size);
+                        stream.read(reinterpret_cast<char*>(data.data()), section.sh_size);
+                        _dw.read_debug_info(data.data(), section.sh_size);
+                    } else if (name == ".debug_line") {
+                        stream.seekg(section.sh_offset);
+                        std::vector<unsigned char> data(section.sh_size);
+                        stream.read(reinterpret_cast<char*>(data.data()), section.sh_size);
+                        _dw.read_debug_line(data.data(), section.sh_size);
+                    } else if (name == ".debug_abbrev") {
+                        stream.seekg(section.sh_offset);
+                        std::vector<unsigned char> data(section.sh_size);
+                        stream.read(reinterpret_cast<char*>(data.data()), section.sh_size);
+                        _dw.read_debug_abbr(data.data(), section.sh_size);
+                    } else if (name == ".debug_str") {
+                        stream.seekg(section.sh_offset);
+                        std::vector<unsigned char> data(section.sh_size);
+                        stream.read(reinterpret_cast<char*>(data.data()), section.sh_size);
+                        _dw.read_debug_str(data.data(), section.sh_size);
+                    } else if (name == ".debug_line_str") {
+                        stream.seekg(section.sh_offset);
+                        std::vector<unsigned char> data(section.sh_size);
+                        stream.read(reinterpret_cast<char*>(data.data()), section.sh_size);
+                        _dw.read_debug_line_str(data.data(), section.sh_size);
+                    }
+
+
+                    //std::cout << name << std::endl;
+                }
+            }
+
             return true;
         }
     }
@@ -784,6 +833,8 @@ void poELF::dump()
     {
         std::cout << symbol.id() << " | " << symbol.getName() << " | " << symbol.type() << " | " << symbol.addr() << std::endl;
     }
+
+    //_dw.dump();
 }
 
 void poELF::buildDynamicSection()

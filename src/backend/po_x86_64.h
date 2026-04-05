@@ -375,22 +375,49 @@ namespace po
 #define VM_MAX_SSE_ARGS 8
 #endif
 
+    class po_x86_64_debug_info
+    {
+        public:
+            po_x86_64_debug_info() : 
+                _fileId(0),
+                _line(0),
+                _column(0)
+            {
+            }
+
+            po_x86_64_debug_info(const int fileId, const int line, const int column) :
+                _fileId(fileId),
+                _line(line),
+                _column(column)
+            {
+            }
+
+            int fileId() const { return _fileId; }
+            int line() const { return _line; }
+            int col() const { return _column; }
+
+        private:
+            int _fileId;
+            int _line;
+            int _column;
+    };
+
     class po_x86_64_instruction
     {
     public:
-        po_x86_64_instruction(bool isSSE, int opcode, int srcReg, int dstReg)
-            : _isSSE(isSSE), _opcode(opcode), _srcReg(srcReg), _dstReg(dstReg), _imm8(0), _id(-1) {
+        po_x86_64_instruction(bool isSSE, int opcode, int srcReg, int dstReg, const po_x86_64_debug_info& info)
+            : _isSSE(isSSE), _opcode(opcode), _srcReg(srcReg), _dstReg(dstReg), _imm8(0), _id(-1), _info(info) {
         }
-        po_x86_64_instruction(bool isSSE, int opcode, int srcReg, int dstReg, int8_t imm)
-            : _isSSE(isSSE), _opcode(opcode), _srcReg(srcReg), _dstReg(dstReg), _imm8(imm), _id(-1) {
+        po_x86_64_instruction(bool isSSE, int opcode, int srcReg, int dstReg, int8_t imm, const po_x86_64_debug_info& info)
+            : _isSSE(isSSE), _opcode(opcode), _srcReg(srcReg), _dstReg(dstReg), _imm8(imm), _id(-1), _info(info) {
         }
-        po_x86_64_instruction(bool isSSE, int opcode, int srcReg, int dstReg, int16_t imm)
-            : _isSSE(isSSE), _opcode(opcode), _srcReg(srcReg), _dstReg(dstReg), _imm16(imm), _id(-1) {
+        po_x86_64_instruction(bool isSSE, int opcode, int srcReg, int dstReg, int16_t imm, const po_x86_64_debug_info& info)
+            : _isSSE(isSSE), _opcode(opcode), _srcReg(srcReg), _dstReg(dstReg), _imm16(imm), _id(-1), _info(info) {
         }
-        po_x86_64_instruction(bool isSSE, int opcode, int srcReg, int dstReg, int32_t imm)
-            : _isSSE(isSSE), _opcode(opcode), _srcReg(srcReg), _dstReg(dstReg), _imm32(imm), _id(-1) {}
-        po_x86_64_instruction(bool isSSE, int opcode, int srcReg, int dstReg, int64_t imm)
-            : _isSSE(isSSE), _opcode(opcode), _srcReg(srcReg), _dstReg(dstReg), _imm64(imm), _id(-1) {
+        po_x86_64_instruction(bool isSSE, int opcode, int srcReg, int dstReg, int32_t imm, const po_x86_64_debug_info& info)
+            : _isSSE(isSSE), _opcode(opcode), _srcReg(srcReg), _dstReg(dstReg), _imm32(imm), _id(-1), _info(info) {}
+        po_x86_64_instruction(bool isSSE, int opcode, int srcReg, int dstReg, int64_t imm, const po_x86_64_debug_info& info)
+            : _isSSE(isSSE), _opcode(opcode), _srcReg(srcReg), _dstReg(dstReg), _imm64(imm), _id(-1), _info(info) {
         }
 
         inline void setId(int id) { _id = id; }
@@ -412,7 +439,11 @@ namespace po
 
         inline const bool isSSE() const { return _isSSE; }
 
+        inline void setDebugInfo(const po_x86_64_debug_info& info) { _info = info; }
+        inline const po_x86_64_debug_info& info() const { return _info; }
+
     private:
+        po_x86_64_debug_info _info;
         bool _isSSE; // Indicates if the instruction is an SSE instruction
         int _opcode; // The opcode of the instruction
         int _srcReg; // Source register
@@ -756,11 +787,14 @@ namespace po
         void mc_ucmps_memory_to_reg_x64(int dst, int src, int src_offset);
         void mc_xorps_reg_to_reg_x64(int dst, int src);
 
+        inline void setDebugInfo(const po_x86_64_debug_info& info) { _info = info; }
         inline po_x86_64_flow_graph& cfg() { return _cfg; }
         void dump() const;
+        void clear();
 
     private:
         po_x86_64_flow_graph _cfg;
+        po_x86_64_debug_info _info;
 
         void op_imm(const int opcode, const int imm);
 
