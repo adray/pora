@@ -1,0 +1,17 @@
+import std;
+namespace Test {
+    static void main() {
+        string f("foo");
+        string b("bar");
+        
+        map<i64, i64, hash_int64> map;
+        map.insert(f.hashCode(), 22);
+        map.insert(b.hashCode(), 99);
+        
+        i64 val;
+        boolean found = map.find(f.hashCode(), &val);
+        if (found) {
+            print_64(val);
+        }
+    }
+}

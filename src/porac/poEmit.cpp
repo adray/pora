@@ -2781,9 +2781,18 @@ int poCodeGenerator::emitDereference(poNode* node, poFlowGraph& cfg)
     const poType& typeData = _module.types()[type];
     if (typeData.isPointer())
     {
-        // Dereference a pointer
-        const int ptr = _emitter.emitPtr(type, expr, 0, cfg);
-        id = _emitter.emitLoad(typeData.baseType(), ptr, cfg);
+        const poType& baseType = _module.types()[typeData.baseType()];
+        if (baseType.isPrimitive())
+        {
+            // Dereference a pointer
+            const int ptr = _emitter.emitPtr(type, expr, 0, cfg);
+            id = _emitter.emitLoad(typeData.baseType(), ptr, cfg);
+        }
+        else
+        {
+            id  = _emitter.emitAlloca(baseType.id(), cfg.getLast());
+            emitCopy(expr, id, cfg);
+        }
     }
     else
     {

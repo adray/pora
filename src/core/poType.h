@@ -28,13 +28,13 @@ namespace po
 
     enum class poTypeKind
     {
-        Unknown,
-        Struct,
-        Class,
-        Trait,
-        Enum,
-        Pointer,
-        Array
+        UNKNOWN,
+        STRUCT,
+        CLASS,
+        TRAIT,
+        ENUM,
+        POINTER,
+        ARRAY
     };
 
     enum class poAttributes
@@ -171,14 +171,16 @@ namespace po
     class poParametricArgument
     {
     public:
-        poParametricArgument(const std::string& identifier, const int traitId);
+        poParametricArgument(const std::string& identifier, const int traitId, const std::vector<std::string>& args);
 
         inline const std::string& identifier() const { return _identifier; }
         inline const int traitId() const { return _traitId; }
+        inline const std::vector<std::string>& parametricArgs() const { return _parametricArgs; }
 
     private:
         std::string _identifier;
         int _traitId;
+        std::vector<std::string> _parametricArgs;
     };
 
     class poType
@@ -187,7 +189,7 @@ namespace po
         poType(const int id, const int baseType, const std::string& name);
         poType(const int id, const int baseType, const std::string& name, const std::string& fullname);
 
-        inline void addParametricArg(const std::string& name, const int traitId) { _parametricArgs.push_back(poParametricArgument(name, traitId)); }
+        inline void addParametricArg(const std::string& name, const int traitId, const std::vector<std::string>& args) { _parametricArgs.push_back(poParametricArgument(name, traitId, args)); }
         inline void addField(const poField& field) { _fields.push_back(field); }
         inline void addMethod(const poMemberFunction& method) { _methods.push_back(method); }
         inline void addOperator(const poOperator& operator_) { _operators.push_back(operator_); }
@@ -211,8 +213,8 @@ namespace po
         inline const int size() const { return _size; }
         inline const int alignment() const { return _alignment; }
         inline const poTypeKind kind() const { return _kind; }
-        inline const bool isArray() const { return _kind == poTypeKind::Array; }
-        inline const bool isPointer() const { return _kind == poTypeKind::Pointer; }
+        inline const bool isArray() const { return _kind == poTypeKind::ARRAY; }
+        inline const bool isPointer() const { return _kind == poTypeKind::POINTER; }
         inline const bool isGeneric() const { return _isGeneric; }
         inline const bool isPrimitive() const { return _id < TYPE_OBJECT; }
         inline const bool isObject() const { return _id == TYPE_OBJECT; }

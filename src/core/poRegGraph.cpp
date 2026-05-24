@@ -162,17 +162,19 @@ void poInterferenceGraph::colorGraph(const int numColors, const int numSpills)
             auto& node = _nodes[i];
             if (node.getNeighbours().size() >= colorsToUse)
             {
-                const int numNeighbours = int(node.getNeighbours().size());
-                for (int j = 0; j < numNeighbours; j++)
-                {
-                    const int neighbourId = node.getNeighbours()[j];
-                    auto& neighbour = _nodes[neighbourId];
-                    neighbour.removeNeighbour(i);
-                }
+                removeFromNeighbours(node, i);
 
                 node.setSpilled(true);
                 node.clearNeightbours();
                 changes = true;
+
+                for (auto& merge : node.getMerged()) {
+                    auto& mergeNode = _nodes[merge];
+
+                    removeFromNeighbours(mergeNode, merge);
+                    mergeNode.setSpilled(true);
+                    mergeNode.clearNeightbours();
+                }
 
                 if (numSpilled == 0)
                 {
@@ -221,6 +223,17 @@ void poInterferenceGraph::colorGraph(const int numColors, const int numSpills)
                 break;
             }
         }
+    }
+}
+
+void poInterferenceGraph::removeFromNeighbours(poInterferenceGraph_Node& node, int i)
+{
+    const int numNeighbours = int(node.getNeighbours().size());
+    for (int j = 0; j < numNeighbours; j++)
+    {
+        const int neighbourId = node.getNeighbours()[j];
+        auto& neighbour = _nodes[neighbourId];
+        neighbour.removeNeighbour(i);
     }
 }
 

@@ -8,14 +8,14 @@
 
 using namespace po;
 
-
 poTypeChecker::poTypeChecker(poModule& module)
     :
     _isError(false),
     _errorCol(0),
     _errorLine(0),
     _errorFile(0),
-    _module(module)
+    _module(module),
+    _genericArgs(nullptr)
 {
 }
 
@@ -321,9 +321,10 @@ void poTypeChecker::checkNamespaces(poNode* node, const std::vector<poNode*> imp
                     pushGenericParameters(static_cast<poListNode*>(node));
                 }
             }
-            _genericParameters.clear();
+            popGenericParameters();
         }
         else if (child->type() == poNodeType::STRUCT ||
+            child->type() == poNodeType::TRAIT ||
             child->type() == poNodeType::EXTERN ||
             child->type() == poNodeType::STATEMENT ||
             child->type() == poNodeType::ENUM)
@@ -511,14 +512,15 @@ void poTypeChecker::checkConstructor(poNode* node)
         checkBody(body, TYPE_VOID);
         popScope();
 
-        _genericParameters.clear();
+        popGenericParameters();
     }
 }
 
-void po::poTypeChecker::pushGenericParameters(po::poListNode* genericArgs)
+void poTypeChecker::pushGenericParameters(poListNode* genericArgs)
 {
     if (genericArgs)
     {
+        _genericArgs = genericArgs;
         for (poNode* node : genericArgs->list())
         {
             if (node->type() == poNodeType::CONSTRAINT) {
@@ -527,6 +529,12 @@ void po::poTypeChecker::pushGenericParameters(po::poListNode* genericArgs)
             _genericParameters.push_back(node->token().string());
         }
     }
+}
+
+void poTypeChecker::popGenericParameters()
+{
+    _genericParameters.clear();
+    _genericArgs = nullptr;
 }
 
 void poTypeChecker::checkFunctions(poNode* node)
@@ -656,7 +664,7 @@ void poTypeChecker::checkFunctions(poNode* node)
         }
         checkBody(body, returnType);
         popScope();
-        _genericParameters.clear();
+        popGenericParameters();
     }
 }
 
@@ -758,7 +766,7 @@ int poTypeChecker::getPointerType(const int baseType, const int count)
 
                 type = int(_module.types().size());
                 poType newType(type, pointerType, typeData.name() + "*");
-                newType.setKind(poTypeKind::Pointer);
+                newType.setKind(poTypeKind::POINTER);
                 newType.setSize(8);
                 newType.setAlignment(8);
                 _module.addType(newType);
@@ -799,7 +807,7 @@ int poTypeChecker::getArrayType(const int baseType, const int arrayRank)
         const int numTypes = int(_module.types().size());
         arrayType = numTypes;
         poType type(arrayType, baseType, name);
-        type.setKind(poTypeKind::Array);
+        type.setKind(poTypeKind::ARRAY);
         _module.addType(type);
     }
     return arrayType;
@@ -921,10 +929,21 @@ void poTypeChecker::checkConstructorCall(poNode* decl)
                     // Get the generic version?
                     std::vector<int> parameters;
                     for (poNode* node : genericNode->nodes()) {
-                        const int paramType = poUtil::unpackTypeNode(_module, node);
+                        int paramType = poUtil::unpackTypeNode(_module, node);
+                        if (paramType == -1) {
+                            paramType = getType(node->token());
+                            if (paramType == -1) {
+                                setError("Internal Error: generic parameter type cannot be found.", decl->token());
+                                return;
+                            }
+                        }
                         parameters.push_back(paramType);
                     }
                     const int genericType = getGenericType(type, parameters);
+                    if (genericType == -1) {
+                        setError("Internal Error: generic type could be found.", decl->token());
+                        return;
+                    }
                     addVariable(varName, genericType);
                 }
                 else if (arrayNode)
@@ -936,12 +955,6 @@ void poTypeChecker::checkConstructorCall(poNode* decl)
                 {
                     addVariable(varName, type);
                 }
-            }
-
-            if (baseType >= TYPE_PARAMETRIC_1 &&
-                baseType <= TYPE_PARAMETRIC_4) {
-                setError("Cannot instantiate a generic parameter type.", decl->token());
-                return;
             }
 
             bool success = false;
@@ -1719,6 +1732,91 @@ int poTypeChecker::checkMemberCall(poNode* node)
     if (objectTypeData.isPointer())
     {
         objectType = objectTypeData.baseType();
+    }
+
+    if (objectType >= TYPE_PARAMETRIC_1 &&
+        objectType <= TYPE_PARAMETRIC_4) {
+        // Handle calling a function for a trait
+
+        const int thisInstruction = getVariable("this");
+        if (thisInstruction == -1) {
+            return -1;
+        }
+
+        const int baseType = _module.types()[thisInstruction].baseType();
+        const auto& parametricArgs = _module.types()[baseType].parametricArgs();
+        const poParametricArgument& arg = parametricArgs[objectType - TYPE_PARAMETRIC_1];
+        const int traitId = arg.traitId();
+        if (traitId >= TYPE_PARAMETRIC_1 &&
+            traitId <= TYPE_PARAMETRIC_4) {
+            setError("Unable to call method on parametric type without a trait.", node->token());
+            return -1;
+        }
+
+        // Find the function for the given name.
+
+        poType& traitType = _module.types()[traitId];
+        int index = 0;
+        for (const poMemberFunction& member : traitType.functions()) {
+            if (member.name() !=
+                memberCall->token().string()) {
+                index++;
+                continue;
+            }
+            break;
+        }
+
+        if (traitType.functions().size() == index) {
+            return -1;
+        }
+
+        // We need to flow the parametric type
+
+        std::vector<int> flowedParametricTypes;
+        for (const auto& argument : arg.parametricArgs()) {
+            for (int i = 0; i < int(parametricArgs.size()); i++) {
+                if (parametricArgs[i].identifier() == 
+                    argument) {
+                    flowedParametricTypes.push_back(i + TYPE_PARAMETRIC_1);
+                }
+            }
+        }
+
+        if (flowedParametricTypes.size() != arg.parametricArgs().size()) {
+            return -1;
+        }
+
+        // Validate the arguments
+
+        poListNode* call = static_cast<poListNode*>(memberCall->right());
+        auto& func = traitType.functions()[index];
+        for (int i = 0; i < func.arguments().size(); i++) {
+            // We need to remap the argType using the flowedParametricTypes
+            int argType = func.arguments()[i];
+            int pointerCount = 0;
+            if (_module.types()[argType].isPointer()) {
+                pointerCount++;
+                argType = _module.types()[argType].baseType();
+            }
+            if (argType >= TYPE_PARAMETRIC_1 &&
+                argType <= TYPE_PARAMETRIC_4) {
+                const int argIndex = argType - TYPE_PARAMETRIC_1;
+                if (argIndex >= int(flowedParametricTypes.size())) {
+                    return -1;
+                }
+                argType = flowedParametricTypes[argIndex];
+            }
+            if (pointerCount > 0) {
+                argType = getPointerType(argType, pointerCount);
+            }
+
+            const int callArgType = checkExpr(call->list()[i]);
+            if (callArgType != argType) {
+                return -1;
+            }
+        }
+
+        return func.returnType();
     }
 
     poType& type = _module.types()[objectType];

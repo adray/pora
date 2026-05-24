@@ -1,0 +1,20 @@
+import std;
+namespace Test {
+    static void main() {
+        date x;
+        x.setDate((u16)7, (u16)2, (u16)2000);
+        
+        date y;
+        y.setDate((u16)22, (u16)8, (u16)1977);
+    
+        map<date, i64, hash_date> map;
+        map.insert(x, 821);
+        map.insert(y, 44);
+        
+        i64 val;
+        boolean found = map.find(y, &val);
+        if (found) {
+            print_64(val);
+        }
+    }
+}

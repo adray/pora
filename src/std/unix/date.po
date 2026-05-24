@@ -8,6 +8,8 @@ namespace std {
     }
 
     class date {
+        // Date is 64-bit and can therefore be passed by value within a single 64-bit register.
+        
         private u16 _day;
         private u16 _month;
         private u16 _year;
@@ -22,6 +24,8 @@ namespace std {
         void setNow();
         void setDate(u16 year, u16 month, u16 day);
         void format(date_text* text);
+        i64 hashCode();
+        boolean equals(date d);
     }
     
     void date::reset() {
@@ -64,5 +68,21 @@ namespace std {
         text.text[8] = '0' + (u8)((_year / (u16)10) % (u16)10);
         text.text[9] = '0' + (u8)(_year % (u16)10);
         text.text[10] = 0b;
+    }
+
+    i64 date::hashCode() {
+        i64 hash = (i64)_day * 593
+            + (i64)_month * (i64)_month * 593
+            + (i64)_year * (i64)_year * (i64)_year * 593;
+        return hash;
+    }
+
+    boolean date::equals(date d) {
+        if (_day == d.getDay &&
+            _month == d.getMonth &&
+            _year == d.getYear) {
+            return true;
+        }
+        return false;
     }
 }

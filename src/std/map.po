@@ -1,42 +1,180 @@
 //
-// A hashmap implemented with open addressing (WIP)
+// A hashmap implemented with open addressing
 //
 
 namespace std {
-    class map<K:new, V:new> {
+    class map<K:new, V:new, H:hash<K>> {
         private K* _keys;
         private V* _values;
+        private i64* _hashes;
+        private boolean* _occupied;
         private i64 _capacity;
         private i64 _size;
 
         map();
         void insert(K key, V val);
+        boolean find(K key, V* val);
+        boolean erase(K key);
+        void clear();
+
         i64 size => _size;
         i64 capacity => _capacity;
 
         private void resize(i64 capacity);
-        private i64 hash(K* key);
     }
 
-    map<K,V>::map() {
+    map<K,V,H>::map() {
         _capacity = 0;
         _size     = 0;
 
-        resize(4);
+        resize(10);
     }
 
-    void map<K,V>::resize(i64 capacity) {
+    void map<K,V,H>::resize(i64 capacity) {
+        K* oldKeys              = _keys;
+        V* oldValues            = _values;
+        i64* oldHashes          = _hashes;
+        boolean* oldOccupied    = _occupied;
+        i64 oldCapacity         = _capacity;
+
         _capacity = capacity;
+
+        _keys       = (K*)new K[_capacity];
+        _values     = (V*)new V[_capacity];
+        _hashes     = (i64*)new i64[_capacity];
+        _occupied   = (boolean*)new boolean[_capacity];
+
+        boolean[] occupied = (boolean[0])_occupied;
+        for (i64 i = 0; i < _capacity; i = i + 1) {
+            occupied[i] = false;
+        }
+
+        i64[] hashes        = (i64[0])oldHashes;
+        i64[] newHashes     = (i64[0])_hashes;
+        K[] oldKeysArr      = (K[0])oldKeys;
+        V[] oldValArr       = (V[0])oldValues;
+        K[] keys            = (K[0])_keys;
+        V[] values          = (V[0])_values;
+
+        for (i64 i = 0; i < oldCapacity; i = i + 1) {
+            i64 hashcode = hashes[i];
+            i64 pos = hashcode % _capacity;
+
+            while (occupied[pos] == true) { 
+                pos = pos + 1;
+                if (pos > _capacity) {
+                    pos = 0;
+                }
+            }
+
+            occupied[pos]   = true;
+            keys[pos]       = oldKeysArr[i];
+            values[pos]     = oldValArr[i];
+            newHashes[pos]  = hashcode;
+        }
+
+        // freeArray(_keys);
+    }
+
+    void map<K,V,H>::insert(K key, V val) {
+        if (_size == _capacity) {
+            resize((_capacity >> 2) + _capacity);
+        }
         
-        _keys   = (K*)new K[_capacity];
-        _values = (V*)new V[_capacity];
+        H hash;
+        i64 hashcode = hash.getHash(&key);
+        i64 pos = hashcode % _capacity;
+
+        boolean[] occupied = (boolean[0])_occupied;
+        
+        while (occupied[pos] == true) { 
+            pos = pos + 1;
+            if (pos > _capacity) {
+                pos = 0;
+            }
+        }
+        
+        i64[] hashes    = (i64[0])_hashes;
+        K[] keys        = (K[0])_keys;
+        V[] values      = (V[0])_values;
+        
+        occupied[pos]  = true;
+        keys[pos]      = key;
+        values[pos]    = val;
+        hashes[pos]    = hashcode;
+        _size = _size + 1;
     }
 
-    void map<K,V>::insert(K key, V val) {
-        i64 hashcode = hash(&key);
+    boolean map<K,V,H>::find(K key, V* val) {
+        H hash;
+        i64 hashcode = hash.getHash(&key);
+        i64 pos = hashcode % _capacity;
+        i64 startPos = pos;
+
+        boolean[] occupied = (boolean[0])_occupied;
+        i64[] hashes    = (i64[0])_hashes;
+        V[] values      = (V[0])_values;
+        K[] keys        = (K[0])_keys;
+
+        while (occupied[pos] == true) {
+            if (hashes[pos] == hashcode) {
+                K foundKey = keys[pos];
+                if (hash.equals(&key, &foundKey) == true) {
+                    *val = values[pos];
+                    return true;
+                }
+            }
+
+            pos = pos + 1;
+            if (pos > _capacity) {
+                pos = 0;
+            }
+            if (pos == startPos) { 
+                break;
+            }
+        }
+
+        return false;
     }
 
-    i64 map<K,V>::hash(K* key) {
-        return 0;
+    boolean map<K,V,H>::erase(K key) {
+        H hash;
+        i64 hashcode = hash.getHash(&key);
+        i64 pos = hashcode % _capacity;
+        i64 startPos = pos;
+
+        boolean[] occupied = (boolean[0])_occupied;
+        i64[] hashes    = (i64[0])_hashes;
+        V[] values      = (V[0])_values;
+        K[] keys        = (K[0])_keys;
+
+        while (occupied[pos] == true) {
+            if (hashes[pos] == hashcode) {
+                K foundKey = keys[pos];
+                if (hash.equals(&key, &foundKey) == true) {
+                    occupied[pos] = false;
+                    return true;
+                }
+            }
+
+            pos = pos + 1;
+            if (pos > _capacity) {
+                pos = 0;
+            }
+            if (pos == startPos) { 
+                break;
+            }
+        }
+
+        return false;
+    }
+
+    void map<K,V,H>::clear() {
+        _size = 0;
+                
+        boolean[] occupied = (boolean[0])_occupied;
+        for (i64 i = 0; i < _capacity; i = i + 1) {
+            occupied[i] = false;
+        }
     }
 }

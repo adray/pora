@@ -71,6 +71,7 @@ namespace po
         CLASS,
         ENUM,
         STRUCT,
+        TRAIT,
         NEW,
         DELETE,
         PUBLIC,

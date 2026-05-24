@@ -7,9 +7,9 @@ namespace po
 
     enum class poGenericType
     {
-        Class,
-        Function,
-        Variable
+        CLASS,
+        FUNCTION,
+        VARIABLE
     };
 
     class poParser
@@ -29,7 +29,7 @@ namespace po
         inline int errorColumn() const { return _col; }
         const int parsePointer();
         void parseGeneric(const poGenericType type, std::vector<poNode*>& parameters);
-        poNode* parseConstraint(poNode* param);
+        poNode* parseConstraint(poNode* param, bool& expectRightShift);
 
     private:
         const std::vector<poToken>& _tokens;
@@ -112,6 +112,16 @@ namespace po
         poParser& _parser;
     };
 
+    class poTraitParser
+    {
+    public:
+        poTraitParser(poParser& parser);
+        poNode* parse();
+
+    private:
+        poParser& _parser;
+    };
+
     class poNamespaceParser
     {
     public:
@@ -124,6 +134,7 @@ namespace po
         poNode* parseStruct();
         poNode* parseClass();
         poNode* parseEnum();
+        poNode* parseTrait();
         poNode* parseStaticVariable(const poToken& type, const int pointerCount, const poToken& name);
 
         poParser& _parser;

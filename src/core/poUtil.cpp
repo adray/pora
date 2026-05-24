@@ -69,7 +69,7 @@ int poUtil::getPointerType(poModule& module, const int baseType)
 
         const int id = int(module.types().size());
         poType pointerType(id, baseType, type.name() + "*");
-        pointerType.setKind(poTypeKind::Pointer);
+        pointerType.setKind(poTypeKind::POINTER);
         pointerType.setSize(8);
         pointerType.setAlignment(8);
         module.addType(pointerType);

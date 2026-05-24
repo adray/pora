@@ -1,0 +1,11 @@
+import std;
+
+namespace Test {
+    static void main() {
+        calendar c;
+        boolean valid = c.validate((u16)1900, (u16)13, (u16)7);
+        if (valid == false) {
+            print("OK", (u32)3);
+        }
+    }
+}

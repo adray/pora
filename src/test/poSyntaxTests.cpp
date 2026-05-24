@@ -1636,10 +1636,56 @@ void po::syntaxTest()
         "   List<Foo> myList;"\
         "}"\
         "}", false);
-    //checkSyntax("Traits #1", "namespace Test {"\
-    //    "trait Default {"\
-    //    "   Self default();"\
-    //    "}"\
-    //    "}", true);
+    checkSyntax("Generics #19", "namespace Test {"\
+        "class List<T:tr,V> {"\
+        "   T<V> _member;"\
+        "}"\
+        "trait tr<T>{ void setVal(i64 x); }"\
+        "}", true);
+    checkSyntax("Traits #1", "namespace Test {"\
+        "trait Default {"\
+        "   void default();"\
+        "}"\
+        "}", true);
+    checkSyntax("Traits #2", "namespace Test {"\
+        "trait Default<T> {"\
+        "   T default();"\
+        "}"\
+        "}", true);
+    checkSyntax("Traits #3", "namespace Test {"\
+        "trait Default {"\
+        "   void default();"\
+        "}"\
+        "class Test<T:Default> {"\
+        "}"\
+        "}", true);
+    checkSyntax("Traits #4", "namespace Test {"\
+        "trait Default {"\
+        "   void default();"\
+        "}"\
+        "class Default_Impl {"\
+        "   i64 default();"\
+        "}"\
+        "i64 Default_Impl::default(){return 0;}"\
+        "class Test<T:Default> {"\
+        "}"\
+        "static void main() {"\
+        "   Test<Default_Impl> impl;"\
+        "}"\
+        "}", false);
+    checkSyntax("Traits #5", "namespace Test {"\
+        "trait Default {"\
+        "   void default();"\
+        "}"\
+        "class Default_Impl {"\
+        "   void default(i64 x);"\
+        "}"\
+        "void Default_Impl::default(i64 x){}"\
+        "class Test<T:Default> {"\
+        "}"\
+        "static void main() {"\
+        "   Test<Default_Impl> impl;"\
+        "}"\
+        "}", false);
 
 }

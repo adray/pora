@@ -279,6 +279,8 @@ static void runIntegrationTest(const std::string& name, const std::string& path,
     args.push_back(dir + "socket.po");
     args.push_back(dir + "list.po");
     args.push_back(dir + "map.po");
+    args.push_back(dir + "numeric.po");
+    args.push_back(dir + "traits.po");
 
     if (!executeCommand(args, true))
     {

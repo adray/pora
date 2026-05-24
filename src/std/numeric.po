@@ -1,0 +1,33 @@
+namespace std {
+    static i64 min(i64 x, i64 y) {
+        if (x < y) {
+            return x;
+        }
+        return y;
+    }
+    
+    static i64 max(i64 x, i64 y) {
+        if (x > y) {
+            return x;
+        }
+        return y;
+    }
+    
+    static i64 power(i64 x, i64 p) {
+        if (p == 0) {
+            return 1;
+        }
+        if (p == 1) {
+            return x;
+        }
+        if (p == 2) {
+            return x * x;
+        }
+
+        i64 v = x;
+        for (i64 i = 0; i < p; i = i + 1) {
+            v = v * x;
+        }
+        return v;
+    }
+}

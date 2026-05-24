@@ -4,6 +4,8 @@ namespace std
     {
         private u8* _chars;
         private i64 _size;
+        private i64 _hashcode;
+        private boolean _hasHash;
 
         //string(u8* str, i64 size);
         string(u8* str);
@@ -11,6 +13,7 @@ namespace std
         u8 at(i64 pos);
         i64 size();
         u8* data();
+        i64 hashCode();
     }
 
     //string::string(u8* str, i64 size) {
@@ -39,5 +42,21 @@ namespace std
 
     u8* string::data() { 
         return _chars;
+    }
+    
+    i64 string::hashCode() {
+        if (_hasHash) {
+            return _hashcode;
+        }
+    
+        i64 hash = 0;
+        u8[] arr = (u8[32])_chars;
+        for (i64 i = 0; i < _size; i = i + 1) {
+            i64 p = power((i64)arr[i], i);
+            hash = hash + p * 593;
+        }
+        _hashcode = hash;
+        _hasHash = true;
+        return hash;
     }
 }

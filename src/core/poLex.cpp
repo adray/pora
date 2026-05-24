@@ -54,6 +54,7 @@ poLexer::poLexer()
     addKeyword("break", poTokenType::BREAK);
     addKeyword("class", poTokenType::CLASS);
     addKeyword("enum", poTokenType::ENUM);
+    addKeyword("trait", poTokenType::TRAIT);
     addKeyword("new", poTokenType::NEW);
     addKeyword("delete", poTokenType::DELETE);
     addKeyword("public", poTokenType::PUBLIC);

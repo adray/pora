@@ -290,7 +290,18 @@ void poOptInline::inlineFunctionCall(poInstruction& ins, poBasicBlock* bb, poMod
             {
                 if (funcIns.type() != TYPE_VOID)
                 {
-                    returnValues.push_back(funcIns.left());
+                    // Insert a copy
+                    maxName++;
+                    int copyName = maxName;
+                    newBB->addInstruction(poInstruction(
+                        copyName,
+                        funcIns.type(),
+                        funcIns.left(),
+                        -1,
+                        IR_COPY
+                    ));
+
+                    returnValues.push_back(copyName);
                     returnBlocks.push_back(newBB);
                 }
 

@@ -64,6 +64,7 @@ namespace po
         CLASS, /* poListNode */
         STRUCT, /* poListNode */
         ENUM, /* poListNode */
+        TRAIT, /* poListNode */
         NAMESPACE, /* poListNode */
         MODULE, /* poListNode */
         IMPORT, /* poNode */

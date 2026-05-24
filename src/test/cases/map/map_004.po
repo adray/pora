@@ -1,0 +1,17 @@
+import std;
+namespace Test {
+    static void main() {
+        map<i64, i64, hash_int64> map;
+        for (i64 i = 0; i < 100; i = i + 1) {
+            map.insert(i, i);
+        }
+        
+        i64 val;
+        for (i64 i = 0; i < 100; i = i + 1) {
+            boolean found = map.find(i, &val);
+            if (found) {
+                print_64(val);
+            }
+        }
+    }
+}

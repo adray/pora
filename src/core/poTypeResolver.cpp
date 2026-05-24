@@ -263,6 +263,10 @@ void poTypeResolver::getNamespaces(poNode* node)
         {
             getEnum(child, ns, id);
         }
+        else if (child->type() == poNodeType::TRAIT)
+        {
+            getTrait(child, ns, id);
+        }
         else if (child->type() == poNodeType::EXTERN)
         {
             getExtern(child, ns);
@@ -277,10 +281,12 @@ void poTypeResolver::addType(poNode* node, poNamespace& ns, const int nsId, cons
 {
     const std::string& name = node->token().string();
     const int id = int(_module.types().size());
-    _module.addType(poType(id,
+    poType type(poType(id,
         baseType,
         name,
         ns.name() + "::" + name));
+    type.setKind(poTypeKind(kind));
+    _module.addType(type);
     ns.addType(id);
     _namespaceForTypes.insert(std::pair<poNode*, int>(node, nsId));
 }
@@ -290,7 +296,7 @@ void poTypeResolver::getEnum(poNode* node, poNamespace& ns, const int nsId)
     assert(node->type() == poNodeType::ENUM);
     _userTypes.push_back(node);
 
-    addType(node, ns, nsId, TYPE_ENUM, int(poTypeKind::Enum));
+    addType(node, ns, nsId, TYPE_ENUM, int(poTypeKind::ENUM));
 }
 
 void poTypeResolver::getClass(poNode* node, poNamespace& ns, const int nsId)
@@ -298,7 +304,7 @@ void poTypeResolver::getClass(poNode* node, poNamespace& ns, const int nsId)
     assert(node->type() == poNodeType::CLASS);
     _userTypes.push_back(node);
 
-    addType(node, ns, nsId, TYPE_OBJECT, int(poTypeKind::Class));
+    addType(node, ns, nsId, TYPE_OBJECT, int(poTypeKind::CLASS));
 }
 
 void poTypeResolver::getStruct(poNode* node, poNamespace& ns, const int nsId)
@@ -306,7 +312,15 @@ void poTypeResolver::getStruct(poNode* node, poNamespace& ns, const int nsId)
     assert(node->type() == poNodeType::STRUCT);
     _userTypes.push_back(node);
 
-    addType(node, ns, nsId, TYPE_OBJECT, int(poTypeKind::Struct));
+    addType(node, ns, nsId, TYPE_OBJECT, int(poTypeKind::STRUCT));
+}
+
+void poTypeResolver::getTrait(poNode* node, poNamespace& ns, const int nsId)
+{
+    assert(node->type() == poNodeType::TRAIT);
+    _userTypes.push_back(node);
+
+    addType(node, ns, nsId, TYPE_OBJECT, int(poTypeKind::TRAIT));
 }
 
 void poTypeResolver::getExtern(poNode* node, poNamespace& ns)
@@ -471,7 +485,7 @@ int poTypeResolver::getPointerType(const int baseType, const int count)
 
             type = int(_module.types().size());
             poType newType(type, pointerType, typeData.name() + "*");
-            newType.setKind(poTypeKind::Pointer);
+            newType.setKind(poTypeKind::POINTER);
             newType.setSize(8);
             newType.setAlignment(8);
             _module.addType(newType);
@@ -480,6 +494,14 @@ int poTypeResolver::getPointerType(const int baseType, const int count)
 
     }
     return pointerType;
+}
+
+bool poTypeResolver:: isEqual(poNode* x, poNode* y)
+{
+    const int typeX = poUtil::getType(x->token());
+    const int typeY = poUtil::getType(y->token());
+
+    return typeX == typeY;
 }
 
 bool poTypeResolver::isTypeResolved(poNode* node, bool isPointer, poListNode* parametricArgs)
@@ -746,7 +768,8 @@ bool poTypeResolver::processWorklist(poMorph& morph, std::vector<poNode*>& work,
                         for (poNode* argument : args->list())
                         {
                             poUnaryNode* argNode = static_cast<poUnaryNode*>(argument);
-                            resolved &= isTypeResolved(argNode->child(), isPointer, parametricArgs);
+                            resolved &= isTypeResolved(argNode->child(), isPointer, parametricArgs) ||
+                                isEqual(argument, typeNode);
                         }
                     }
                 }
@@ -1173,17 +1196,26 @@ void poTypeResolver::resolveType(const std::string& name, poNamespace& ns, poLis
         {
             poNode* arg = node;
             int traitId = 0;
+            std::vector<std::string> args;
             if (node->type() == poNodeType::CONSTRAINT) {
+                poUnaryNode* constraintNode = static_cast<poUnaryNode*>(arg);
                 if (node->token().token() == poTokenType::NEW) {
                     traitId = TYPE_TRAIT_NEW;
                 } else {
                     const std::string constraint = node->token().string();
                     traitId = _module.getTypeFromName(constraint);
+                    if (constraintNode->child()->type() == poNodeType::GENERIC) {
+                        poGenericNode* generic = static_cast<poGenericNode*>(constraintNode->child());
+                        node = generic;
+                        for (poNode* node : generic->nodes()) {
+                            args.push_back(node->token().string());
+                        }
+                    }
                 }
                 arg = static_cast<poUnaryNode*>(node)->child();
             }
 
-            type.addParametricArg(arg->token().string(), traitId);
+            type.addParametricArg(arg->token().string(), traitId, args);
         }
     }
 
@@ -1198,7 +1230,7 @@ int poTypeResolver::getArrayType(int fieldType)
         arrayType = int(_module.types().size());
         std::string baseName = _module.types()[fieldType].name();
         poType type(arrayType, fieldType, baseName + "[]");
-        type.setKind(poTypeKind::Array);
+        type.setKind(poTypeKind::ARRAY);
         _module.addType(type);
     }
     return arrayType;
@@ -1267,7 +1299,11 @@ bool poTypeResolver::generateSpecializations(poMorphNode* node, poListNode* type
                 }
             }
             else if (arg.traitId() > 0) {
-                ok = false;
+                // Check the type argument satisfies the constraint trait
+                const int paramType = node->parameters()[i].type();
+                const poType& paramTypeData = _module.types()[paramType];
+                const poType& traitData = _module.types()[arg.traitId()];
+                checkTrait(traitData, paramTypeData, ok);
             }
 
             if (!ok) {
@@ -1374,6 +1410,70 @@ bool poTypeResolver::generateSpecializations(poMorphNode* node, poListNode* type
     }
 
     return changes;
+}
+
+void poTypeResolver::checkTrait(const poType& traitData, const poType& paramTypeData, bool& ok)
+{
+    std::vector<int> constraints;
+    constraints.resize(traitData.parametricArgs().size());
+
+    for (const poMemberFunction& traitFunc : traitData.functions()) {
+        // Find the matching function (or fail if not)
+        bool found = false;
+        for (const poMemberFunction& func : paramTypeData.functions()) {
+            if (traitFunc.name() !=
+                func.name()) {
+                continue;
+            }
+
+            if (traitFunc.arguments().size() !=
+                func.arguments().size()) {
+                continue;
+            }
+
+            if (traitFunc.returnType() !=
+                func.returnType()) {
+                continue;
+            }
+
+            bool argsMatch = true;
+            for (int i = 0; i < int(traitFunc.arguments().size()); i++) {
+                int traitArg = traitFunc.arguments()[i];
+                int funcArg = func.arguments()[i];
+                const poType& traitArgType = _module.types()[traitArg];
+                if (traitArgType.isPointer()) {
+                    traitArg = traitArgType.baseType();
+                }
+                
+                if (traitArg >= TYPE_PARAMETRIC_1 &&
+                    traitArg <= TYPE_PARAMETRIC_4) {
+                    // Remap type - if the constraint has not been specified set it
+                    // otherwise check if it is constraint
+                    if (constraints[traitArg - TYPE_PARAMETRIC_1] == 0) {
+                        constraints[traitArg - TYPE_PARAMETRIC_1] = funcArg;
+                        continue;
+                    } else {
+                        traitArg = constraints[traitArg - TYPE_PARAMETRIC_1];
+                    }
+                }
+
+                if (traitArg != funcArg) {
+                    argsMatch = false;
+                    break;
+                }
+            }
+
+            found = argsMatch;
+            if (found) {
+                break;
+            }
+        }
+
+        if (!found) {
+            ok = false;
+            break;
+        }
+    }
 }
 
 void po::poTypeResolver::getGenericTypeName(std::string& newName, po::poMorphNode* node)

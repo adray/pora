@@ -277,6 +277,87 @@ static void regGraphTest7()
 }
 
 
+static void regGraphTest8() {
+    /*
+
+    Basic Block 3:
+    42 IR_CMP 1 39 4
+    43 IR_BR 1 5 --> Basic Block 5
+    Basic Block 4:
+    44 IR_COPY 1 39
+    45 IR_BR 1 0 --> Basic Block 6
+    Basic Block 5:
+    46 IR_COPY 1 4
+    Basic Block 6:
+    47 IR_PHI 1 44 46
+    49 IR_CONSTANT 1 7
+    50 IR_COPY 1 49
+    Basic Block 7:
+    51 IR_PHI 1 50 52
+    53 IR_CMP 1 51 47
+    54 IR_BR 1 5 --> Basic Block 10
+
+    */
+
+    std::cout << "Reg Graph Test #8 ";
+
+    poFlowGraph cfg;
+    poBasicBlock* bb1 = new poBasicBlock();
+    poBasicBlock* bb2 = new poBasicBlock();
+    poBasicBlock* bb3 = new poBasicBlock();
+    poBasicBlock* bb4 = new poBasicBlock();
+    poBasicBlock* bb5 = new poBasicBlock();
+
+    bb1->setBranch(bb3, false);
+    bb2->setBranch(bb4, true);
+    bb3->addIncoming(bb1);
+    bb4->addIncoming(bb2);
+
+    cfg.addBasicBlock(bb1);
+    cfg.addBasicBlock(bb2);
+    cfg.addBasicBlock(bb3);
+    cfg.addBasicBlock(bb4);
+    cfg.addBasicBlock(bb5);
+
+    bb1->addInstruction(poInstruction(4, 1, 0, IR_CONSTANT));
+    bb1->addInstruction(poInstruction(39, 1, 1, IR_CONSTANT));
+    bb1->addInstruction(poInstruction(42, 1, 39, 4, IR_CMP));
+    bb1->addInstruction(poInstruction(43, 1, 5, IR_BR));
+
+    bb2->addInstruction(poInstruction(44, 1, 39, -1, IR_COPY));
+    bb2->addInstruction(poInstruction(45, 1, 0, -1, IR_BR));
+
+    bb3->addInstruction(poInstruction(46, 1, 4, -1, IR_COPY));
+
+    bb4->addInstruction(poInstruction(47, 1, 44, 46, IR_PHI));
+    bb4->addInstruction(poInstruction(49, 1, 2, IR_CONSTANT));
+    bb4->addInstruction(poInstruction(50, 1, 49, -1, IR_COPY));
+
+    bb5->addInstruction(poInstruction(53, 1, 50, 47, IR_CMP));
+
+    poModule mod;
+    poRegGraph graph(mod);
+    graph.setNumRegisters(8);
+    for (int i = 0; i < 8; i++)
+    {
+        graph.setType(i, poRegType::General);
+    }
+    graph.allocateRegisters(cfg);
+
+    bool ok =
+        graph.getRegisterByVariable(47, 7) !=
+        graph.getRegisterByVariable(50, 9);
+
+    if (ok)
+    {
+        std::cout << "OK" << std::endl;
+    }
+    else
+    {
+        std::cout << "FAILED" << std::endl;
+    }
+}
+
 void po::runRegGraphTests()
 {
     regGraphTest1();
@@ -286,5 +367,6 @@ void po::runRegGraphTests()
     regGraphTest5();
     regGraphTest6();
     regGraphTest7();
+    regGraphTest8();
 }
 

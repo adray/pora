@@ -1,0 +1,67 @@
+namespace std {
+    trait hash<T> {
+        i64 getHash(T* t);
+        boolean equals(T* t, T* s);
+    }
+
+    //-----------------------------
+    
+    class hash_int64 {
+        i64 getHash(i64* i);
+        boolean equals(i64* t, i64* s);
+    }
+    
+    i64 hash_int64::getHash(i64* i) {
+        return *i;
+    }
+
+    boolean hash_int64::equals(i64* t, i64* s) {
+        i64 x = *t;
+        i64 y = *s;
+        if (x == y) {
+            return true;
+        }
+        return false;
+    }
+
+    //-----------------------------
+
+    class hash_string {
+        i64 getHash(string* str);
+    }
+
+    i64 hash_string::getHash(string* str) {
+        return str.hashCode();
+    }
+
+    //-----------------------------
+
+    class hash_default<T> {
+        i64 getHash(T* t);
+    }
+
+    i64 hash_default<T>::getHash(T* t) {
+        // TODO: return memory address as i64
+        return 0;
+    }
+
+    //-----------------------------
+
+    class hash_date {
+        i64 getHash(date* d);
+        boolean equals(date* t, date* s);
+    }
+
+    i64 hash_date::getHash(date* d) {
+        return d.hashCode();
+    }
+
+    boolean hash_date::equals(date* t, date* s) {
+        date x = *t;
+        date y = *s;
+        if (x.equals(y)) {
+            return true;
+        }
+        return false;
+    }
+}

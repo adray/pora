@@ -57,10 +57,11 @@ poField::poField(const poAttributes attributes, const int offset, const int type
 {
 }
 
-poParametricArgument::poParametricArgument(const std::string& identifier, const int traitId)
+poParametricArgument::poParametricArgument(const std::string& identifier, const int traitId, const std::vector<std::string>& args)
     :
     _identifier(identifier),
-    _traitId(traitId)
+    _traitId(traitId),
+    _parametricArgs(args)
 {
 }
 
@@ -68,7 +69,7 @@ poType::poType(const int id, const int baseType, const std::string& name)
     :
     _id(id),
     _baseType(baseType),
-    _kind(poTypeKind::Unknown),
+    _kind(poTypeKind::UNKNOWN),
     _isGeneric(false),
     _name(name),
     _fullname(name),
@@ -81,7 +82,7 @@ poType::poType(const int id, const int baseType, const std::string& name, const 
     :
     _id(id),
     _baseType(baseType),
-    _kind(poTypeKind::Unknown),
+    _kind(poTypeKind::UNKNOWN),
     _isGeneric(false),
     _name(name),
     _fullname(fullname),

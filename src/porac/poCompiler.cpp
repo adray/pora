@@ -154,7 +154,7 @@ int poCompiler:: compile()
     if (_debugDump) { module.dump(_debugDumpName); }
 
     // Convert the basic blocks/cfg to machine code
-    _assembler.setDebugDump(_debugDump);
+    //_assembler.setDebugDump(_debugDump);
     _assembler.generate(module);
     //module.dump(_debugDumpName);
 

@@ -474,7 +474,7 @@ void poModule::addPrimitives()
     types[TYPE_ENUM].setSize(4);
 
     // Set kind
-    types[TYPE_TRAIT_NEW].setKind(poTypeKind::Trait);
+    types[TYPE_TRAIT_NEW].setKind(poTypeKind::TRAIT);
 
     for (auto& type : types)
     {

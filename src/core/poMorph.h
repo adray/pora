@@ -23,7 +23,7 @@ namespace po {
         poMorphNode* find(const int type, const std::vector<int>& parameters);
 
     private:
-        std::unordered_map<int, std::vector<poMorphNode*>> _items;
+        std::unordered_map<size_t, std::vector<poMorphNode*>> _items;
     };
 
     // A class for a generic type
@@ -119,16 +119,20 @@ namespace po {
             std::vector<poNode*>& userTypes);
         void walkNamespace(poNode* node, const std::vector<poNode*>& userTypes);
         void walkFunction(poNode* node, const std::vector<poNode*>& userTypes);
-        void walkStatement(poNode* node, const std::vector<poNode*>& userTypes);
+        void walkStatement(const int typeId, poNode* node, const std::vector<poNode*>& userTypes);
         void walkDecl(poMorphType* sourceType, poNode* node);
-        void walkDecl(poNode* node, const std::vector<poNode*>& types);
+        void walkDecl(const int typeId, poNode* node, const std::vector<poNode*>& types);
         void checkConstraints();
+        void checkTrait(const poType& traitData, const poType& paramTypeData, bool& ok);
         void generateMorphs();
         void morphASTs(const std::vector<poNode*>& nodes, std::vector<poNode*>& userTypes);
         void substituteFunctions(const std::string& namespaceName, std::vector<poNode*>& ns, poNode* node, std::vector<poNode*>& userTypes);
         void substituteConstructor(const std::string& namespaceName, std::vector<poNode*>& ns, poNode* node, std::vector<poNode*>& userTypes);
-        void substituteBody(poListNode* body, poListNode* generic, poMorphNode* morph, std::vector<poNode*>& nodes);
+        void substituteBody(poListNode* node, poListNode* generic, poMorphNode* morph, std::vector<poNode*>& nodes);
+        poNode* substituteBody(poNode* body, poListNode* generic, poMorphNode* morph);
         poNode* substituteStatement(poNode* statement, poListNode* generic, poMorphNode* morph);
+        poNode* substituteWhile(poNode* statement, poListNode* generic, poMorphNode* morph);
+        poNode* substituteIf(poNode* statement, poListNode* generic, poMorphNode* morph);
         poNode* substituteAssignment(poNode* assignment, poListNode* generic, poMorphNode* morph);
         poNode* substituteDecl(poNode* decl, poListNode* generic, poMorphNode* morph);
         poNode* substituteCast(poNode* cast, poListNode* generic, poMorphNode* morph);

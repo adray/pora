@@ -32,12 +32,14 @@ namespace po
         bool processWorklist(poMorph& morph, std::vector<poNode*>& work, std::vector<poNode*>& worklist);
         bool processMorphWorklist(poMorph& morph, std::vector<poMorphNode*>& work, std::vector<poMorphNode*>& worklist);
         bool generateSpecializations(poMorphNode* node, poListNode* typeNode, const std::string& name, const int typeId);
+        void checkTrait(const poType& traitData, const poType& paramTypeData, bool& ok);
         void resolveType(const std::string& name, poNamespace& ns, poListNode* typeNode);
         void resolveStatics(poNode* namespaceNode);
         void getPrototypeArgs(poListNode* prototypeNode, poListNode* parametricArgs, std::vector<int>& argTypes);
         void getNamespaces(poNode* node);
         void getStruct(poNode* node, poNamespace& ns, const int nsId);
         void getClass(poNode* node, poNamespace& ns, const int nsId);
+        void getTrait(poNode* node, poNamespace& ns, const int nsId);
         void getEnum(poNode* node, poNamespace& ns, const int nsId);
         void getExtern(poNode* node, poNamespace& ns);
         void getFunction(poNode* node, poNamespace& ns);
@@ -57,6 +59,7 @@ namespace po
 
         void updateArgs(poNode* nodes);
         bool isTypeResolved(poNode* node, bool isPointer, poListNode* parametricArgs);
+        bool isEqual(poNode* x, poNode* y);
 
         void setError(const std::string& errorText, const poToken& token);
 

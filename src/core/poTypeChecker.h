@@ -36,7 +36,8 @@ namespace po
         void checkFunctions(poNode* node);
         void checkExpression(poNode* classNode, poNode* node);
         void checkConstructor(poNode* node);
-        void pushGenericParameters(po::poListNode* genericArgs);
+        void pushGenericParameters(poListNode* genericArgs);
+        void popGenericParameters();
         void checkBody(poNode* node, const int returnType);
         void checkStatement(poNode* node, const int returnType);
         void checkConstructorCall(poNode* decl);
@@ -72,6 +73,7 @@ namespace po
         std::unordered_map<std::string, poListNode*> _functions;
         std::vector<std::string> _imports;
         std::vector<std::string> _genericParameters;
+        poListNode* _genericArgs;
         std::string _errorText;
         int _errorLine;
         int _errorCol;

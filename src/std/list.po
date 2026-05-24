@@ -17,6 +17,8 @@ namespace std {
         void erase(i64 pos);
         void resize(i64 capacity);
         void pop();
+        void clear();               // clears the data array and sets the capacity to the default value
+        void reset();               // resets the size to zero; thus clearing the data array and leaving the capacity the same
         T at(i64 pos);
     }
 
@@ -57,10 +59,11 @@ namespace std {
         }
         
         T[] old_arr = (T[0])_data;
-        for (i64 i = 0; i < _capacity; i = i + 1) {
+        i64 numElems = min(_capacity, capacity);
+        for (i64 i = 0; i < numElems; i = i + 1) {
             data[i] = old_arr[i];
         }
-        
+
         //freeArray(data);
         _data = (T*)data;
         _capacity = capacity;
@@ -71,7 +74,16 @@ namespace std {
             _size = _size - 1;
         }
     }
-    
+
+    void list<T>::clear() {
+        _size = 0;
+        resize(4);
+    }
+
+    void list<T>::reset() {
+        _size = 0;
+    }
+
     T list<T>::at(i64 pos) {
         if (pos < 0 ||
             pos >= _size) {

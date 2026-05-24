@@ -22,10 +22,12 @@ void poMorphCache:: add(poMorphNode* node)
         return;
     }
 
-    int hashCode = parameters[0].type();
+    std::hash<int> hash;
+
+    size_t hashCode = hash(parameters[0].type());
     for (int i = 1; i < int(parameters.size()); i++) {
         const poMorphParameter& param = parameters[i];
-        hashCode = (~hashCode << 3) ^ param.type();
+        hashCode ^= hash(param.type());
     }
 
     const auto& it = _items.find(hashCode);
@@ -35,7 +37,7 @@ void poMorphCache:: add(poMorphNode* node)
     else {
         std::vector<poMorphNode*> nodes;
         nodes.push_back(node);
-        _items.insert(std::pair<int, std::vector<poMorphNode*>>(hashCode, nodes));
+        _items.insert(std::pair<size_t, std::vector<poMorphNode*>>(hashCode, nodes));
     }
 }
 
@@ -46,9 +48,11 @@ poMorphNode* poMorphCache::find(const int type, const std::vector<int>& paramete
         return node;
     }
 
-    int hashCode = parameters[0];
+    std::hash<int> hash;
+
+    size_t hashCode = hash(parameters[0]);
     for (int i = 1; i < int(parameters.size()); i++) {
-        hashCode = (~hashCode << 3) ^ parameters[i];
+        hashCode ^= hash(parameters[i]);
     }
 
     const auto& it = _items.find(hashCode);
@@ -149,6 +153,7 @@ void poMorph::gatherTypesFromNamespace(poNode* child, std::vector<poNode*>& user
             switch (child->type()) {
             case poNodeType::CLASS:
             case poNodeType::STRUCT:
+            case poNodeType::TRAIT:
             case poNodeType::ENUM:
                 userTypes.push_back(child);
                 break;
@@ -537,10 +542,63 @@ void po::poMorph::substituteBody(poListNode* body, poListNode* generic, poMorphN
         if (child->type() == poNodeType::STATEMENT) {
             nodes.push_back(substituteStatement(child, generic, morph));
         }
+        else if (child->type() == poNodeType::WHILE) {
+            nodes.push_back(substituteWhile(child, generic, morph));
+        }
+        else if (child->type() == poNodeType::IF) {
+            nodes.push_back(substituteIf(child, generic, morph));
+        }
         else {
             nodes.push_back(child->clone());
         }
     }
+}
+
+poNode* poMorph::substituteBody(poNode* node, poListNode* generic, poMorphNode* morph)
+{
+    poListNode* body = static_cast<poListNode*>(node);
+    std::vector<poNode*> children;
+    substituteBody(body, generic, morph, children);
+
+    return new poListNode(
+        poNodeType::BODY,
+        children,
+        body->token()
+    );
+}
+
+poNode* poMorph::substituteIf(poNode* statement, poListNode* generic, poMorphNode* morph)
+{
+    poListNode* node = static_cast<poListNode*>(statement);
+
+    std::vector<poNode*> children;
+    for (poNode* child : node->list()) {
+        poNode* clone = substitute(child, generic, morph);
+        children.push_back(clone);
+    }
+
+    return new poListNode(
+        poNodeType::IF,
+        children,
+        node->token()
+    );
+}
+
+poNode* poMorph::substituteWhile(poNode* statement, poListNode* generic, poMorphNode* morph)
+{
+    poListNode* node = static_cast<poListNode*>(statement);
+
+    std::vector<poNode*> children;
+    for (poNode* child : node->list()) {
+        poNode* clone = substitute(child, generic, morph);
+        children.push_back(clone);
+    }
+
+    return new poListNode(
+        poNodeType::WHILE,
+        children,
+        node->token()
+    );
 }
 
 poNode* poMorph::substituteStatement(poNode* statement, poListNode* generic, poMorphNode* morph)
@@ -575,7 +633,7 @@ poNode* poMorph::substituteDecl(poNode* decl, poListNode* generic, poMorphNode* 
         clone = substituteAssignment(node->child(), generic, morph);
         break;
     default:
-        clone = substitute(node, generic, morph);
+        clone = substitute(node->child(), generic, morph);
         break;
     }
 
@@ -716,9 +774,6 @@ poNode* poMorph:: match(const poToken& token, poListNode* generic, poMorphNode* 
     poNode* found = nullptr;
     for (int i = 0; i < int(generic->list().size()); i++) {
         poNode* arg = generic->list()[i];
-        if (arg->type() == poNodeType::CONSTRAINT) {
-            arg = static_cast<poUnaryNode*>(arg)->child();
-        }
 
         const std::string& typeName = arg->token().string();
         if (token.string() == typeName) {
@@ -855,6 +910,9 @@ poNode* poMorph:: substitute(poNode* node, poListNode* generic, poMorphNode* mor
     case poNodeType::CALL:
         clone = substituteCall(node, generic, morph);
         break;
+    case poNodeType::BODY:
+        clone = substituteBody(node, generic, morph);
+        break;
     default:
         clone = node->clone();
         break;
@@ -874,8 +932,7 @@ void po::poMorph::substituteArgs(poListNode* args, poListNode* generic, poMorphN
             poToken& token = type->token();
             const std::string& typeName = generic->list()[j]->token().string();
             if (token.string() == typeName) {
-                poMorphParameter& param = morph->parameters()[i];
-                newType = substitute(param.node(), generic, morph);
+                newType = substitute(type, generic, morph);
             }
         }
 
@@ -962,7 +1019,8 @@ void poMorph::buildGraph(const std::vector<poNode*>& nodes,
     for (poNode* node : userTypes) {
         assert(node->type() == poNodeType::CLASS ||
             node->type() == poNodeType::STRUCT ||
-            node->type() == poNodeType::ENUM);
+            node->type() == poNodeType::ENUM ||
+            node->type() == poNodeType::TRAIT);
 
         std::vector<poNode*> parameters;
 
@@ -996,7 +1054,8 @@ void poMorph::buildGraph(const std::vector<poNode*>& nodes,
     for (poNode* node : userTypes) {
         assert(node->type() == poNodeType::CLASS ||
             node->type() == poNodeType::STRUCT ||
-            node->type() == poNodeType::ENUM);
+            node->type() == poNodeType::ENUM ||
+            node->type() == poNodeType::TRAIT);
 
         poListNode* type = static_cast<poListNode*>(node);
         const std::string& name = type->token().string();
@@ -1044,30 +1103,42 @@ void poMorph::walkFunction(poNode* node, const std::vector<poNode*>& userTypes)
 {
     poListNode* func = static_cast<poListNode*>(node);
     poListNode* body = nullptr;
+    poResolverNode* resolver = nullptr;
     for (poNode* child : func->list()) {
         if (child->type() == poNodeType::BODY) {
             body = static_cast<poListNode*>(child);
+        } else if (child->type() == poNodeType::RESOLVER) {
+            resolver = static_cast<poResolverNode*>(child);
+        }
+    }
+
+    int type = -1;
+    if (resolver && int(resolver->path().size()) > 0) {
+        const std::string path = resolver->path()[0];
+        const auto& it = _map.find(path);
+        if (it != _map.end()) {
+            type = it->second;
         }
     }
 
     if (body) {
         for (poNode* child : body->list()) {
             if (child->type() == poNodeType::STATEMENT) {
-                walkStatement(child, userTypes);
+                walkStatement(type, child, userTypes);
             }
         }
     }
 }
 
-void poMorph::walkStatement(poNode* node, const std::vector<poNode*>& userTypes)
+void poMorph::walkStatement(const int typeId, poNode* node, const std::vector<poNode*>& userTypes)
 {
     poUnaryNode* statement = static_cast<poUnaryNode*>(node);
     if (statement->child()->type() == poNodeType::DECL) {
-        walkDecl(statement->child(), userTypes);
+        walkDecl(typeId, statement->child(), userTypes);
     }
 }
 
-void poMorph::walkDecl(poNode* node, const std::vector<poNode*>& types)
+void poMorph::walkDecl(const int typeId, poNode* node, const std::vector<poNode*>& types)
 {
     poUnaryNode* decl = static_cast<poUnaryNode*>(node);
     poNode* type = decl->child();
@@ -1087,17 +1158,55 @@ void poMorph::walkDecl(poNode* node, const std::vector<poNode*>& types)
 
     int baseType = -1;
     poNode* typeNode = nullptr;
+    poListNode* typeArgs = nullptr;
+    poMorphType* sourceType = nullptr;
     if (generic) {
         const std::string baseTypeName = generic->token().string();
         const auto& it = _map.find(baseTypeName);
-        if (it == _map.end()) {
+        int genericTypeId = -1;
+        if (it != _map.end()) {
+            genericTypeId = it->second;
+        } else if (genericTypeId == -1 && typeId != -1) {
+            poListNode* genericNode = static_cast<poListNode*>(types[typeId]);
+            for (int i = 0; i < int(genericNode->list().size()); i++) {
+                poNode* child = genericNode->list()[i];
+                if (child->type() == poNodeType::GENERIC_ARGS) {
+                    typeArgs = static_cast<poListNode*>(child);
+                    break;
+                }
+            }
+
+            if (typeArgs) {
+                // Check the constraint
+                for (poNode* argNode : typeArgs->list()) {
+                    poNode* constraint = nullptr;
+                    if (argNode->type() == poNodeType::CONSTRAINT) {
+                        constraint = argNode;
+                        argNode = static_cast<poUnaryNode*>(argNode)->child();
+                    }
+
+                    assert(argNode->type() == poNodeType::TYPE);
+
+                    const poToken& typeToken = argNode->token();
+                    if (typeToken.string() == baseTypeName && constraint) {
+                        const auto& it = _map.find(constraint->token().string());
+                        if (it != _map.end()) {
+                            genericTypeId = it->second;
+                            sourceType = _typeMap[typeId + TYPE_OBJECT + 1];
+                            break;
+                        }
+                    }
+                }
+            }
+        } 
+        
+        if (genericTypeId == -1) {
             setError("Unable to find " + baseTypeName, generic->token());
             return;
         }
-        else {
-            baseType = it->second + TYPE_OBJECT + 1;
-            typeNode = types[it->second];
-        }
+
+        baseType = genericTypeId + TYPE_OBJECT + 1;
+        typeNode = types[genericTypeId];
     }
     else {
         // Return: not a generic type
@@ -1122,7 +1231,24 @@ void poMorph::walkDecl(poNode* node, const std::vector<poNode*>& types)
             assert(node->type() == poNodeType::TYPE ||
                 node->type() == poNodeType::POINTER);
 
+            int typeIndex = -1;
             int parameterType = poUtil::unpackTypeNode(_module, node);
+
+            if (parameterType == -1 && typeArgs) {
+                for (int i = 0; i < int(typeArgs->list().size()); i++) {
+                    poNode* argNode = typeArgs->list()[i];
+                    if (argNode->type() == poNodeType::CONSTRAINT) {
+                        argNode = static_cast<poUnaryNode*>(argNode)->child();
+                    }
+
+                    const poToken& typeToken = argNode->token();
+                    if (typeToken.string() == node->token().string()) {
+                        parameterType = baseType;
+                        typeIndex = i;
+                        break;
+                    }
+                }
+            }
 
             if (parameterType == -1) {
                 // Error: type not found
@@ -1130,7 +1256,12 @@ void poMorph::walkDecl(poNode* node, const std::vector<poNode*>& types)
                 break;
             }
 
-            types.push_back(poMorphParameter(parameterType, node));
+            if (typeIndex != -1) {
+                types.push_back(poMorphParameter(parameterType, typeIndex));
+            }
+            else {
+                types.push_back(poMorphParameter(parameterType, node));
+            }
         }
 
         std::vector<int> args;
@@ -1148,7 +1279,13 @@ void poMorph::walkDecl(poNode* node, const std::vector<poNode*>& types)
                 for (poMorphParameter& param : types) {
                     morphNode->parameters().push_back(param);
                 }
-                _nodes.push_back(morphNode);
+
+                if (sourceType) {
+                    sourceType->nodes().push_back(morphNode);
+                }
+                else {
+                    _nodes.push_back(morphNode);
+                }
                 _cache.add(morphNode);
             }
         }
@@ -1166,6 +1303,7 @@ void poMorph::setError(const std::string& errorText, const poToken& token) {
 }
 
 void poMorph:: checkConstraints() {
+    // TODO: is this duplication of the code in poTypeResolver?
     // Check each generic specialization satisfies the constraints.
 
     bool isValid = true;
@@ -1213,15 +1351,95 @@ void poMorph:: checkConstraints() {
                 }
             }
             else {
-                // TODO: search for trait and check the shape matches
+                // Search for trait and check the shape matches
 
-                isValid = false;
-                setError("Constraint not satisfied", constraint->token());
-                break;
+                bool ok = false;
+                const std::string name = constraint->token().string();
+                const int traitId = _module.getTypeFromName(name);
+                if (traitId >= 0) {
+                    ok = true;
+                    const int paramType = node->parameters()[i].type();
+                    const poType& paramTypeData = _module.types()[paramType];
+                    const poType& traitData = _module.types()[traitId];
+                    checkTrait(traitData, paramTypeData, ok);
+                }
+
+                if (!ok) {
+                    isValid = false;
+                    setError("Constraint not satisfied", constraint->token());
+                    break;
+                }
             }
         }
 
         if (!isValid) {
+            break;
+        }
+    }
+}
+
+void poMorph::checkTrait(const poType& traitData, const poType& paramTypeData, bool& ok)
+{
+    // TODO: this *is* duplication of the code in poTypeResolver
+
+    std::vector<int> constraints;
+    constraints.resize(traitData.parametricArgs().size());
+
+    for (const poMemberFunction& traitFunc : traitData.functions()) {
+        // Find the matching function (or fail if not)
+        bool found = false;
+        for (const poMemberFunction& func : paramTypeData.functions()) {
+            if (traitFunc.name() !=
+                func.name()) {
+                continue;
+            }
+
+            if (traitFunc.arguments().size() !=
+                func.arguments().size()) {
+                continue;
+            }
+
+            if (traitFunc.returnType() !=
+                func.returnType()) {
+                continue;
+            }
+
+            bool argsMatch = true;
+            for (int i = 0; i < int(traitFunc.arguments().size()); i++) {
+                int traitArg = traitFunc.arguments()[i];
+                int funcArg = func.arguments()[i];
+                const poType& traitArgType = _module.types()[traitArg];
+                if (traitArgType.isPointer()) {
+                    traitArg = traitArgType.baseType();
+                }
+
+                if (traitArg >= TYPE_PARAMETRIC_1 &&
+                    traitArg <= TYPE_PARAMETRIC_4) {
+                    // Remap type - if the constraint has not been specified set it
+                    // otherwise check if it is constraint
+                    if (constraints[traitArg - TYPE_PARAMETRIC_1] == 0) {
+                        constraints[traitArg - TYPE_PARAMETRIC_1] = funcArg;
+                        continue;
+                    }
+                    else {
+                        traitArg = constraints[traitArg - TYPE_PARAMETRIC_1];
+                    }
+                }
+
+                if (traitArg != funcArg) {
+                    argsMatch = false;
+                    break;
+                }
+            }
+
+            found = argsMatch;
+            if (found) {
+                break;
+            }
+        }
+
+        if (!found) {
+            ok = false;
             break;
         }
     }
@@ -1241,17 +1459,67 @@ void poMorph::walkDecl(poMorphType* sourceType, poNode* node)
         generic = static_cast<poGenericNode*>(type);
     }
 
+    poListNode* genericArgs = nullptr;
+    if (sourceType) {
+        poListNode* ast = static_cast<poListNode*>(sourceType->node());
+        for (poNode* child : ast->list()) {
+            if (child->type() == poNodeType::GENERIC_ARGS) {
+                genericArgs = static_cast<poListNode*>(child);
+            }
+        }
+    }
+
+    // We have something like: class A<?> { N n }
+    // A<?> must be a generic type since it has poMorphType
+    // Different paths:
+    // 1) N is a fixed type. Do nothing.
+    // 2) N is a fixed generic type. 
+    // 3) N is a generic parameter of a non-generic trait.
+    // 4) N is a generic parameter of a generic trait.
+    // For cases 2-4 in which case add a poMorphNode flowing from this node.
+    //
+
     bool error = false;
     int baseType = -1;
     poMorphType* typeNode = nullptr;
     if (generic) {
+        int nodeType = -1;
         const std::string baseTypeName = generic->token().string();
-        const auto& it = _map.find(baseTypeName);
-        if (it == _map.end()) {
+
+        if (genericArgs) {
+            for (poNode* argNode : genericArgs->list()) {
+                poNode* constraint = nullptr;
+                if (argNode->type() == poNodeType::CONSTRAINT) {
+                    constraint = argNode;
+                    argNode = static_cast<poUnaryNode*>(argNode)->child();
+                }
+
+                assert(argNode->type() == poNodeType::TYPE);
+
+                const poToken& typeToken = argNode->token();
+                if (typeToken.string() == baseTypeName &&  constraint) {
+                    const auto& it = _map.find(constraint->token().string());
+                    if (it != _map.end()) {
+                        nodeType = it->second;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (nodeType == -1) {
+            const auto& it = _map.find(baseTypeName);
+            if (it != _map.end()) {
+                nodeType = it->second;
+            }
+        }
+
+        if (nodeType == -1) {
             error = true;
+            setError("Cannot find type '" + baseTypeName + "'", generic->token());
         }
         else {
-            baseType = it->second + TYPE_OBJECT + 1;
+            baseType = nodeType + TYPE_OBJECT + 1;
             typeNode = _typeMap[baseType];
         }
     } else {
@@ -1268,16 +1536,6 @@ void poMorph::walkDecl(poMorphType* sourceType, poNode* node)
         }
 
         // Constraint [parameters] flows into the decl type
-
-        poListNode* genericArgs = nullptr;
-        if (sourceType) {
-            poListNode* ast = static_cast<poListNode*>(sourceType->node());
-            for (poNode* child : ast->list()) {
-                if (child->type() == poNodeType::GENERIC_ARGS) {
-                    genericArgs = static_cast<poListNode*>(child);
-                }
-            }
-        }
 
         std::vector<poMorphParameter> types;
         for (poNode* node : generic->nodes()) {
@@ -1319,6 +1577,7 @@ void poMorph::walkDecl(poMorphType* sourceType, poNode* node)
 
             if (parameterType == -1) {
                 // Error: type not found
+                setError("Type not found", token);
                 error = true;
                 break;
             }
@@ -1334,6 +1593,10 @@ void poMorph::walkDecl(poMorphType* sourceType, poNode* node)
             else {
                 types.push_back(poMorphParameter(parameterType, typeIndex));
             }
+        }
+
+        if (error) {
+            return;
         }
 
         std::vector<int> args;

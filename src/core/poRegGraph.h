@@ -57,6 +57,7 @@ namespace po
         void insert(const poInterferenceGraph_Node& node);
         void calculateAffinity(const poPhiWeb& web);
         void colorGraph(const int numColors, const int numSpills);
+        void removeFromNeighbours(po::poInterferenceGraph_Node& node, int i);
         inline const std::vector<poInterferenceGraph_Node>& nodes() const { return _nodes; }
         const int findNode(const int variable, const int pos) const;
 

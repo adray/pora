@@ -1,0 +1,24 @@
+import std;
+namespace Test {
+    static void main() {
+        map<i64, i64, hash_int64> map;
+        for (i64 i = 0; i < 100; i = i + 1) {
+            map.insert(i, i);
+        }
+        
+        boolean erased = map.erase(55);
+        if (erased) {
+            i64 val;
+            if (map.find(55, &val)) {
+                print_64(val);
+            } else {
+                println("Erased", (u32)7);
+            }
+        }
+        
+        erased = map.erase(200);
+        if (erased == false) {
+            println("Not erased", (u32)11);
+        }
+    }
+}
