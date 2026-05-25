@@ -1,6 +1,6 @@
 # Pora 
 
-Pora is an experimental programming language which aims to be streamlined and aesthetically pleasing. It is multi paradigm namely, OOP and producural. It is a manually memory managed language, statically typed and AOT compiled. It is written in C++ with no other external dependicies - other than CMake used for the build system.
+Pora is an experimental programming language which aims to be streamlined and aesthetically pleasing. It is multi paradigm namely, OOP and producural. It is a manually memory managed language, statically typed and AOT compiled. It is written in C++ with no other external dependicies - other than CMake used for the build system. Windows and Linux (tested on Arch Linux) are supported.
 
 Here is an example of the clock class found in std\win\clock.po. 
 ```
@@ -122,5 +122,23 @@ Generics are supported, here is a sample from the map class.
 
         private void resize(i64 capacity);
     }
+```
+
+## Building the examples
+
+Via the command line enter into the examples directory. For example building ProcApp.
+```
+porac.exe /O2 ProcApp.po /std:..\std
+```
+The valid optimization levels:
+* O2 - Full optimization (Default)
+* O1 - No inlining
+* O0 - No optimizations
+
+## Running the tests
+
+To run the tests we need supply the directory where the test cases are found, then the path to the compiler, the standard library path and finally the optimization level to be passed to the compiler.
+```
+poratest.exe "\src\test\cases" "porac.exe" "\src\std" -O2
 ```
 

@@ -1545,8 +1545,10 @@ void poTypeResolver::getPrototypeArgs(poListNode* prototypeNode, poListNode* par
                     }
                 }
 
-                const int variableType = getPointerType(typeId, pointerCount);
-                argTypes.push_back(variableType);
+                if (typeId != -1) {
+                    const int variableType = getPointerType(typeId, pointerCount);
+                    argTypes.push_back(variableType);
+                }
             }
         }
     }

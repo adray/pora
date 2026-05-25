@@ -59,6 +59,7 @@ static bool openLibraryFile(const std::string& fileName, poCommonObjectFileForma
     std::cout << "Failed to open " << fileName << std::endl;
     return false;
 }
+
 #else
 static bool openLibraryFile(const std::string& fileName, poELF& elf)
 {
@@ -113,6 +114,37 @@ static bool openLibraryFile(const std::string& fileName, poELF& elf)
     return false;
 }
 #endif
+
+static void addStdLibrary(const std::string& path, poCompiler& compiler)
+{
+    std::filesystem::path dir(path);
+    if (!std::filesystem::exists(dir) || !std::filesystem::is_directory(dir)) {
+        std::cout << "Failed to add std library files." << std::endl;
+        return;
+    }
+
+#ifdef WIN32
+    const std::string osDir = "win";
+#else
+    const std::string osDir = "unix";
+#endif
+
+    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+        if (entry.is_directory()) {
+            if (entry.path().filename() == osDir) {
+                for (const auto& entry : std::filesystem::directory_iterator(entry)) {
+                    if (entry.is_regular_file()) {
+                        std::cout << "Compiling " << entry.path().string() << std::endl;
+                        compiler.addFile(entry.path().string());
+                    }
+                }
+            }
+        } else {
+            std::cout << "Compiling " << entry.path().string() << std::endl;
+            compiler.addFile(entry.path().string());
+        }
+    }
+}
 
 static int align(const int size, const int alignment)
 {
@@ -179,9 +211,9 @@ int main(const int numArgs, const char** const args)
             {
                 compiler.setDebugDump(true);
             }
-            else if (arg.starts_with("/dump"))
+            else if (arg.starts_with("/dump:"))
             {
-                if (arg.size() > 5 && arg[5] == ':')
+                if (arg.size() > 6)
                 {
                     compiler.setDebugDumpName(arg.substr(6));
                 }
@@ -199,6 +231,14 @@ int main(const int numArgs, const char** const args)
             else if (arg == "/O2")
             {
                 compiler.setOptimizationLevel(OPTIMIZATION_LEVEL_2);
+            }
+            else if (arg.starts_with("/std:"))
+            {
+                if (arg.size() > 5)
+                {
+                    std::string stdPath = arg.substr(5);
+                    addStdLibrary(stdPath, compiler);
+                }
             }
             else
             {
