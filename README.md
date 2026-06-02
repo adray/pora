@@ -2,6 +2,17 @@
 
 Pora is an experimental programming language which aims to be streamlined and aesthetically pleasing. It is multi paradigm namely, OOP and producural. It is a manually memory managed language, statically typed and AOT compiled. It is written in C++ with no other external dependicies - other than CMake used for the build system. Windows and Linux (tested on Arch Linux) are supported.
 
+## Architecture
+* Parser written using recursive descent
+* Generics based monomorphization (performed on the AST)
+* SSA based IR
+* Optimizations: Constant folding on the AST. Inlining and Deadcode elimination in SSA form
+* Graph colouring register allocator
+* Lowering to x86_64 instructions
+* ELF and PE generation (On Linux linked with glibc)
+
+## Samples
+
 Here is an example of the clock class found in std\win\clock.po. 
 ```
 namespace std
